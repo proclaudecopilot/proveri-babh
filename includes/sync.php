@@ -124,14 +124,65 @@ add_action('babh6_sync_process', 'babh6_sync_process_cron');
 
 /* ============ HTTP ============ */
 
-function babh6_sync_http_args($extra = array()) {
-    $args = array(
-        'timeout'    => 60,
-        'redirection' => 5,
-        'user-agent' => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 proveri-babh/' . BABH6_VERSION,
-        'headers'    => array('Accept-Language' => 'bg,en;q=0.8'),
+/**
+ * HTTP стратегии — порталът на БАБХ (IBM WebSphere) понякога затваря връзката
+ * без отговор (cURL 52) или праща бавно. Пробваме ги подред; работещата се
+ * запомня и се ползва първа следващия път.
+ */
+function babh6_sync_strategies() {
+    $chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+    $list = array(
+        'default' => array('ua' => $chrome . ' proveri-babh/' . BABH6_VERSION),
+        'http11'  => array('ua' => $chrome, 'http11' => true, 'nogzip' => true, 'close' => true),
+        'plain'   => array('ua' => 'Mozilla/5.0', 'http11' => true, 'nogzip' => true, 'close' => true, 'minimal' => true),
     );
+    $list = apply_filters('babh6_sync_strategies', $list);
+    $pref = (string)get_option('babh6_sync_strategy', '');
+    if ($pref !== '' && isset($list[$pref])) $list = array($pref => $list[$pref]) + $list;
+    return $list;
+}
+
+function babh6_sync_http_args($extra = array(), $strategy = array()) {
+    $headers = array();
+    if (empty($strategy['minimal'])) {
+        $headers['Accept-Language'] = 'bg,en;q=0.8';
+        $headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+    }
+    if (!empty($strategy['nogzip'])) $headers['Accept-Encoding'] = 'identity';
+    if (!empty($strategy['close']))  $headers['Connection'] = 'close';
+    $args = array(
+        'timeout'     => 60,
+        'redirection' => 5,
+        'user-agent'  => isset($strategy['ua']) ? $strategy['ua'] : 'Mozilla/5.0',
+        'headers'     => $headers,
+        'decompress'  => empty($strategy['nogzip']),
+    );
+    if (isset($extra['headers'])) { $args['headers'] = array_merge($headers, $extra['headers']); unset($extra['headers']); }
+    $GLOBALS['babh6_sync_curl'] = $strategy;
     return apply_filters('babh6_sync_http_args', array_merge($args, $extra));
+}
+
+/* cURL опции по стратегия (WP пуска http_api_curl преди всяка заявка) */
+add_action('http_api_curl', function ($handle) {
+    if (empty($GLOBALS['babh6_sync_curl']) || !is_array($GLOBALS['babh6_sync_curl'])) return;
+    $st = $GLOBALS['babh6_sync_curl'];
+    if (!empty($st['http11']) && defined('CURL_HTTP_VERSION_1_1')) curl_setopt($handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+    if (!empty($st['close'])) { curl_setopt($handle, CURLOPT_FORBID_REUSE, true); curl_setopt($handle, CURLOPT_FRESH_CONNECT, true); }
+    if (!empty($st['nogzip'])) curl_setopt($handle, CURLOPT_ENCODING, 'identity');
+}, 10, 1);
+
+/** Ред в дневника на текущата проверка (пази се в state.last_log, макс. 40 реда). */
+function babh6_sync_log($line) {
+    $s = babh6_sync_state();
+    $log = isset($s['last_log']) && is_array($s['last_log']) ? $s['last_log'] : array();
+    $log[] = date_i18n('H:i:s') . ' ' . $line;
+    if (count($log) > 40) $log = array_slice($log, -40);
+    babh6_sync_state_set(array('last_log' => $log));
+}
+
+function babh6_sync_err_short($e) {
+    $m = is_wp_error($e) ? $e->get_error_message() : (string)$e;
+    return mb_substr($m, 0, 160, 'UTF-8');
 }
 
 function babh6_sync_timeout() {
@@ -140,35 +191,69 @@ function babh6_sync_timeout() {
 }
 
 /**
- * Тегли HTML-а на страницата на регистъра. Порталът на БАБХ (IBM WebSphere)
- * праща страницата бавно и на части, затова стриймваме във файл: при timeout
- * ползваме вече полученото, ако линковете са вътре (проверява се после).
- * @return array|WP_Error {html, partial(bool), note}
+ * Тегли HTML-а на страницата на регистъра с дадена стратегия. Порталът на
+ * БАБХ праща страницата бавно и на части, затова стриймваме във файл: при
+ * timeout ползваме вече полученото, ако линковете са вътре (проверява се после).
+ * @return array|WP_Error {html, partial(bool), note, secs, bytes, cookies}
  */
-function babh6_sync_fetch_page($url) {
+function babh6_sync_fetch_page($url, $strategy = array()) {
     $dir = wp_upload_dir();
     $base = trailingslashit($dir['basedir']) . 'babh6';
     wp_mkdir_p($base);
     $tmp = $base . '/page-' . time() . '-' . wp_rand(100, 999) . '.html';
     $timeout = babh6_sync_timeout();
     $t0  = microtime(true);
-    $res = wp_remote_get($url, babh6_sync_http_args(array('timeout' => $timeout, 'stream' => true, 'filename' => $tmp,
-        'headers' => array('Accept-Language' => 'bg,en;q=0.8', 'Accept' => 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'))));
-    $secs = round(microtime(true) - $t0);
+    $res = wp_remote_get($url, babh6_sync_http_args(array('timeout' => $timeout, 'stream' => true, 'filename' => $tmp), $strategy));
+    $secs = round(microtime(true) - $t0, 1);
     $body = is_file($tmp) ? (string)file_get_contents($tmp) : '';
     @unlink($tmp);
+    $bytes = strlen($body);
     if (is_wp_error($res)) {
         if ($body !== '') {
-            return array('html' => $body, 'partial' => true,
-                'note' => $res->get_error_message() . ' — ползвам получените ' . number_format_i18n(strlen($body)) . ' байта за ' . $secs . ' сек.');
+            return array('html' => $body, 'partial' => true, 'secs' => $secs, 'bytes' => $bytes, 'cookies' => array(),
+                'note' => $res->get_error_message() . ' — ползвам получените ' . number_format_i18n($bytes) . ' байта за ' . $secs . ' сек.');
         }
+        $res->add_data(array('secs' => $secs));
         return $res;
     }
     $code = (int)wp_remote_retrieve_response_code($res);
-    if ($code !== 200) return new WP_Error('babh6_sync_http', 'Порталът на БАБХ върна HTTP ' . $code . '.');
+    if ($code !== 200) return new WP_Error('babh6_sync_http', 'Порталът на БАБХ върна HTTP ' . $code . ' (' . $secs . ' сек).');
     if ($body === '') $body = (string)wp_remote_retrieve_body($res);
-    if ($body === '') return new WP_Error('babh6_sync_empty', 'Порталът на БАБХ върна празен отговор.');
-    return array('html' => $body, 'partial' => false, 'note' => 'Страницата е свалена за ' . $secs . ' сек.');
+    if ($body === '') return new WP_Error('babh6_sync_empty', 'Порталът на БАБХ върна празен отговор (HTTP 200, ' . $secs . ' сек).');
+    $bytes = strlen($body);
+    return array('html' => $body, 'partial' => false, 'secs' => $secs, 'bytes' => $bytes,
+        'cookies' => (array)wp_remote_retrieve_cookies($res),
+        'note' => 'Страницата е свалена за ' . $secs . ' сек (' . number_format_i18n($bytes) . ' байта).');
+}
+
+/**
+ * Пробва стратегиите подред (до 2 кръга, ако провалите са бързи — напр.
+ * cURL 52). Връща резултата на първата успешна + името ѝ в 'strategy'.
+ */
+function babh6_sync_fetch_page_retry($url) {
+    $last = null;
+    for ($round = 1; $round <= 2; $round++) {
+        $quick_fail = true;
+        foreach (babh6_sync_strategies() as $name => $st) {
+            babh6_sync_state_set(array('last_message' => 'Свалям страницата на БАБХ (' . $name . ', кръг ' . $round . ', до ' . babh6_sync_timeout() . ' сек)…'));
+            $r = babh6_sync_fetch_page($url, $st);
+            if (!is_wp_error($r)) {
+                babh6_sync_log('страница [' . $name . '] OK: ' . $r['note']);
+                update_option('babh6_sync_strategy', $name);
+                $r['strategy'] = $name;
+                return $r;
+            }
+            $d = $r->get_error_data();
+            $secs = is_array($d) && isset($d['secs']) ? $d['secs'] : 0;
+            babh6_sync_log('страница [' . $name . '] грешка: ' . babh6_sync_err_short($r));
+            if ($secs > 15) $quick_fail = false;
+            $last = $r;
+            sleep(3);
+        }
+        if (!$quick_fail) break;
+        if ($round === 1) { babh6_sync_log('всички стратегии паднаха бързо — пауза 15 сек и втори кръг'); sleep(15); }
+    }
+    return $last;
 }
 
 /**
@@ -237,18 +322,37 @@ function babh6_sync_signature($links) {
     return md5(implode("\n", $paths));
 }
 
-/** Сваля файл на диска (stream). Проверява, че е XLSX (zip) а не HTML страница. */
-function babh6_sync_download($url, $dest) {
-    $res = wp_remote_get($url, babh6_sync_http_args(array('timeout' => max(300, 2 * babh6_sync_timeout()), 'stream' => true, 'filename' => $dest)));
-    if (is_wp_error($res)) { @unlink($dest); return $res; }
-    $code = (int)wp_remote_retrieve_response_code($res);
-    if ($code !== 200) { @unlink($dest); return new WP_Error('babh6_sync_dl', 'HTTP ' . $code . ' при сваляне на ' . $url); }
-    $size = @filesize($dest);
-    $fh = @fopen($dest, 'rb');
-    $magic = $fh ? fread($fh, 2) : '';
-    if ($fh) fclose($fh);
-    if (!$size || $magic !== 'PK') { @unlink($dest); return new WP_Error('babh6_sync_notxlsx', 'Сваленият файл не е .xlsx (получих ' . (int)$size . ' байта): ' . $url); }
-    return $dest;
+/** Сваля файл на диска (stream) с повторни опити. Проверява, че е XLSX (zip) а не HTML страница. */
+function babh6_sync_download($url, $dest, $strategy = array(), $referer = '', $cookies = array()) {
+    $headers = array();
+    if ($referer) $headers['Referer'] = $referer;
+    $err = null;
+    for ($try = 1; $try <= 3; $try++) {
+        $t0  = microtime(true);
+        $res = wp_remote_get($url, babh6_sync_http_args(array(
+            'timeout' => max(300, 2 * babh6_sync_timeout()), 'stream' => true, 'filename' => $dest,
+            'headers' => $headers, 'cookies' => $cookies,
+        ), $strategy));
+        $secs = round(microtime(true) - $t0, 1);
+        if (is_wp_error($res)) {
+            $err = new WP_Error('babh6_sync_dl', $res->get_error_message() . ' при сваляне на ' . basename(rawurldecode($url)) . ' (' . $secs . ' сек)');
+        } else {
+            $code = (int)wp_remote_retrieve_response_code($res);
+            $size = (int)@filesize($dest);
+            $fh = @fopen($dest, 'rb');
+            $magic = $fh ? fread($fh, 2) : '';
+            if ($fh) fclose($fh);
+            if ($code === 200 && $size > 0 && $magic === 'PK') {
+                babh6_sync_log('файл OK: ' . basename(rawurldecode($url)) . ' — ' . number_format_i18n($size) . ' байта за ' . $secs . ' сек');
+                return $dest;
+            }
+            $err = new WP_Error('babh6_sync_notxlsx', ($code !== 200 ? 'HTTP ' . $code : 'Отговорът не е .xlsx') . ' при сваляне на ' . basename(rawurldecode($url)) . ' (' . number_format_i18n($size) . ' байта, ' . $secs . ' сек)');
+        }
+        @unlink($dest);
+        babh6_sync_log('файл опит ' . $try . '/3 грешка: ' . babh6_sync_err_short($err));
+        if ($try < 3) sleep(5 * $try);
+    }
+    return $err;
 }
 
 /* ============ Основно изпълнение ============ */
@@ -286,11 +390,12 @@ function babh6_sync_run($force = false, $context = 'cron') {
 
 function babh6_sync_run_locked($force, $context, $now) {
     $url = babh6_sync_url();
-    babh6_sync_state_set(array('last_result' => 'running', 'last_message' => 'Свалям страницата на БАБХ (до ' . babh6_sync_timeout() . ' сек)…', 'queued_force' => 0));
+    babh6_sync_state_set(array('last_result' => 'running', 'last_message' => 'Свалям страницата на БАБХ (до ' . babh6_sync_timeout() . ' сек)…', 'queued_force' => 0, 'last_log' => array()));
+    babh6_sync_log('старт (' . $context . ($force ? ', принудително' : '') . ') → ' . $url);
 
-    $page = babh6_sync_fetch_page($url);
+    $page = babh6_sync_fetch_page_retry($url);
     if (is_wp_error($page)) {
-        return babh6_sync_fail($now, $page->get_error_message() . ' Порталът е бавен — вдигни „Timeout за портала" в настройките и опитай пак.', $context);
+        return babh6_sync_fail($now, 'Страницата на БАБХ: ' . $page->get_error_message() . ' Опитах всички HTTP стратегии — виж дневника. Ако е timeout, вдигни „Timeout за портала".', $context);
     }
     $html  = $page['html'];
     $links = babh6_sync_parse_links($html, babh6_sync_base($url));
@@ -302,6 +407,7 @@ function babh6_sync_run_locked($force, $context, $now) {
         return babh6_sync_fail($now, 'Порталът отговори частично (' . $page['note'] . ') и не мога да гарантирам, че списъкът с файлове е пълен (намерих ' . count($links) . '). Вдигни „Timeout за портала" и опитай пак.', $context);
     }
 
+    babh6_sync_log('намерени ' . count($links) . ' файла: ' . implode('; ', array_map(function ($l) { return basename(rawurldecode(str_replace('+', ' ', $l['path']))); }, $links)));
     $sig     = babh6_sync_signature($links);
     $updated = babh6_sync_parse_updated($html);
     $state   = babh6_sync_state();
@@ -324,10 +430,10 @@ function babh6_sync_run_locked($force, $context, $now) {
     foreach ($links as $i => $l) {
         babh6_sync_state_set(array('last_message' => 'Свалям файл ' . ($i + 1) . '/' . count($links) . ' от БАБХ…'));
         $tmp = $base . '/dl-' . time() . '-' . ($i + 1) . '.tmp';
-        $r = babh6_sync_download($l['url'], $tmp);
+        $r = babh6_sync_download($l['url'], $tmp, babh6_sync_strategy_by_name($page['strategy']), $url, $page['cookies']);
         if (is_wp_error($r)) {
             foreach ($files as $f) @unlink($f['src']);
-            return babh6_sync_fail($now, $r->get_error_message(), $context);
+            return babh6_sync_fail($now, 'Файл ' . ($i + 1) . '/' . count($links) . ': ' . $r->get_error_message() . ' (3 опита — виж дневника).', $context);
         }
         $name = basename(rawurldecode(str_replace('+', ' ', $l['path'])));
         $files[] = array('src' => $tmp, 'name' => sanitize_file_name($name), 'title' => $l['title']);
@@ -348,6 +454,11 @@ function babh6_sync_run_locked($force, $context, $now) {
     return array('status' => 'started', 'message' => $msg);
 }
 
+function babh6_sync_strategy_by_name($name) {
+    $all = babh6_sync_strategies();
+    return isset($all[$name]) ? $all[$name] : array();
+}
+
 function babh6_sync_base($url) {
     $p = wp_parse_url($url);
     if (empty($p['host'])) return 'https://bfsa.egov.bg';
@@ -355,8 +466,11 @@ function babh6_sync_base($url) {
 }
 
 function babh6_sync_fail($now, $message, $context) {
+    babh6_sync_log('ГРЕШКА: ' . $message);
     babh6_sync_state_set(array('last_check' => $now, 'last_result' => 'error', 'last_message' => $message));
-    babh6_sync_notify('Грешка при автоматично обновяване от БАБХ', "Проверката (" . $context . ") не успя:\n\n" . $message . "\n\nАдрес: " . babh6_sync_url());
+    $st = babh6_sync_state();
+    babh6_sync_notify('Грешка при автоматично обновяване от БАБХ', "Проверката (" . $context . ") не успя:\n\n" . $message . "\n\nАдрес: " . babh6_sync_url() .
+        "\n\nДневник:\n" . implode("\n", isset($st['last_log']) ? (array)$st['last_log'] : array()));
     return array('status' => 'error', 'message' => $message);
 }
 
@@ -540,6 +654,11 @@ function babh6_sync_admin_section() {
         echo implode(', ', $parts) . (!empty($state['portal_updated']) ? ' · актуализация на портала: ' . esc_html(date_i18n('d.m.Y', strtotime($state['portal_updated']))) : '') . '</li>';
     }
     echo '</ul>';
+
+    if (!empty($state['last_log'])) {
+        echo '<details style="margin:0 0 12px"><summary style="cursor:pointer;color:#2271b1">Дневник на последната проверка</summary>';
+        echo '<pre style="background:#f6f7f7;border:1px solid #dcdcde;border-radius:4px;padding:8px 10px;font-size:11px;white-space:pre-wrap;max-height:260px;overflow:auto;margin:6px 0 0">' . esc_html(implode("\n", (array)$state['last_log'])) . '</pre></details>';
+    }
 
     if (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) {
         echo '<p style="color:#dba617"><b>Внимание:</b> <code>DISABLE_WP_CRON</code> е включен. Графикът работи само ако системен cron вика <code>wp-cron.php</code> (напр. на всеки 5 мин).</p>';
