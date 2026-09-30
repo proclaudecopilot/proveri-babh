@@ -722,3 +722,13 @@ body.babh6-body { margin: 0; background: #ECECE8; font-family: 'Geist', system-u
 }
 /* лентата с брой/подреждане остава видима под горната лента */
 @media (min-width: 901px) { .b6-pres > .b6-rbar { position: sticky; top: calc(60px + var(--wp-admin--admin-bar--height, 0px)); z-index: 20; background: var(--bg); padding: 10px 0; margin: -10px 0 2px; } }
+
+/* v6.7.2: търсене в профила на фирма */
+.b6-pdq { position: relative; display: flex; align-items: center; margin: 18px 0 0; }
+.b6-pdq > svg { position: absolute; left: 14px; width: 17px; height: 17px; color: var(--acc); pointer-events: none; }
+.b6-pdq input { width: 100%; height: 46px; padding: 0 40px 0 42px; font-size: 15px; background: var(--bg-card); border: 1px solid var(--bd); border-radius: 12px; }
+.b6-pdq input:focus { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(230,106,61,.14); outline: none; }
+.b6-pdq .clr { position: absolute; right: 8px; width: 30px; height: 30px; border: 0; border-radius: 8px; background: var(--bg-soft); color: var(--t3); display: none; align-items: center; justify-content: center; cursor: pointer; }
+.b6-pdq .clr.show { display: flex; }
+.b6-pdq .clr svg { width: 13px; height: 13px; }
+.b6-dw-b .b6-pdq + .b6-seg { margin-top: 12px; }
