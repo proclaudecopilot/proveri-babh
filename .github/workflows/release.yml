@@ -1,0 +1,49 @@
+# Автоматичен Release: при всеки push в main чете версията от babh-register-v6.php.
+# Ако таг vX.Y.Z за нея още няма — прави babh-register-v6.zip (папка babh-register-v6/
+# вътре, както WP го очаква), създава тага и Release-а. Плъгинът на сайта вижда
+# новия release и предлага Update (или се обновява сам с auto-updates).
+# Т.е. „нова версия" = вдигни версията в babh-register-v6.php и push-ни. Нищо друго.
+name: release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: release
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Read version
+        id: v
+        run: |
+          VER=$(grep -m1 -E '^\s*\*\s*Version:' babh-register-v6.php | sed -E 's/.*Version:\s*//; s/\s+$//')
+          CONST=$(grep -m1 -E "define\(\s*'BABH6_VERSION'" babh-register-v6.php | sed -E "s/.*'BABH6_VERSION'[^']*'([0-9.]+)'.*/\1/")
+          echo "header=$VER const=$CONST"
+          [ -n "$VER" ] && [ "$VER" = "$CONST" ] || { echo "::error::Version: ($VER) и BABH6_VERSION ($CONST) не съвпадат"; exit 1; }
+          if git ls-remote --exit-code --tags origin "v$VER" >/dev/null 2>&1; then echo "exists=1" >> "$GITHUB_OUTPUT"; echo "Таг v$VER вече има — няма нов release"; else echo "exists=0" >> "$GITHUB_OUTPUT"; fi
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+      - name: PHP lint
+        if: steps.v.outputs.exists == '0'
+        run: |
+          sudo apt-get install -y -qq php-cli >/dev/null
+          for f in $(find . -name '*.php' -not -path './.git/*'); do php -l "$f" >/dev/null || exit 1; done
+      - name: Build zip
+        if: steps.v.outputs.exists == '0'
+        run: |
+          mkdir -p build/babh-register-v6
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'build' --exclude '*.md' --exclude '.gitignore' ./ build/babh-register-v6/
+          cd build && zip -qr ../babh-register-v6.zip babh-register-v6 && cd ..
+          unzip -l babh-register-v6.zip | tail -1
+      - name: Release v${{ steps.v.outputs.ver }}
+        if: steps.v.outputs.exists == '0'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.ver }}
+          target_commitish: ${{ github.sha }}
+          name: v${{ steps.v.outputs.ver }}
+          files: babh-register-v6.zip
+          generate_release_notes: true
