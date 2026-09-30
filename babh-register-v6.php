@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Регистър на добавките — версия 6
  * Description: Търсене в данни от регистъра на хранителните добавки на БАБХ. Качване на Excel файловете на регистъра или автоматично изтегляне от портала на БАБХ по график, преглед на продукти, профили на производители и търговци, изтегляне на резултатите в CSV. За вграждане в страница: [babh_register].
- * Version: 6.5.1
+ * Version: 6.6.0
  * GitHub Plugin URI: proclaudecopilot/proveri-babh
  * Author: BABH Register
  * Requires PHP: 7.4
@@ -11,7 +11,10 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BABH6_VERSION', '6.5.1');
+define('BABH6_VERSION', '6.6.0');
+/* Версия на правилата за производни данни (категории, автоматични бележки, ключове на фирмите).
+   При промяна всички записи се преизчисляват на порции (AD-01). */
+define('BABH6_RULES_VERSION', '2026-09-30.1');
 define('BABH6_PATH', plugin_dir_path(__FILE__));
 define('BABH6_URL', plugin_dir_url(__FILE__));
 
@@ -41,18 +44,24 @@ function babh6_deactivate() {
     wp_clear_scheduled_hook('babh6_sync_process');
 }
 
-/* Upgrade-safe: пресъздава таблиците при промяна на версията (на init — важи и за WP-Cron, не само за админа) */
+/* Upgrade-safe: пресъздава таблиците при промяна на версията (на init — важи и за WP-Cron, не само за админа).
+   Версията се записва чак след като миграционните стъпки са изпълнени (AD-06); при прекъсване се повтарят. */
 add_action('init', function () {
     if (get_option('babh6_version') !== BABH6_VERSION) {
+        if (get_transient('babh6_migrating')) return;
+        set_transient('babh6_migrating', 1, 5 * MINUTE_IN_SECONDS);
         babh6_create_tables();
-        update_option('babh6_version', BABH6_VERSION);
         /* Години под 2000 или в бъдещето са от грешни рег. номера → без година (v6.5) */
         global $wpdb;
         $wpdb->query($wpdb->prepare("UPDATE " . babh6_table('products') . " SET ryear = NULL WHERE ryear IS NOT NULL AND (ryear < 2000 OR ryear > %d)", (int)gmdate('Y') + 1));
-        /* Ключовете на фирмите (norm) зависят от babh6_norm_firm() → преизчисли всички записи на порции,
-           накрая се преизчисляват и фирмите (партньори, търговец по името, БГ). */
-        babh6_renorm_start();
         delete_transient('babh6_stats');
+        delete_transient('babh6_health');
+        update_option('babh6_version', BABH6_VERSION);
+        delete_transient('babh6_migrating');
+    }
+    /* Производните данни се преизчисляват на порции при нова версия на правилата (AD-01) */
+    if (get_option('babh6_rules_version') !== BABH6_RULES_VERSION && !get_option('babh6_renorm')) {
+        babh6_renorm_start();
     }
 });
 

@@ -30,6 +30,8 @@ function babh6_render_standalone() {
 
     status_header(200);
     header('Content-Type: text/html; charset=utf-8');
+    /* Страницата носи персонализирано състояние (locked/pro/nonce) → без общо кеширане (AU-04) */
+    if (babh6_password() !== '' || is_user_logged_in()) { nocache_headers(); header('Vary: Cookie'); }
     ?><!DOCTYPE html>
 <html lang="bg">
 <head>
@@ -54,7 +56,7 @@ function babh6_render_standalone() {
   <div id="babh6-app" class="babh6"><div class="b6-boot">Регистърът се зарежда…</div><noscript><div class="b6-boot">За търсене в регистъра е необходим JavaScript. Включи го в браузъра и презареди страницата.</div></noscript></div>
   <footer class="b6-site-f">© <?php echo esc_html(date_i18n('Y')); ?> <?php echo esc_html($site ? $site : 'Регистър на добавките'); ?>. Данни от Българската агенция по безопасност на храните (БАБХ). Сайт за справки по данни от регистъра на БАБХ.</footer>
 </div>
-<script>window.BABH6_CFG = { rest: <?php echo wp_json_encode($rest); ?>, rest2: <?php echo wp_json_encode($rest2); ?>, locked: <?php echo babh6_gate_ok() ? '0' : '1'; ?>, hasAI: <?php echo babh6_api_key() !== '' ? '1' : '0'; ?>, pro: <?php echo babh6_pro_ok() ? '1' : '0'; ?>, nonce: <?php echo wp_json_encode(is_user_logged_in() ? wp_create_nonce('wp_rest') : ''); ?> };</script>
+<script>window.BABH6_CFG = { rest: <?php echo wp_json_encode($rest); ?>, rest2: <?php echo wp_json_encode($rest2); ?>, locked: <?php echo babh6_gate_ok() ? '0' : '1'; ?>, hasAI: <?php echo babh6_api_key() !== '' ? '1' : '0'; ?>, pro: <?php echo babh6_pro_ok() ? '1' : '0'; ?>, pw: <?php echo babh6_password() !== '' ? '1' : '0'; ?>, nonce: <?php echo wp_json_encode(is_user_logged_in() ? wp_create_nonce('wp_rest') : ''); ?> };</script>
 <script src="<?php echo $js; ?>"></script>
 </body>
 </html><?php
