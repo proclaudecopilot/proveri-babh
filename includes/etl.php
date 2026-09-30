@@ -188,6 +188,7 @@ function babh6_run_step() {
         }
 
         babh6_rebuild_parties();
+        delete_transient('babh6_stats');
 
         $wpdb->update($uploads_t, array(
             'status'     => 'done',

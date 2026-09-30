@@ -77,7 +77,7 @@ function babh6_admin_dashboard() {
     $fulltext = (int)get_option('babh6_fulltext', 0);
     $job      = get_option('babh6_job');
 
-    echo '<div class="wrap"><h1>БАБХ Регистър v6 <span style="font-size:12px;color:#787c82;font-weight:400">Сесия 1 · Foundation</span></h1>';
+    echo '<div class="wrap"><h1>БАБХ Регистър v6 <span style="font-size:12px;color:#787c82;font-weight:400">v6 · DB + ETL + Frontend</span></h1>';
 
     if (isset($_GET['babh6_err'])) {
         $err = sanitize_text_field(wp_unslash($_GET['babh6_err']));
@@ -232,6 +232,6 @@ function babh6_admin_dashboard() {
         echo '</tbody></table>';
     }
 
-    echo '<p style="color:#787c82;margin-top:20px">Сесия 2 добавя публичния фронтенд. Плъгинът работи паралелно с v5.6 — отделни таблици <code>' . esc_html($wpdb->prefix) . 'babh6_*</code>.</p>';
+    echo '<p style="color:#787c82;margin-top:20px"><b>Публичен фронтенд:</b> сложи shortcode <code>[babh_register]</code> на страница (препоръчително full-width template без sidebar). Плъгинът работи паралелно с v5.6 — отделни таблици <code>' . esc_html($wpdb->prefix) . 'babh6_*</code>.</p>';
     echo '</div>';
 }

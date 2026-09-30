@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: БАБХ Регистър v6
- * Description: Регистър на хранителните добавки — Сесия 1: база данни + ETL за Excel файлове от БАБХ + diff между качвания. Фронтендът идва в Сесия 2. Работи паралелно с v5.6 (отделни таблици).
- * Version: 6.0.1
+ * Description: Регистър на хранителните добавки — публично търсене (shortcode [babh_register]), REST API, ETL за Excel файлове от БАБХ, diff между качвания, регулаторни флагове. Работи паралелно с v5.6 (отделни таблици).
+ * Version: 6.0.2
  * GitHub Plugin URI: proclaudecopilot/proveri-babh
  * Author: BABH Register
  * Requires PHP: 7.4
@@ -11,7 +11,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BABH6_VERSION', '6.0.1');
+define('BABH6_VERSION', '6.0.2');
 define('BABH6_PATH', plugin_dir_path(__FILE__));
 define('BABH6_URL', plugin_dir_url(__FILE__));
 
@@ -19,6 +19,8 @@ require_once BABH6_PATH . 'includes/schema.php';
 require_once BABH6_PATH . 'includes/detect.php';
 require_once BABH6_PATH . 'includes/xlsx-reader.php';
 require_once BABH6_PATH . 'includes/etl.php';
+require_once BABH6_PATH . 'includes/rest.php';
+require_once BABH6_PATH . 'includes/frontend.php';
 require_once BABH6_PATH . 'includes/admin.php';
 
 register_activation_hook(__FILE__, 'babh6_activate');
