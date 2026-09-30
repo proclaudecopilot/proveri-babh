@@ -143,11 +143,13 @@ function babh6_order_sql($sort) {
 }
 
 function babh6_row_to_item($r) {
-    $flags = array();
-    if (!empty($r->flags)) {
-        $d = json_decode($r->flags, true);
-        if (is_array($d)) $flags = $d;
-    }
+    /* Бележките се преизчисляват при показване: така старите записи също носят
+       намерения термин, полето и откъса (не само label от времето на качването). */
+    $flags = (isset($r->composition) || isset($r->purpose))
+        ? babh6_find_flags_fields($r->name, isset($r->composition) ? $r->composition : '', isset($r->purpose) ? $r->purpose : '')
+        : array();
+    foreach ($flags as &$fl) { $fl['field_label'] = babh6_field_label($fl['field']); }
+    unset($fl);
     return array(
         'reg'  => $r->reg,
         't'    => $r->rtype,
@@ -166,8 +168,10 @@ function babh6_row_to_item($r) {
         'nd'   => $r->notif_date,
         'ld'   => $r->launch_date,
         'cat'  => $r->category,
+        'catl' => babh6_category_label($r->category ? $r->category : 'other'),
         'f'    => $flags,
         'del'  => !empty($r->deletion),
+        'dn'   => isset($r->deletion) ? (string)$r->deletion : '',
     );
 }
 
@@ -210,7 +214,7 @@ function babh6_rest_product($req) {
     $t   = babh6_table('products');
     $reg = sanitize_text_field(urldecode((string)$req['reg']));
     $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE reg = %s LIMIT 1", $reg));
-    if (!$row) return new WP_Error('babh6_notfound', 'Продуктът не е намерен.', array('status' => 404));
+    if (!$row) return new WP_Error('babh6_notfound', 'Няма намерен запис с този регистрационен номер.', array('status' => 404));
     return rest_ensure_response(babh6_row_to_item($row));
 }
 
@@ -252,13 +256,11 @@ function babh6_rest_stats() {
     $out['recent12'] = array_sum(array_map(function ($x) { return $x['c']; }, $monthly));
 
     /* Категории */
-    $labels = array('other' => 'Други');
-    foreach (babh6_categories() as $c) $labels[$c[0]] = $c[1];
     $cats = array();
     $crows = $wpdb->get_results("SELECT category, COUNT(*) AS c FROM $t WHERE deleted_at IS NULL GROUP BY category ORDER BY c DESC");
     foreach ($crows as $r) {
         $code = $r->category ? $r->category : 'other';
-        $cats[] = array('code' => $code, 'label' => isset($labels[$code]) ? $labels[$code] : $code, 'count' => (int)$r->c);
+        $cats[] = array('code' => $code, 'label' => babh6_category_label($code), 'count' => (int)$r->c);
     }
     $out['cats'] = $cats;
 
@@ -278,26 +280,22 @@ function babh6_rest_export($req) {
     $wsql  = implode(' AND ', $where);
     $order = babh6_order_sql((string)$req->get_param('sort'));
 
-    $sql  = "SELECT reg, name, producer_name, trader_name, notif_date, category, flags FROM $t WHERE $wsql ORDER BY $order LIMIT 5000";
+    $sql  = "SELECT reg, name, producer_name, producer_kind, trader_name, trader_kind, notif_date, category, composition, purpose FROM $t WHERE $wsql ORDER BY $order LIMIT 5000";
     $rows = $wpdb->get_results(babh6_maybe_prepare($sql, $args));
-
-    $labels = array('other' => 'Други');
-    foreach (babh6_categories() as $c) $labels[$c[0]] = $c[1];
 
     nocache_headers();
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="babh-register-export.csv"');
     echo "\xEF\xBB\xBF";
     $fh = fopen('php://output', 'w');
-    fputcsv($fh, array('Рег №', 'Продукт', 'Производител', 'Търговец', 'Дата', 'Категория', 'Флагове'));
+    fputcsv($fh, array('Регистрационен №', 'Наименование на продукта', 'Производител', 'Тип на полето „Производител“', 'Търговец', 'Тип на полето „Търговец“', 'Дата на уведомление', 'Автоматична категория', 'Бележки за проверка (автоматични съвпадения по дума, не становище)'));
+    $kinds = array('firm' => 'фирма', 'country' => 'посочена държава', '' => '');
     foreach ((array)$rows as $r) {
-        $flags = '';
-        if (!empty($r->flags)) {
-            $d = json_decode($r->flags, true);
-            if (is_array($d)) $flags = implode('; ', array_map(function ($f) { return $f['label']; }, $d));
-        }
-        $cat = isset($labels[$r->category]) ? $labels[$r->category] : $r->category;
-        fputcsv($fh, array($r->reg, $r->name, $r->producer_name, $r->trader_name, (string)$r->notif_date, $cat, $flags));
+        $flags = implode('; ', array_map(function ($f) { return $f['label'] . ' (в ' . babh6_field_label($f['field']) . ': ' . $f['term'] . ')'; },
+            babh6_find_flags_fields($r->name, $r->composition, $r->purpose)));
+        fputcsv($fh, array($r->reg, $r->name, $r->producer_name, isset($kinds[$r->producer_kind]) ? $kinds[$r->producer_kind] : $r->producer_kind,
+            $r->trader_name, isset($kinds[$r->trader_kind]) ? $kinds[$r->trader_kind] : $r->trader_kind,
+            (string)$r->notif_date, babh6_category_label($r->category ? $r->category : 'other'), $flags));
     }
     fclose($fh);
     exit;
@@ -314,22 +312,25 @@ function babh6_rest_waitlist($req) {
 
     $email = sanitize_email((string)$req->get_param('email'));
     if (!is_email($email)) {
-        return new WP_Error('babh6_email', 'Невалиден имейл адрес.', array('status' => 400));
+        return new WP_Error('babh6_email', 'Въведи валиден имейл адрес, например name@example.com.', array('status' => 400));
     }
 
     /* лек rate limit по IP */
     $ip  = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
     $key = 'babh6_wl_' . md5($ip);
     $n   = (int)get_transient($key);
-    if ($n > 10) return new WP_Error('babh6_rate', 'Твърде много опити — опитай по-късно.', array('status' => 429));
+    if ($n > 10) return new WP_Error('babh6_rate', 'Направени са твърде много опити. Опитай отново по-късно.', array('status' => 429));
     set_transient($key, $n + 1, HOUR_IN_SECONDS);
 
     $source = sanitize_key((string)$req->get_param('source'));
     $wt = babh6_table('waitlist');
-    $wpdb->query($wpdb->prepare(
+    $res = $wpdb->query($wpdb->prepare(
         "INSERT IGNORE INTO $wt (email, source, created_at) VALUES (%s, %s, %s)",
         $email, $source ? $source : 'pro', current_time('mysql')
     ));
-
-    return rest_ensure_response(array('ok' => 1));
+    if ($res === false) {
+        return new WP_Error('babh6_db', 'Имейлът не е записан поради технически проблем. Опитай отново.', array('status' => 500));
+    }
+    /* 0 засегнати реда = имейлът вече е в списъка (UNIQUE email) */
+    return rest_ensure_response(array('ok' => 1, 'exists' => ((int)$wpdb->rows_affected === 0) ? 1 : 0));
 }

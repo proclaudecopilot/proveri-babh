@@ -135,7 +135,7 @@
 .b6-cat .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .b6-cat .c { font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--t4); }
 .b6-cat.on .c { color: rgba(255,255,255,.7); }
-.b6-legend { display: flex; gap: 14px; align-items: center; font-size: 11px; color: var(--t3); margin-bottom: 10px; padding: 0 4px; flex-wrap: wrap; }
+.b6-legend { display: block; font-size: 11px; color: var(--t3); margin-bottom: 10px; line-height: 1.5; padding: 0 4px; flex-wrap: wrap; }
 .b6-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .b6-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
@@ -307,3 +307,24 @@ body.babh6-body { margin: 0; background: #ECECE8; font-family: 'Geist', system-u
 .b6-pcats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .b6-chip.firm { background: var(--acc-d); border-color: var(--acc-d); max-width: 260px; }
 .b6-chip.firm svg:last-child { margin-left: 2px; opacity: .8; }
+
+/* ===== Редакция на текстовете: състояния, бележки, достъпност ===== */
+.b6-item .pro.soon { background: var(--sb-3); color: var(--sb-t); font-weight: 600; letter-spacing: 0; text-transform: none; font-size: 8.5px; padding: 2px 5px; white-space: nowrap; flex-shrink: 0; }
+.b6-item .lbl { min-width: 0; line-height: 1.2; }
+.b6-flagnote { font-size: 11.5px; color: var(--t3); margin-top: 6px; line-height: 1.5; }
+.b6-flagbox .b6-flagnote { color: inherit; opacity: .8; }
+.b6-orig { margin-top: 8px; font-size: 12px; }
+.b6-orig summary { cursor: pointer; color: var(--t3); border-bottom: 1px dotted var(--bd-hover); display: inline; }
+.b6-orig summary:hover { color: var(--acc-d); }
+.b6-orig > div { margin-top: 6px; padding: 10px 12px; background: var(--bg-soft); border-radius: 8px; white-space: pre-wrap; color: var(--t2); line-height: 1.55; }
+.b6-retry { padding: 8px 16px; font-size: 12.5px; font-weight: 500; border: 1px solid var(--bd); background: var(--bg-card); color: var(--t1); border-radius: 8px; cursor: pointer; }
+.b6-retry:hover { border-color: var(--acc); color: var(--acc-d); }
+.b6-errdet { margin-top: 12px; font-size: 11px; color: var(--t4); }
+.b6-errdet summary { cursor: pointer; }
+.b6-errdet code { display: block; margin-top: 6px; word-break: break-all; }
+.b6-load-err { margin: 12px 0; padding: 10px 14px; background: var(--amber-bg); border: 1px solid var(--amber-line); border-radius: 10px; font-size: 12.5px; color: var(--amber); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.b6-more-wrap { text-align: center; }
+.b6-left { font-size: 11.5px; color: var(--t4); margin-top: 6px; }
+.b6-wl-label { display: block; font-size: 12px; font-weight: 500; color: var(--t2); margin-bottom: 6px; }
+.b6-wl-err { font-size: 12px; color: var(--red); margin-top: 6px; min-height: 1em; }
+.b6-card:focus-visible, .b6-ing:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }

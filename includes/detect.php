@@ -142,6 +142,40 @@ function babh6_flag_defs() {
     return $defs;
 }
 
+/**
+ * Автоматични бележки: съвпадение по дума в име / състав / предназначение.
+ * Пази намерения термин, полето и кратък откъс, за да може интерфейсът да
+ * покаже КАКВО и КЪДЕ е намерено, а не регулаторна присъда.
+ * @return array [{label, sev, term, field, excerpt}]
+ */
+function babh6_find_flags_fields($name, $composition = '', $purpose = '') {
+    $fields = array('name' => (string)$name, 'composition' => (string)$composition, 'purpose' => (string)$purpose);
+    $lower  = array();
+    foreach ($fields as $k => $v) $lower[$k] = mb_strtolower($v, 'UTF-8');
+    $out = array();
+    foreach (babh6_flag_defs() as $d) {
+        $hit = null;
+        foreach ($fields as $k => $v) {
+            if ($lower[$k] === '') continue;
+            foreach ($d['terms'] as $term) {
+                $pos = mb_strpos($lower[$k], $term, 0, 'UTF-8');
+                if ($pos !== false) {
+                    $from = max(0, $pos - 25);
+                    $len  = mb_strlen($term, 'UTF-8') + 50;
+                    $ex   = trim(mb_substr($fields[$k], $from, $len, 'UTF-8'));
+                    if ($from > 0) $ex = '…' . $ex;
+                    if ($from + $len < mb_strlen($fields[$k], 'UTF-8')) $ex .= '…';
+                    $hit = array('label' => $d['label'], 'sev' => $d['sev'], 'term' => $term, 'field' => $k, 'excerpt' => $ex);
+                    break 2;
+                }
+            }
+        }
+        if ($hit) $out[] = $hit;
+    }
+    return $out;
+}
+
+/** Обратна съвместимост: само по общ текст (без поле/откъс). */
 function babh6_find_flags($text) {
     $t = mb_strtolower((string)$text, 'UTF-8');
     if ($t === '') return array();
@@ -149,12 +183,28 @@ function babh6_find_flags($text) {
     foreach (babh6_flag_defs() as $d) {
         foreach ($d['terms'] as $term) {
             if (mb_strpos($t, $term) !== false) {
-                $out[] = array('label' => $d['label'], 'sev' => $d['sev'], 'note' => $d['note']);
+                $out[] = array('label' => $d['label'], 'sev' => $d['sev'], 'term' => $term, 'field' => '', 'excerpt' => '');
                 break;
             }
         }
     }
     return $out;
+}
+
+/** Име на полето за показване. */
+function babh6_field_label($field) {
+    $m = array('name' => 'наименование', 'composition' => 'състав', 'purpose' => 'предназначение');
+    return isset($m[$field]) ? $m[$field] : 'наличните данни';
+}
+
+/** Публично име на категория с резервен текст (кодовете не се показват). */
+function babh6_category_label($code) {
+    static $labels = null;
+    if ($labels === null) {
+        $labels = array('other' => 'Без определена категория');
+        foreach (babh6_categories() as $c) $labels[$c[0]] = $c[1];
+    }
+    return isset($labels[$code]) ? $labels[$code] : 'Категорията не е определена';
 }
 
 /* ============ Категории ============ */
@@ -164,20 +214,20 @@ function babh6_categories() {
     $cats = array(
         array('vitamins','Витамини',array('витамин','vitamin','b12','b6','d3','к2','niacin','folic','ниацин','фолиев','биотин','biotin','токоферол')),
         array('minerals','Минерали',array('магнезий','magnesium','цинк','zinc','калций','calcium','желязо','iron','селен','selenium','хром','chromium','йод','iodine','манган','manganese','калий','potassium','молибден','molybdenum')),
-        array('protein','Протеини и спорт',array('протеин','protein','whey','уей','казеин','casein','bcaa','бцаа','креатин','creatine','глутамин','glutamine','аргинин','arginin','бета-аланин','beta-alanine','изолат','isolate','гейнер','gainer','карнитин','carnitin','таурин','taurin','цитрулин','citrullin','pre-workout','workout')),
-        array('collagen','Колаген и стави',array('колаген','collagen','глюкозамин','glucosamine','хондроитин','chondroitin','msm','хиалуронов','hyaluronic','стави','joint','пептид','peptid')),
-        array('omega','Омега и масла',array('омега','omega','рибено масло','fish oil','epa','dha','krill','крил','ленено масло','flaxseed','вечерна иглика','evening primrose')),
+        array('protein','Протеини и спортни добавки',array('протеин','protein','whey','уей','казеин','casein','bcaa','бцаа','креатин','creatine','глутамин','glutamine','аргинин','arginin','бета-аланин','beta-alanine','изолат','isolate','гейнер','gainer','карнитин','carnitin','таурин','taurin','цитрулин','citrullin','pre-workout','workout')),
+        array('collagen','Колаген и добавки за стави',array('колаген','collagen','глюкозамин','glucosamine','хондроитин','chondroitin','msm','хиалуронов','hyaluronic','стави','joint','пептид','peptid')),
+        array('omega','Омега мастни киселини и масла',array('омега','omega','рибено масло','fish oil','epa','dha','krill','крил','ленено масло','flaxseed','вечерна иглика','evening primrose')),
         array('digestion','Храносмилане',array('пробиотик','probiotic','лактобацил','lactobacill','бифидобактер','bifido','ензим','enzyme','псилиум','psyllium','инулин','inulin','бромелаин','bromelain','храносмилане','чревен','intestin','колон')),
         array('immune','Имунитет',array('имунитет','immune','immun','ехинацея','echinacea','бъз','elderberry','sambucus','прополис','propolis')),
-        array('herbal','Билки и екстракти',array('екстракт','extract','билк','herb','куркум','curcumin','гинко','ginkgo','женшен','ginseng','ашваганда','ashwagandha','родиола','rhodiola','босвелия','boswellia','артишок','artichoke','маточина','melissa','лайка','chamomile','маслинов лист','olive leaf','силимарин','silymarin')),
-        array('weight','Отслабване и енергия',array('отслабване','weight','fat burner','мазнини','глюкоманан','glucomannan','зелено кафе','green coffee','гарциния','garcinia','кофеин','caffeine','термоген','thermogen','диет','diet','slim','keto','кетон')),
-        array('beauty','Красота и кожа',array('кожа','skin','коса','hair','нокти','nail','beauty','красота','анти-ейдж','anti-age','anti-aging','glow')),
+        array('herbal','Билки и растителни екстракти',array('екстракт','extract','билк','herb','куркум','curcumin','гинко','ginkgo','женшен','ginseng','ашваганда','ashwagandha','родиола','rhodiola','босвелия','boswellia','артишок','artichoke','маточина','melissa','лайка','chamomile','маслинов лист','olive leaf','силимарин','silymarin')),
+        array('weight','Тегло и енергия',array('отслабване','weight','fat burner','мазнини','глюкоманан','glucomannan','зелено кафе','green coffee','гарциния','garcinia','кофеин','caffeine','термоген','thermogen','диет','diet','slim','keto','кетон')),
+        array('beauty','Кожа, коса и нокти',array('кожа','skin','коса','hair','нокти','nail','beauty','красота','анти-ейдж','anti-age','anti-aging','glow')),
         array('men','За мъже',array('мъжки','male','тестостерон','testosteron','либидо','libido','трибулус','tribulus','мака','maca','потентност','potency','простат','prostat','палмето','saw palmetto')),
         array('women','За жени',array('женск','female','women','менопауза','menopause','pms','цикъл','хормонал','hormone','витекс','vitex','фолиева','бременн','pregnan')),
         array('children','За деца',array('деца','child','kids','бебе','baby','infant','педиатр','pediatr','junior','юноша','тийн','teen')),
-        array('sleep','Сън и релаксация',array('сън','sleep','мелатонин','melatonin','валериана','valerian','теанин','theanine','пасифлора','passionflower','лавандула','lavender','глицин','glycin','5-htp','тревож','стрес','stress','calm','relax')),
-        array('cardio','Сърце и кръв',array('сърц','heart','cardio','коензим q10','coq10','холестерол','cholesterol','кръвно налягане','blood pressure','нар ','pomegranate','хибискус','hibiscus')),
-        array('detox','Детокс и черен дроб',array('детокс','detox','черен дроб','liver','бял трън','milk thistle','глутатион','glutathione','антиоксидант','antioxidant','н-ацетил','nac ')),
+        array('sleep','Сън и спокойствие',array('сън','sleep','мелатонин','melatonin','валериана','valerian','теанин','theanine','пасифлора','passionflower','лавандула','lavender','глицин','glycin','5-htp','тревож','стрес','stress','calm','relax')),
+        array('cardio','Сърце и кръвообращение',array('сърц','heart','cardio','коензим q10','coq10','холестерол','cholesterol','кръвно налягане','blood pressure','нар ','pomegranate','хибискус','hibiscus')),
+        array('detox','Черен дроб и антиоксиданти',array('детокс','detox','черен дроб','liver','бял трън','milk thistle','глутатион','glutathione','антиоксидант','antioxidant','н-ацетил','nac ')),
     );
     return $cats;
 }

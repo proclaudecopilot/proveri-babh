@@ -28,7 +28,7 @@ function babh6_shortcode() {
         'pro'    => babh6_pro_ok() ? 1 : 0,
         'nonce'  => is_user_logged_in() ? wp_create_nonce('wp_rest') : '',
     ));
-    return '<div id="babh6-app" class="babh6"><div class="b6-boot">Зарежда регистър…</div></div>';
+    return '<div id="babh6-app" class="babh6"><div class="b6-boot">Регистърът се зарежда…</div><noscript><div class="b6-boot">За търсене в регистъра е необходим JavaScript. Включи го в браузъра и презареди страницата.</div></noscript></div>';
 }
 add_shortcode('babh_register', 'babh6_shortcode');
 add_shortcode('babh_register_v6', 'babh6_shortcode');

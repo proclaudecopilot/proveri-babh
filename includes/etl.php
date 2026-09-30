@@ -28,20 +28,20 @@ function babh6_job_create($tmp_path, $filename, $source = 'manual') {
 function babh6_job_create_files($files, $source = 'manual', $meta = array()) {
     global $wpdb;
     $files = array_values(array_filter((array)$files, function ($f) { return !empty($f['src']); }));
-    if (!$files) return new WP_Error('babh6_nofiles', 'Няма файлове за обработка.');
+    if (!$files) return new WP_Error('babh6_nofiles', 'Не е получен файл за обработка.');
 
     /* Маркирай закъсали стари задачи */
     $uploads_t = babh6_table('uploads');
     $old = get_option('babh6_job');
     if ($old && !empty($old['files'])) foreach ((array)$old['files'] as $f) @unlink($f);
-    $wpdb->query("UPDATE $uploads_t SET status = 'failed', notes = 'Прекъснат — заменен от нов import' WHERE status = 'processing'");
+    $wpdb->query("UPDATE $uploads_t SET status = 'failed', notes = 'Обработката е прекратена, защото е започнато ново качване.' WHERE status = 'processing'");
     delete_option('babh6_job');
     delete_transient('babh6_step_lock');
 
     $dir = wp_upload_dir();
     $base = trailingslashit($dir['basedir']) . 'babh6';
     if (!wp_mkdir_p($base)) {
-        return new WP_Error('babh6_dir', 'Не мога да създам папка ' . $base);
+        return new WP_Error('babh6_dir', 'Не може да се създаде папката за качвания. Провери правата за запис. (' . $base . ')');
     }
 
     $paths = array(); $names = array(); $stamp = time();
@@ -53,7 +53,7 @@ function babh6_job_create_files($files, $source = 'manual', $meta = array()) {
         if (!$moved && @copy($f['src'], $dest)) { @unlink($f['src']); $moved = true; }
         if (!$moved) {
             foreach ($paths as $p) @unlink($p);
-            return new WP_Error('babh6_move', 'Не мога да запиша файла в ' . $base);
+            return new WP_Error('babh6_move', 'Файлът не може да бъде записан на сървъра. Провери свободното място и правата за запис. (' . $base . ')');
         }
         $paths[] = $dest;
         $names[] = isset($f['name']) && $f['name'] !== '' ? $f['name'] : basename($dest);
@@ -96,7 +96,7 @@ function babh6_job_cancel() {
     $job = get_option('babh6_job');
     if ($job) {
         $wpdb->update(babh6_table('uploads'),
-            array('status' => 'failed', 'notes' => 'Отменен от потребителя'),
+            array('status' => 'failed', 'notes' => 'Обработката е спряна от администратор. Вече записаните промени остават.'),
             array('id' => (int)$job['upload_id']));
         foreach (babh6_job_files($job) as $f) @unlink($f);
     }
@@ -131,7 +131,7 @@ function babh6_run_step() {
     if (function_exists('wp_raise_memory_limit')) wp_raise_memory_limit('admin');
 
     $job = get_option('babh6_job');
-    if (!$job) return new WP_Error('babh6_nojob', 'Няма активна import задача.');
+    if (!$job) return new WP_Error('babh6_nojob', 'Няма обработка, която да продължим.');
 
     /* Стар формат (job от версия преди 6.1) */
     if (empty($job['files']) && !empty($job['file'])) {
@@ -166,8 +166,8 @@ function babh6_run_step_locked($job) {
 
     foreach ($files as $f) {
         if (empty($f) || !file_exists($f)) {
-            babh6_job_fail($job, 'Файлът липсва');
-            return new WP_Error('babh6_nofile', 'Import файлът липсва — качи отново.');
+            babh6_job_fail($job, 'Файлът за обработка липсва на сървъра.');
+            return new WP_Error('babh6_nofile', 'Файлът за обработка липсва. Качи го отново.');
         }
     }
 
@@ -284,8 +284,9 @@ function babh6_run_step_locked($job) {
 
     /* Фаза 3: финализиране след последния файл */
     if ($file_done) {
-        $removed = 0; $notes = null;
+        $removed = 0; $notes = null; $removed_checked = false;
         if ((int)$job['parsed'] > 100) {
+            $removed_checked = true;
             /* Предпазител: ако липсват над X% от активните продукти, файловете
                най-вероятно са непълни (напр. само част 1) — не заличаваме. */
             $active = (int)$wpdb->get_var("SELECT COUNT(*) FROM $products_t WHERE deleted_at IS NULL");
@@ -293,8 +294,9 @@ function babh6_run_step_locked($job) {
                 "SELECT COUNT(*) FROM $products_t WHERE deleted_at IS NULL AND (last_upload IS NULL OR last_upload <> %d)", $upload_id));
             $ratio  = (float)apply_filters('babh6_max_remove_ratio', 0.5);
             if ($active > 0 && $would > $active * $ratio) {
-                $notes = sprintf('Заличаването е пропуснато: %d от %d активни продукта липсват във файловете (над %d%%) — вероятно непълен набор файлове.',
+                $notes = sprintf('Проверката за липсващи записи е пропусната: %d от %d записа липсват в качените файлове (над %d%%). Вероятно файловете не са пълни.',
                     $would, $active, (int)round($ratio * 100));
+                $removed_checked = false;
             } else {
                 $wpdb->query($wpdb->prepare(
                     "UPDATE $products_t SET deleted_at = %s
@@ -321,7 +323,8 @@ function babh6_run_step_locked($job) {
         foreach ($files as $f) @unlink($f);
         delete_option('babh6_job');
 
-        $result = array('done' => true, 'phase' => 'done', 'notes' => $notes,
+        if (!$removed_checked && $notes === null) $notes = 'Проверка за липсващи записи не е извършена (под 100 обработени записа).';
+        $result = array('done' => true, 'phase' => 'done', 'notes' => $notes, 'removed_checked' => $removed_checked,
             'progress' => (int)$job['total'], 'total' => (int)$job['total'],
             'parsed' => (int)$job['parsed'], 'added' => (int)$job['added'],
             'updated' => (int)$job['updated'], 'removed' => $removed, 'restored' => (int)$job['restored']);
@@ -350,7 +353,7 @@ function babh6_normalize_row($row) {
     $storage      = trim((string)(isset($row[8]) ? $row[8] : ''));
     $deletion     = trim((string)(isset($row[13]) ? $row[13] : ''));
 
-    $flags = babh6_find_flags($name . ' ' . $composition . ' ' . $purpose);
+    $flags = babh6_find_flags_fields($name, $composition, $purpose);
 
     return array(
         'reg'           => $reg_info['reg'],

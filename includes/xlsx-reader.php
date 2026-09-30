@@ -13,15 +13,15 @@ class BABH6_XLSX_Reader {
      */
     public static function read_register_rows($path) {
         if (!class_exists('ZipArchive')) {
-            return new WP_Error('babh6_nozip', 'PHP разширението ZipArchive липсва на този сървър. Свържи се с хостинга.');
+            return new WP_Error('babh6_nozip', 'Липсва PHP поддръжка за ZIP архиви (ZipArchive). Помоли хостинг доставчика да я активира.');
         }
         if (!class_exists('XMLReader')) {
-            return new WP_Error('babh6_noxml', 'PHP разширението XMLReader липсва на този сървър.');
+            return new WP_Error('babh6_noxml', 'Липсва PHP поддръжка за XMLReader. Помоли хостинг доставчика да я активира.');
         }
 
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) {
-            return new WP_Error('babh6_zip', 'Файлът не може да се отвори като XLSX архив. Провери дали е валиден .xlsx (не .xls).');
+            return new WP_Error('babh6_zip', 'Файлът не може да бъде прочетен като .xlsx. Провери формата и качи файла отново.');
         }
 
         /* Най-големият worksheet = регистърът (chart sheets са в друга папка) */
@@ -36,7 +36,7 @@ class BABH6_XLSX_Reader {
         }
         if (!$best) {
             $zip->close();
-            return new WP_Error('babh6_nosheet', 'Не намерих работен лист във файла.');
+            return new WP_Error('babh6_nosheet', 'Във файла не е намерен работен лист за обработка. Провери дали качваш правилния .xlsx файл.');
         }
 
         /* Shared strings */
@@ -66,7 +66,7 @@ class BABH6_XLSX_Reader {
 
         $reader = new XMLReader();
         if (!@$reader->open('zip://' . $path . '#' . $best)) {
-            return new WP_Error('babh6_open', 'Не мога да чета работния лист (zip stream).');
+            return new WP_Error('babh6_open', 'Работният лист не може да бъде прочетен. Опитай да качиш файла отново.');
         }
 
         $rows = array();
@@ -105,7 +105,7 @@ class BABH6_XLSX_Reader {
         $reader->close();
 
         if (count($rows) < 2) {
-            return new WP_Error('babh6_empty', 'Листът изглежда празен или в неочакван формат.');
+            return new WP_Error('babh6_empty', 'Работният лист е празен или не съдържа достатъчно редове за обработка. Провери дали това е файлът с регистъра.');
         }
         return $rows;
     }
@@ -125,10 +125,10 @@ class BABH6_XLSX_Reader {
 
     /** Намира най-големия worksheet и връща (път в архива, shared strings) или WP_Error */
     private static function open_context($path) {
-        if (!class_exists('ZipArchive')) return new WP_Error('babh6_nozip', 'PHP разширението ZipArchive липсва.');
-        if (!class_exists('XMLReader')) return new WP_Error('babh6_noxml', 'PHP разширението XMLReader липсва.');
+        if (!class_exists('ZipArchive')) return new WP_Error('babh6_nozip', 'Липсва PHP поддръжка за ZIP архиви (ZipArchive). Помоли хостинг доставчика да я активира.');
+        if (!class_exists('XMLReader')) return new WP_Error('babh6_noxml', 'Липсва PHP поддръжка за XMLReader. Помоли хостинг доставчика да я активира.');
         $zip = new ZipArchive();
-        if ($zip->open($path) !== true) return new WP_Error('babh6_zip', 'Файлът не може да се отвори като XLSX архив.');
+        if ($zip->open($path) !== true) return new WP_Error('babh6_zip', 'Файлът не може да бъде прочетен като .xlsx. Провери формата и качи файла отново.');
         $best = null; $best_size = 0;
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $st = $zip->statIndex($i);
@@ -136,7 +136,7 @@ class BABH6_XLSX_Reader {
                 $best = $st['name']; $best_size = $st['size'];
             }
         }
-        if (!$best) { $zip->close(); return new WP_Error('babh6_nosheet', 'Не намерих работен лист.'); }
+        if (!$best) { $zip->close(); return new WP_Error('babh6_nosheet', 'Във файла не е намерен работен лист за обработка. Провери дали качваш правилния .xlsx файл.'); }
         $shared = array();
         $ss = $zip->getFromName('xl/sharedStrings.xml');
         if ($ss !== false && $ss !== '') {
@@ -161,7 +161,7 @@ class BABH6_XLSX_Reader {
         $ctx = self::open_context($path);
         if (is_wp_error($ctx)) return $ctx;
         $reader = new XMLReader();
-        if (!@$reader->open('zip://' . $path . '#' . $ctx['sheet'])) return new WP_Error('babh6_open', 'Не мога да чета листа.');
+        if (!@$reader->open('zip://' . $path . '#' . $ctx['sheet'])) return new WP_Error('babh6_open', 'Работният лист не може да бъде прочетен. Опитай да качиш файла отново.');
         $count = 0;
         $found = false;
         while (@$reader->read()) {
@@ -180,7 +180,7 @@ class BABH6_XLSX_Reader {
         if (is_wp_error($ctx)) return $ctx;
         $shared = $ctx['shared'];
         $reader = new XMLReader();
-        if (!@$reader->open('zip://' . $path . '#' . $ctx['sheet'])) return new WP_Error('babh6_open', 'Не мога да чета листа.');
+        if (!@$reader->open('zip://' . $path . '#' . $ctx['sheet'])) return new WP_Error('babh6_open', 'Работният лист не може да бъде прочетен. Опитай да качиш файла отново.');
         $out = array();
         $prev = libxml_use_internal_errors(true);
         $found = false;
