@@ -9,19 +9,24 @@ if (!root) return;
 var $ = function (s, r) { return (r || root).querySelector(s); };
 var $$ = function (s, r) { return Array.prototype.slice.call((r || root).querySelectorAll(s)); };
 
+/* Филтри на „Продукти“. status: '' активни | flagged | deleted; period: '' | '12m' | година (по рег. №) */
+function newFilters() {
+  return { q: '', status: '', period: '', obl: '', rt: '', cats: [], sort: 'rel',
+    producer: null, producerName: '', trader: null, traderName: '', own: false, brand: null };
+}
+function newPList() { return { q: '', sort: 'products', all: false, page: 1, per: 40, items: [], total: 0, allN: 0, allBg: 0, loading: false, loaded: false }; }
 var state = {
-  tab: 'register', q: '', flagged: false, rt: '', recent: false, more: false,
-  cat: null, year: null, obl: null, sort: 'rel',
-  page: 1, per: 20, items: [], total: 0, loading: false,
-  openReg: null, stats: null, deepReg: null, waitOk: {}, statsErr: false,
-  producer: null, producerName: '', trader: null, traderName: '', own: false, brand: null, inferred: false,
-  /* Списъци с фирми — отделно състояние за производители (p) и търговци (t), защото таблото ги показва едновременно */
+  tab: 'overview',
+  f: newFilters(),           /* приложени филтри */
+  draft: null,               /* чернова в панела на телефон (до „Приложи“) */
+  fpanel: false, catsAll: false,
+  page: 1, per: 20, items: [], total: 0, loading: false, openReg: null, deepReg: null,
+  stats: null, statsErr: false, waitOk: {},
   plist: { p: newPList(), t: newPList() },
-  /* Отворен профил на фирма */
-  party: { kind: 'p', open: null, detail: null }
+  party: { kind: 'p', open: null, detail: null, view: 'partners', prod: { items: [], total: 0, page: 1, loading: false, openReg: null } }
 };
-function newPList() { return { q: '', sort: 'products', all: false, page: 1, per: 8, items: [], total: 0, allN: 0, allBg: 0, loading: false, loaded: false }; }
 var PRO = String(CFG.pro) === '1';
+var isMobile = function () { return window.matchMedia && window.matchMedia('(max-width: 900px)').matches; };
 
 /* ===== Icons ===== */
 var I = {
@@ -39,6 +44,7 @@ var I = {
   grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>',
   layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
   bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.5 10 19 14 21 14 12.5 22 3"/></svg>',
   menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>',
   empty: '<svg width="120" height="88" viewBox="0 0 130 96" fill="none"><rect x="18" y="26" width="66" height="46" rx="8" stroke="#CECEC8" stroke-width="2"/><path d="M18 40h66" stroke="#CECEC8" stroke-width="2"/><path d="M30 52h24M30 60h32" stroke="#E4E4E0" stroke-width="2.5" stroke-linecap="round"/><circle cx="92" cy="60" r="16" stroke="#E66A3D" stroke-width="3"/><path d="m103 71 12 12" stroke="#E66A3D" stroke-width="3.5" stroke-linecap="round"/></svg>'
 };
@@ -76,7 +82,7 @@ function catLabel(code, fallback) {
     var f = state.stats.cats.filter(function (c) { return c.code === code; });
     if (f.length) return f[0].label;
   }
-  return fallback || 'Категорията не е определена';
+  return fallback || 'Без определена категория';
 }
 function monthLabel(m) { var names = ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек']; return names[parseInt(m.slice(5), 10) - 1] + ' ' + m.slice(0, 4); }
 function pluralN(n, one, many) { return nfmt(n) + ' ' + (n === 1 ? one : many); }
@@ -113,20 +119,23 @@ function restUrl(path, qs) {
   return base + path + qs;
 }
 try { if (sessionStorage.getItem('babh6_rest_alt') === '1' && CFG.rest2) CFG._alt = true; } catch (e) {}
-function currentParams() {
+
+/* Параметри за /products и /export от филтрите */
+function filterParams(f) {
+  var isYear = /^\d{4}$/.test(f.period);
   return {
-    q: state.q, flagged: state.flagged, rt: state.rt, recent: state.recent,
-    cat: state.cat, year: state.year, obl: state.obl, sort: state.sort,
-    producer: state.producer, trader: state.trader, own: state.own, brand: state.brand, inferred: state.inferred
+    q: f.q, flagged: f.status === 'flagged', deleted: f.status === 'deleted',
+    recent: f.period === '12m', year: isYear ? f.period : null,
+    obl: f.obl, rt: f.rt, cat: f.cats.length ? f.cats.join(',') : null, sort: f.sort,
+    producer: f.producer, trader: f.trader, own: f.own, brand: f.brand
   };
 }
-/* Отваря регистъра, филтриран по фирма (от Pro профилите) */
+/* Отваря „Продукти“ с чисти филтри + подадените (от профили и обобщението) */
 function gotoProducts(f) {
-  state.producer = f.producer || null; state.producerName = f.producerName || '';
-  state.trader = f.trader || null; state.traderName = f.traderName || '';
-  state.own = !!f.own; state.brand = f.brand || null; state.inferred = !!f.inferred;
-  state.q = ''; state.page = 1; state.cat = null; state.year = null; state.obl = null; state.flagged = false; state.rt = ''; state.recent = false;
-  setTab('register');
+  var nf = newFilters();
+  Object.keys(f || {}).forEach(function (k) { nf[k] = f[k]; });
+  state.f = nf; state.draft = null; state.page = 1; state.openReg = null;
+  setTab('products');
 }
 function partyLink(kind, norm, name) {
   if (!PRO || !norm) return esc(name);
@@ -190,30 +199,31 @@ function renderShell() {
       '<aside class="b6-sb" id="b6-sb">' +
         '<div class="b6-brand"><div class="b6-mark"></div><div><div class="b6-brand-n">Регистър на добавките</div><div class="b6-brand-t">Данни от БАБХ</div></div></div>' +
         '<div class="b6-sb-l">Меню</div>' +
-        '<button class="b6-item on" data-tab="register">' + I.search + '<span class="lbl">Регистър</span><span class="count" id="b6-c-total">—</span></button>' +
-        '<button class="b6-item alert" data-tab="flagged">' + I.warn + '<span class="lbl">За проверка</span><span class="count" id="b6-c-flag" aria-label="Данните се зареждат">—</span></button>' +
-        '<button class="b6-item" data-tab="producers">' + I.factory + '<span class="lbl">Производители</span><span class="pro">PRO</span></button>' +
-        '<button class="b6-item" data-tab="traders">' + I.store + '<span class="lbl">Търговци</span><span class="pro">PRO</span></button>' +
+        '<button class="b6-item on" data-tab="overview">' + I.grid + '<span class="lbl">Регистър</span></button>' +
+        '<button class="b6-item" data-tab="products">' + I.search + '<span class="lbl">Продукти</span><span class="count" id="b6-c-total">—</span></button>' +
+        '<button class="b6-item" data-tab="producers">' + I.factory + '<span class="lbl">Производители</span>' + (PRO ? '' : '<span class="pro">PRO</span>') + '</button>' +
+        '<button class="b6-item" data-tab="traders">' + I.store + '<span class="lbl">Търговци</span>' + (PRO ? '' : '<span class="pro">PRO</span>') + '</button>' +
         '<div class="b6-sb-l">Pro инструменти</div>' +
         '<button class="b6-item" data-tab="novel">' + I.flask + '<span class="lbl">Проверка на съставки</span>' + (CFG.hasAI == 1 ? '<span class="pro">PRO</span>' : '<span class="pro soon">В подготовка</span>') + '</button>' +
-        '<button class="b6-item" data-tab="inspector">' + I.grid + '<span class="lbl">Промени в регистъра</span><span class="pro soon">В подготовка</span></button>' +
+        '<button class="b6-item" data-tab="inspector">' + I.layers + '<span class="lbl">Промени в регистъра</span><span class="pro soon">В подготовка</span></button>' +
         '<button class="b6-item" data-tab="watchlist">' + I.bell + '<span class="lbl">Известия</span><span class="pro soon">В подготовка</span></button>' +
-        '<div class="b6-sb-foot">Данните са от регистъра на БАБХ. Сайт за справки по данни от регистъра на БАБХ.</div>' +
+        '<div class="b6-sb-foot"><span id="b6-live-t" aria-live="polite">Зареждане…</span><br>Данните са от регистъра на БАБХ. Сайт за справки по данни от регистъра на БАБХ.</div>' +
       '</aside>' +
       '<div class="b6-main">' +
         '<div class="b6-top">' +
           '<button class="b6-burger" id="b6-burger" aria-label="Отвори менюто" aria-expanded="false">' + I.menu + '</button>' +
           '<div class="b6-topq">' + I.search + '<input id="b6-topq" type="text" placeholder="Търси продукт, фирма или съставка" aria-label="Търсене в регистъра" autocomplete="off"></div>' +
-          '<div class="b6-live"><span class="b6-live-dot"></span><span id="b6-live-t" aria-live="polite">Зареждане…</span></div>' +
+          '<div class="b6-live"><span class="b6-live-dot"></span><span id="b6-live-t2">Зареждане…</span></div>' +
         '</div>' +
         '<div class="b6-content" id="b6-content"></div>' +
       '</div>' +
     '</div>' +
     '<div class="b6-scrim" id="b6-scrim"></div>' +
     '<nav class="b6-bnav">' +
-      '<button data-tab="register" class="on">' + I.search + '<span>Регистър</span></button>' +
-      '<button data-tab="flagged">' + I.warn + '<span>За проверка</span></button>' +
+      '<button data-tab="overview" class="on">' + I.grid + '<span>Регистър</span></button>' +
+      '<button data-tab="products">' + I.search + '<span>Продукти</span></button>' +
       '<button data-tab="producers">' + I.factory + '<span>Производители</span></button>' +
+      '<button data-tab="traders">' + I.store + '<span>Търговци</span></button>' +
       '<button data-btn="menu">' + I.menu + '<span>Меню</span></button>' +
     '</nav>';
 
@@ -226,58 +236,58 @@ function renderShell() {
   });
   $('#b6-burger').addEventListener('click', function () { $('#b6-sb').classList.add('open'); $('#b6-scrim').classList.add('show'); this.setAttribute('aria-expanded', 'true'); });
   $('#b6-scrim').addEventListener('click', closeSidebar);
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSidebar(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeSidebar(); if (state.fpanel) { state.fpanel = false; renderFilterPanel(); } } });
 
   var tqT = null;
   $('#b6-topq').addEventListener('input', function (e) {
     clearTimeout(tqT);
     var v = e.target.value;
     tqT = setTimeout(function () {
-      state.q = v; state.page = 1;
+      if (state.tab !== 'products') { gotoProducts({ q: v }); var tq = $('#b6-topq'); if (tq) tq.value = v; return; }
+      state.f.q = v; state.page = 1;
       var qi = $('#b6-q'); if (qi && qi.value !== v) { qi.value = v; var cl = $('#b6-qclr'); if (cl) cl.classList.toggle('show', !!v); }
-      if (state.tab !== 'register' && state.tab !== 'flagged') setTab('register'); else { loadProducts(false); }
+      loadProducts(false); renderActive();
     }, 350);
   });
 }
 function closeSidebar() { $('#b6-sb').classList.remove('open'); $('#b6-scrim').classList.remove('show'); var bg = $('#b6-burger'); if (bg) bg.setAttribute('aria-expanded', 'false'); }
 
 function setTab(t) {
-  state.tab = t; state.page = 1; state.openReg = null;
-  state.flagged = (t === 'flagged');
+  state.tab = t; state.page = 1; state.openReg = null; state.fpanel = false;
   closeSidebar();
   $$('.b6-item').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
   $$('.b6-bnav button[data-tab]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
   if (t === 'producers' || t === 'traders') { state.party.open = null; state.party.detail = null; state.party.kind = t === 'producers' ? 'p' : 't'; }
   render();
-  if (t === 'register' || t === 'flagged') loadProducts(false);
-  window.scrollTo({ top: root.offsetTop - 20, behavior: 'smooth' });
+  if (t === 'products') loadProducts(false);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* ===== Data ===== */
 function loadStats() {
   return api('/stats').then(function (s) {
     state.stats = s;
-    var ct = $('#b6-c-total'), cf = $('#b6-c-flag'), lv = $('#b6-live-t');
+    var ct = $('#b6-c-total');
     if (ct) ct.textContent = nfmt(s.total);
-    if (cf) cf.textContent = nfmt(s.flagged);
-    if (lv) lv.textContent = s.last_update ? 'Данни, качени на ' + s.last_update : 'Още няма качен регистър.';
+    var txt = s.last_update ? 'Данни, качени на ' + s.last_update : 'Още няма качен регистър.';
+    $$('#b6-live-t, #b6-live-t2').forEach(function (el) { el.textContent = txt; });
     state.statsErr = false;
   }).catch(function (e) {
     state.statsErr = true;
-    var lv = $('#b6-live-t'); if (lv) lv.textContent = 'Статистиката временно не е достъпна.';
+    $$('#b6-live-t, #b6-live-t2').forEach(function (el) { el.textContent = 'Статистиката временно не е достъпна.'; });
     throw e;
   });
 }
 function loadProducts(append) {
   var c0 = $('#b6-list');
-  if (state.q && state.q.trim().length === 1) {
+  if (state.f.q && state.f.q.trim().length === 1) {
     state.loading = false;
     if (c0) c0.innerHTML = '<div class="b6-empty"><div class="b6-empty-t">Въведи поне 2 знака.</div><div>Търсенето започва от втория знак.</div></div>';
     return Promise.resolve();
   }
   state.loading = true;
   if (!append) renderList(true);
-  var p = currentParams();
+  var p = filterParams(state.f);
   p.page = state.page; p.per = state.per;
   return api('/products', p).then(function (r) {
     state.total = r.total;
@@ -309,109 +319,136 @@ function loadProducts(append) {
 /* ===== Views ===== */
 function render() {
   var c = $('#b6-content');
-  c.classList.toggle('flag-mode', state.tab === 'flagged');
   switch (state.tab) {
-    case 'register':
-    case 'flagged': renderRegister(c); break;
-    case 'producers': if (PRO) { state.party.kind = 'p'; renderParties(c, 'p'); } else { renderSoon(c, 'Производители', 'Тук можеш да разглеждаш производителите, фирмите, за които произвеждат, и продуктите, в които са посочени. Разделът е достъпен за потребители с Pro достъп.', 'producers', true); } break;
-    case 'traders': if (PRO) { state.party.kind = 't'; renderParties(c, 't'); } else { renderSoon(c, 'Търговци', 'Тук можеш да разглеждаш търговците, производителите зад тях и продуктите, в които са посочени. Разделът е достъпен за потребители с Pro достъп.', 'traders', true); } break;
+    case 'overview': renderOverview(c); break;
+    case 'products': renderProducts(c); break;
+    case 'producers': if (PRO) { state.party.kind = 'p'; renderParties(c, 'p'); } else { renderSoon(c, 'Производители', 'Тук можеш да разглеждаш производителите, клиентите им (фирмите, за които произвеждат) и продуктите, в които са посочени. Разделът е достъпен за потребители с Pro достъп.', 'producers', true); } break;
+    case 'traders': if (PRO) { state.party.kind = 't'; renderParties(c, 't'); } else { renderSoon(c, 'Търговци', 'Тук можеш да разглеждаш търговците, марките, които продават, производителите зад тях и всички продукти, регистрирани с тях като търговец. Разделът е достъпен за потребители с Pro достъп.', 'traders', true); } break;
     case 'novel': if (CFG.hasAI == 1) { renderNovel(c); } else { renderSoon(c, 'Проверка на съставки', 'Подготвяме справка за съставки с препратки към използваните източници. Функцията още не е достъпна.', 'novel', false); } break;
     case 'inspector': renderSoon(c, 'Промени в регистъра', 'Тук ще можеш да сравняваш качени версии на регистъра и да виждаш добавени, променени и липсващи записи. Функцията още не е достъпна.', 'inspector', false); break;
     case 'watchlist': renderSoon(c, 'Известия за промени', 'Подготвяме известия по имейл за нови записи, свързани с избрани фирми или съставки. Функцията още не е достъпна.', 'watchlist', false); break;
   }
 }
 
-function bentoHTML(s) {
-  if (!s) return '';
+/* ===== Регистър: обобщение ===== */
+function renderOverview(c) {
+  var s = state.stats;
+  if (!s) {
+    c.innerHTML = '<div class="b6-head"><div><div class="b6-title">Регистър на хранителните добавки</div><div class="b6-sub">' + (state.statsErr ? 'Статистиката временно не е достъпна. Продуктите се търсят в раздел „Продукти“.' : 'Зареждане на обобщението…') + '</div></div></div>';
+    return;
+  }
   var max = 1, i;
   for (i = 0; i < s.monthly.length; i++) if (s.monthly[i].c > max) max = s.monthly[i].c;
   var names = ['яну', 'фев', 'мар', 'апр', 'май', 'юни', 'юли', 'авг', 'сеп', 'окт', 'ное', 'дек'];
   var bars = '', labels = '', srText = [];
   for (i = 0; i < s.monthly.length; i++) {
     var mo = s.monthly[i];
-    var lbl = names[parseInt(mo.m.slice(5), 10) - 1];
     var full = monthLabel(mo.m) + ': ' + pluralN(mo.c, 'уведомление', 'уведомления');
     srText.push(full);
     bars += '<div class="b6-bar' + (i === s.monthly.length - 1 ? ' now' : '') + '" style="height:' + Math.max(7, Math.round(mo.c / max * 100)) + '%" title="' + esc(full) + '"></div>';
-    labels += '<span>' + lbl + '</span>';
+    labels += '<span>' + names[parseInt(mo.m.slice(5), 10) - 1] + '</span>';
   }
   var period = s.monthly.length ? monthLabel(s.monthly[0].m) + ' – ' + monthLabel(s.monthly[s.monthly.length - 1].m) : '';
-  var thisM = s.monthly[s.monthly.length - 1].c;
-  var pOther = (s.producers || 0) - (s.producers_bg || 0), tOther = (s.traders || 0) - (s.traders_bg || 0);
-  return '<div class="b6-bento">' +
-      '<div class="b6-bm"><div class="b6-bm-l">' + I.layers + 'Продукти в наличните данни</div>' +
-        '<div class="b6-bm-n">' + nfmt(s.total) + '</div>' +
-        '<div class="b6-bm-d">' + pluralN(thisM, 'уведомление', 'уведомления') + ' този месец · ' + nfmt(s.recent12) + ' за ' + esc(period) + '</div>' +
-        '<div class="b6-chart" role="img" aria-label="Уведомления по месеци: ' + esc(srText.join('; ')) + '">' + bars + '</div><div class="b6-chart-x">' + labels + '</div>' +
-      '</div>' +
-      '<div class="b6-side">' +
-        '<div class="b6-bc tint link" data-scroll="b6-s-products" data-flag="1" role="button" tabindex="0"><div class="b6-bc-l">' + I.warn + 'Продукти за проверка</div><div class="b6-bc-n">' + nfmt(s.flagged) + '</div><div class="b6-bc-s">с автоматична бележка</div></div>' +
-        '<div class="b6-bc link" data-scroll="b6-s-producers" role="button" tabindex="0"><div class="b6-bc-l">' + I.factory + 'Производители от България</div><div class="b6-bc-n">' + nfmt(s.producers_bg) + '</div><div class="b6-bc-s">' + (pOther > 0 ? 'още ' + nfmt(pOther) + ' чуждестранни · ' : '') + 'по име и адрес в регистъра</div></div>' +
-      '</div>' +
-      '<div class="b6-side">' +
-        '<div class="b6-bc link" data-scroll="b6-s-traders" role="button" tabindex="0"><div class="b6-bc-l">' + I.store + 'Търговци от България</div><div class="b6-bc-n">' + nfmt(s.traders_bg) + '</div><div class="b6-bc-s">' + (tOther > 0 ? 'още ' + nfmt(tOther) + ' чуждестранни · ' : '') + 'по име и адрес в регистъра</div></div>' +
-        '<div class="b6-bc"><div class="b6-bc-l">' + I.bolt + 'Уведомления за периода</div><div class="b6-bc-n">' + nfmt(s.recent12) + '</div><div class="b6-bc-s">' + esc(period) + '</div></div>' +
-      '</div>' +
-    '</div>';
-}
-
-/* Има ли активен филтър от панела „Още филтри“ */
-function advancedActive() { return !!(state.recent || state.year || state.obl || state.rt); }
-
-function renderRegister(c) {
-  var s = state.stats;
-  var isFlag = state.tab === 'flagged';
-  var years = s ? s.years : [];
-  var obls = s ? s.oblasti : [];
-  var cats = s ? s.cats.filter(function (x) { return x.count > 0; }) : [];
-  var showMore = state.more || advancedActive();
-
+  var thisM = s.monthly.length ? s.monthly[s.monthly.length - 1].c : 0;
+  var cats = s.cats.filter(function (x) { return x.count > 0; });
+  var cmax = 1; cats.forEach(function (x) { if (x.code !== 'other' && x.count > cmax) cmax = x.count; });
+  var other = cats.filter(function (x) { return x.code === 'other'; });
+  cats = cats.filter(function (x) { return x.code !== 'other'; }).concat(other);
+  var kpi = function (id, icon, label, n, sub, cls) {
+    return '<div class="b6-bc link' + (cls ? ' ' + cls : '') + '" data-go="' + id + '" role="button" tabindex="0"><div class="b6-bc-l">' + icon + label + '</div><div class="b6-bc-n">' + nfmt(n) + '</div><div class="b6-bc-s">' + sub + '</div></div>';
+  };
   c.innerHTML =
     '<div class="b6-head"><div>' +
-      '<div class="b6-title">' + (isFlag ? 'Продукти за проверка' : 'Регистър на хранителните добавки') + '</div>' +
-      '<div class="b6-sub">' + (s && s.last_update ? 'Данни, качени на <b>' + esc(s.last_update) + '</b>. ' : '') +
-        (isFlag ? 'Бележките се създават автоматично по думи в наличните данни. Те не са становище на БАБХ за конкретния продукт.' : 'Продукти, производители и търговци на едно място. Отвори продукт, за да видиш наличните данни, състава и бележките за проверка.') + '</div>' +
+      '<div class="b6-title">Регистър на хранителните добавки</div>' +
+      '<div class="b6-sub">' + (s.last_update ? 'Данни, качени на <b>' + esc(s.last_update) + '</b>. ' : '') + 'Обобщение на наличните данни. Търсенето е в раздел „Продукти“, фирмите — в „Производители“ и „Търговци“.</div>' +
+    '</div></div>' +
+    '<div class="b6-kpis six">' +
+      kpi('products', I.layers, 'Продукти в регистъра', s.total, 'активни записи') +
+      kpi('flagged', I.warn, 'За проверка', s.flagged, 'с автоматична бележка', 'tint') +
+      kpi('deleted', I.x, 'Заличени', s.deleted, 'липсват в последното качване') +
+      kpi('producers', I.factory, 'Производители от България', s.producers_bg, (s.producers > s.producers_bg ? 'още ' + nfmt(s.producers - s.producers_bg) + ' чуждестранни' : 'по име и адрес')) +
+      kpi('traders', I.store, 'Търговци от България', s.traders_bg, (s.traders > s.traders_bg ? 'още ' + nfmt(s.traders - s.traders_bg) + ' чуждестранни' : 'по име и адрес')) +
+      kpi('recent', I.bolt, 'Уведомления за 12 месеца', s.recent12, esc(period)) +
+    '</div>' +
+    '<div class="b6-ov">' +
+      '<div class="b6-bm"><div class="b6-bm-l">' + I.bolt + 'Уведомления по месеци</div>' +
+        '<div class="b6-bm-n">' + nfmt(thisM) + '</div>' +
+        '<div class="b6-bm-d">' + plural(thisM, 'уведомление', 'уведомления') + ' този месец · ' + nfmt(s.recent12) + ' за ' + esc(period) + '</div>' +
+        '<div class="b6-chart" role="img" aria-label="Уведомления по месеци: ' + esc(srText.join('; ')) + '">' + bars + '</div><div class="b6-chart-x">' + labels + '</div>' +
+      '</div>' +
+      '<div class="b6-ovc"><div class="b6-sec-l">Категории (автоматично по наименование и състав)</div>' +
+        cats.map(function (ct) {
+          var w = ct.code === 'other' ? 0 : Math.max(2, Math.round(100 * ct.count / cmax));
+          return '<a href="#" class="b6-ovcat' + (ct.code === 'other' ? ' muted' : '') + '" data-cat="' + esc(ct.code) + '"><span class="n">' + esc(ct.code === 'other' ? 'Без определена категория' : ct.label) + '</span><span class="bar"><i style="width:' + w + '%"></i></span><span class="c">' + nfmt(ct.count) + '</span></a>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  $$('[data-go]', c).forEach(function (el) {
+    var go = function () {
+      var id = el.getAttribute('data-go');
+      if (id === 'products') gotoProducts({});
+      else if (id === 'flagged') gotoProducts({ status: 'flagged' });
+      else if (id === 'deleted') gotoProducts({ status: 'deleted' });
+      else if (id === 'recent') gotoProducts({ period: '12m' });
+      else setTab(id);
+    };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  $$('.b6-ovcat', c).forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); gotoProducts({ cats: [a.getAttribute('data-cat')] }); }); });
+}
+
+/* ===== Продукти ===== */
+var STATUS_OPTS = [['', 'Активни в регистъра'], ['flagged', 'С бележки за проверка'], ['deleted', 'Заличени (махнати от регистъра)']];
+var RT_OPTS = [['', 'Всички рег. номера'], ['П', 'Започващи с „П“'], ['Т', 'Започващи с „Т“']];
+function periodOpts() {
+  var out = [['', 'Целият период'], ['12m', 'Последните 12 месеца (по дата на уведомление)']];
+  (state.stats ? state.stats.years : []).forEach(function (y) { out.push([String(y), 'Година ' + y + ' (по рег. №)']); });
+  return out;
+}
+function optLabel(opts, v) { for (var i = 0; i < opts.length; i++) if (opts[i][0] === String(v)) return opts[i][1]; return String(v); }
+function catsList() {
+  var cats = state.stats ? state.stats.cats.filter(function (x) { return x.count > 0; }) : [];
+  var other = cats.filter(function (x) { return x.code === 'other'; });
+  return { main: cats.filter(function (x) { return x.code !== 'other'; }), other: other[0] || null };
+}
+/* Кой обект редактират контролите: на телефон — чернова до „Приложи“, иначе директно филтрите */
+function fsrc() {
+  if (!isMobile()) return state.f;
+  if (!state.draft) state.draft = JSON.parse(JSON.stringify(state.f));
+  return state.draft;
+}
+function activeCount(f) {
+  var n = f.cats.length;
+  ['status', 'period', 'obl', 'rt'].forEach(function (k) { if (f[k]) n++; });
+  if (f.producer) n++; if (f.trader) n++; if (f.brand) n++; if (f.own) n++;
+  return n;
+}
+function applyFilters() {
+  state.page = 1; state.openReg = null;
+  loadProducts(false); renderActive(); renderFilterPanel();
+  var b = $('#b6-fbtn'); if (b) b.innerHTML = I.filter + 'Филтри' + (activeCount(state.f) ? ' · ' + activeCount(state.f) : '');
+}
+function onFilterChange() {
+  if (isMobile()) { renderFilterPanel(); return; }
+  applyFilters();
+}
+
+function renderProducts(c) {
+  var f = state.f;
+  c.innerHTML =
+    '<div class="b6-head"><div>' +
+      '<div class="b6-title">Продукти</div>' +
+      '<div class="b6-sub">Търси по наименование, съставка, фирма или регистрационен номер (кирилица и латиница са взаимозаменяеми). Отвори продукт за наличните данни, състава и бележките за проверка.</div>' +
     '</div><div class="b6-actions"><button class="b6-btn" id="b6-export">' + I.dl + '<span>Изтегли CSV</span></button></div></div>' +
-    (isFlag ? '' : bentoHTML(s)) +
-
-    /* ---- 1. Продукти ---- */
-    '<section class="b6-section" id="b6-s-products">' +
-      (isFlag ? '' : '<div class="b6-sech"><div><div class="b6-sech-t">' + I.layers + 'Продукти</div><div class="b6-sech-s">Търси по наименование, съставка, фирма или регистрационен номер. Кирилица и латиница се търсят взаимозаменяемо.</div></div></div>') +
-      '<div class="b6-fbar">' +
-        '<div class="b6-fq">' + I.search + '<input id="b6-q" type="text" placeholder="Име на продукт, съставка, фирма или рег. №" aria-label="Търсене в регистъра" value="' + esc(state.q) + '" autocomplete="off"><button class="clr' + (state.q ? ' show' : '') + '" id="b6-qclr" aria-label="Изчисти търсенето">' + I.x + '</button></div>' +
-        '<button class="b6-chip' + (state.flagged ? ' on danger' : '') + '" data-f="flagged" aria-pressed="' + (state.flagged ? 'true' : 'false') + '" title="Само продукти с автоматична бележка за проверка">' + I.warn + 'За проверка' + (s ? '<span class="c">' + nfmt(s.flagged) + '</span>' : '') + '</button>' +
-        (state.producer ? '<button class="b6-chip on firm" data-clear="producer" title="Премахни филтъра">' + I.factory + esc(state.producerName || 'Производител') + (state.own ? ' · собствени' : '') + I.x + '</button>' : '') +
-        (state.trader ? '<button class="b6-chip on firm" data-clear="trader" title="Премахни филтъра">' + I.store + esc(state.traderName || 'Търговец') + (state.own && !state.producer ? ' · собствени' : '') + I.x + '</button>' : '') +
-        (state.brand ? '<button class="b6-chip on firm" data-clear="brand" title="Премахни филтъра">' + I.layers + 'Марка: ' + esc(state.brand) + I.x + '</button>' : '') +
-        (state.inferred ? '<button class="b6-chip on firm" data-clear="inferred" title="Премахни филтъра">' + I.store + 'Търговец по името' + I.x + '</button>' : '') +
-        '<select class="b6-sel" id="b6-sort" aria-label="Подреждане">' +
-          '<option value="rel"' + (state.sort === 'rel' ? ' selected' : '') + '>По съвпадение</option>' +
-          '<option value="new"' + (state.sort === 'new' ? ' selected' : '') + '>По рег. №: най-нови</option>' +
-          '<option value="date"' + (state.sort === 'date' ? ' selected' : '') + '>По дата на уведомление</option>' +
-          '<option value="old"' + (state.sort === 'old' ? ' selected' : '') + '>По рег. №: най-стари</option>' +
-          '<option value="name"' + (state.sort === 'name' ? ' selected' : '') + '>По име: А–Я</option>' +
-          '<option value="flagged"' + (state.sort === 'flagged' ? ' selected' : '') + '>С най-много бележки</option>' +
-        '</select>' +
-        '<button class="b6-chip' + (showMore ? ' on' : '') + '" id="b6-fmore" aria-expanded="' + (showMore ? 'true' : 'false') + '" aria-controls="b6-fmore-panel">Още филтри' + (advancedActive() ? '<span class="c">•</span>' : '') + I.chev + '</button>' +
-      '</div>' +
-      '<div class="b6-fmore" id="b6-fmore-panel"' + (showMore ? '' : ' hidden') + '>' +
-        '<span class="b6-fmore-l">Период</span>' +
-        '<button class="b6-chip' + (state.recent ? ' on' : '') + '" data-f="recent" aria-pressed="' + (state.recent ? 'true' : 'false') + '" title="Дата на уведомление през последните 12 месеца">Последните 12 месеца</button>' +
-        '<select class="b6-sel" id="b6-year" aria-label="Година в регистрационния номер"><option value="">Всички години (по рег. №)</option>' + years.map(function (y) { return '<option value="' + y + '"' + (state.year === y ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>' +
-        '<span class="b6-fmore-l">Рег. №</span>' +
-        '<select class="b6-sel" id="b6-obl" aria-label="Област според регистрационния номер"><option value="">Всички области (по рег. №)</option>' + obls.map(function (o) { return '<option value="' + esc(o) + '"' + (state.obl === o ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>' +
-        '<select class="b6-sel" id="b6-rt" aria-label="Първа буква на регистрационния номер"><option value="">Всички рег. номера</option><option value="П"' + (state.rt === 'П' ? ' selected' : '') + '>Само с „П“</option><option value="Т"' + (state.rt === 'Т' ? ' selected' : '') + '>Само с „Т“</option></select>' +
-        (advancedActive() ? '<button class="b6-chip" id="b6-fclear">' + I.x + 'Изчисти</button>' : '') +
-      '</div>' +
-      '<div class="b6-cats">' + cats.map(function (ct) {
-        return '<button class="b6-cat' + (state.cat === ct.code ? ' on' : '') + '" data-cat="' + esc(ct.code) + '"><span class="dot" style="background:' + (CAT_COLORS[ct.code] || '#999') + '"></span>' + esc(ct.label) + '<span class="c">' + nfmt(ct.count) + '</span></button>';
-      }).join('') + '</div>' +
-      '<div class="b6-legend">Категориите са определени автоматично по наименованието и състава. Бележките за проверка са автоматични съвпадения по думи в наличните данни, не становище на БАБХ.' + (s && s.inferred ? ' При ' + nfmt(s.inferred) + ' продукта търговецът е определен по името (регистърът не го посочва) и е отбелязан „по името“.' : '') + '</div>' +
-      '<div id="b6-list"></div>' +
-    '</section>' +
-
-    /* ---- 2. Производители, 3. Търговци ---- */
-    (isFlag ? '' : partySectionHTML('p') + partySectionHTML('t'));
+    '<div class="b6-ptool">' +
+      '<div class="b6-fq">' + I.search + '<input id="b6-q" type="text" placeholder="Име на продукт, съставка, фирма или рег. №" aria-label="Търсене в регистъра" value="' + esc(f.q) + '" autocomplete="off"><button class="clr' + (f.q ? ' show' : '') + '" id="b6-qclr" aria-label="Изчисти търсенето">' + I.x + '</button></div>' +
+      '<button class="b6-btn b6-fbtn" id="b6-fbtn" aria-controls="b6-fpanel" aria-expanded="false">' + I.filter + 'Филтри' + (activeCount(f) ? ' · ' + activeCount(f) : '') + '</button>' +
+    '</div>' +
+    '<div class="b6-fpanel" id="b6-fpanel"></div>' +
+    '<div class="b6-active" id="b6-active"></div>' +
+    '<div class="b6-legend">Категориите са определени автоматично по наименованието и състава. Бележките за проверка са автоматични съвпадения по думи в наличните данни, не становище на БАБХ.</div>' +
+    '<div id="b6-list"></div>';
 
   var qi = $('#b6-q'), qT = null;
   qi.addEventListener('input', function (e) {
@@ -419,52 +456,13 @@ function renderRegister(c) {
     var v = e.target.value;
     $('#b6-qclr').classList.toggle('show', !!v);
     var tq = $('#b6-topq'); if (tq && tq.value !== v) tq.value = v;
-    qT = setTimeout(function () { state.q = v; state.page = 1; loadProducts(false); }, 350);
+    qT = setTimeout(function () { state.f.q = v; state.page = 1; loadProducts(false); }, 350);
   });
-  $('#b6-qclr').addEventListener('click', function () { state.q = ''; state.page = 1; qi.value = ''; this.classList.remove('show'); var tq = $('#b6-topq'); if (tq) tq.value = ''; loadProducts(false); });
-  $$('.b6-chip[data-f]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var f = b.getAttribute('data-f');
-      state[f] = !state[f];
-      state.page = 1;
-      if (f === 'flagged') { setTab(state.flagged ? 'flagged' : 'register'); return; }
-      b.classList.toggle('on'); b.setAttribute('aria-pressed', state[f] ? 'true' : 'false');
-      loadProducts(false);
-    });
-  });
-  $$('.b6-chip[data-clear]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var f = b.getAttribute('data-clear');
-      if (f === 'inferred') state.inferred = false; else { state[f] = null; if (f !== 'brand') state[f + 'Name'] = ''; }
-      if (!state.producer && !state.trader) { state.own = false; state.inferred = false; }
-      state.page = 1; render(); loadProducts(false);
-    });
-  });
-  $('#b6-fmore').addEventListener('click', function () {
-    state.more = !state.more;
-    var panel = $('#b6-fmore-panel'), on = state.more || advancedActive();
-    if (on) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
-    this.classList.toggle('on', on); this.setAttribute('aria-expanded', on ? 'true' : 'false');
-  });
-  var fclear = $('#b6-fclear');
-  if (fclear) fclear.addEventListener('click', function () { state.recent = false; state.year = null; state.obl = null; state.rt = ''; state.page = 1; render(); loadProducts(false); });
-  $('#b6-year').addEventListener('change', function (e) { state.year = e.target.value ? parseInt(e.target.value, 10) : null; state.page = 1; loadProducts(false); });
-  $('#b6-obl').addEventListener('change', function (e) { state.obl = e.target.value || null; state.page = 1; loadProducts(false); });
-  $('#b6-rt').addEventListener('change', function (e) { state.rt = e.target.value || ''; state.page = 1; loadProducts(false); });
-  $('#b6-sort').addEventListener('change', function (e) { state.sort = e.target.value; state.page = 1; loadProducts(false); });
-  $$('.b6-cat[data-cat]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var cd = b.getAttribute('data-cat');
-      state.cat = state.cat === cd ? null : cd;
-      state.page = 1;
-      $$('.b6-cat').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-cat') === state.cat); });
-      loadProducts(false);
-    });
-  });
+  $('#b6-qclr').addEventListener('click', function () { state.f.q = ''; state.page = 1; qi.value = ''; this.classList.remove('show'); var tq = $('#b6-topq'); if (tq) tq.value = ''; loadProducts(false); });
+  $('#b6-fbtn').addEventListener('click', function () { state.fpanel = !state.fpanel; if (state.fpanel) state.draft = null; renderFilterPanel(); });
   $('#b6-export').addEventListener('click', function () {
     if (state.total > 5000 && !confirm('Ще се изтеглят първите 5000 резултата според избраното подреждане. Стесни търсенето, за да включиш всички нужни записи. Да продължим ли?')) return;
-    var p = currentParams(); p.page = null; p.per = null;
-    var parts = [];
+    var p = filterParams(state.f), parts = [];
     Object.keys(p).forEach(function (k) {
       var v = p[k];
       if (v === null || v === undefined || v === '' || v === false) return;
@@ -472,38 +470,102 @@ function renderRegister(c) {
     });
     window.location.href = restUrl('/export', parts.length ? '?' + parts.join('&') : '');
   });
-  $$('[data-scroll]', c).forEach(function (el) {
-    var go = function () {
-      if (el.getAttribute('data-flag')) { setTab('flagged'); return; }
-      var target = $('#' + el.getAttribute('data-scroll'));
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-    el.addEventListener('click', go);
-    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
-  });
-
+  renderFilterPanel();
+  renderActive();
   renderList(true);
-  if (!isFlag && PRO) { bindPartyToolbar('p'); bindPartyToolbar('t'); ensureParties('p'); ensureParties('t'); }
 }
 
-/* Секция „Производители“ / „Търговци“ в таблото (компактен списък; пълният е в отделния раздел) */
-function partySectionHTML(kind) {
-  var isP = kind === 'p', tab = isP ? 'producers' : 'traders';
-  var title = isP ? 'Производители' : 'Търговци';
-  var sub = isP
-    ? 'Кой за кого произвежда: клиентите на всеки производител и колко продукта има при всеки. По подразбиране са показани само дружества с българска регистрация и седалище.'
-    : 'Кой доставя на кого: производителите зад всеки търговец и с колко продукта. По подразбиране са показани само дружества с българска регистрация и седалище.';
-  var body;
-  if (PRO) {
-    body = partyToolbarHTML(kind) + '<div id="b6-plist-' + kind + '"></div>';
-  } else {
-    body = '<div class="b6-lock"><div>' + (isP ? 'Списъкът на производителите, клиентите им и продуктите при всеки клиент' : 'Списъкът на търговците, доставчиците им и продуктите при всеки') + ' е достъпен за потребители с Pro достъп.</div>' +
-      '<button class="b6-btn" data-goto-pro="' + tab + '">' + I.bell + '<span>Уведоми ме за достъпа</span></button></div>';
-  }
-  return '<section class="b6-section" id="b6-s-' + tab + '">' +
-    '<div class="b6-sech"><div><div class="b6-sech-t">' + (isP ? I.factory : I.store) + title + '<span class="b6-pro-badge">PRO</span></div><div class="b6-sech-s">' + sub + '</div></div>' +
-      (PRO ? '<div class="b6-actions"><button class="b6-btn" data-goto-pro="' + tab + '">' + I.grid + '<span>Пълен списък</span></button></div>' : '') +
-    '</div>' + body + '</section>';
+function renderFilterPanel() {
+  var panel = $('#b6-fpanel');
+  if (!panel) return;
+  var mobile = isMobile(), f = fsrc();
+  var open = !mobile || state.fpanel;
+  panel.classList.toggle('sheet', mobile);
+  panel.classList.toggle('open', open);
+  document.body.classList.toggle('b6-noscroll', mobile && open);
+  var btn = $('#b6-fbtn'); if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open) { panel.innerHTML = ''; return; }
+
+  var sel = function (id, label, opts, val) {
+    return '<label class="b6-fld"><span class="b6-fld-l">' + label + '</span><select class="b6-sel" data-fk="' + id + '">' +
+      opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(val) === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>';
+  };
+  var obls = [['', 'Всички области (по рег. №)']].concat((state.stats ? state.stats.oblasti : []).map(function (o) { return [o, o]; }));
+  var cl = catsList();
+  var selectedBeyond = f.cats.some(function (code) { var idx = cl.main.map(function (x) { return x.code; }).indexOf(code); return idx >= 8; });
+  var showAll = state.catsAll || selectedBeyond || cl.main.length <= 9;
+  var visible = showAll ? cl.main : cl.main.slice(0, 8);
+  var catBox = function (ct) {
+    var on = f.cats.indexOf(ct.code) !== -1;
+    return '<label class="b6-ck' + (on ? ' on' : '') + '"><input type="checkbox" data-cat="' + esc(ct.code) + '"' + (on ? ' checked' : '') + '><span class="b6-ck-l">' + esc(ct.label) + '</span><span class="b6-ck-c">' + nfmt(ct.count) + '</span></label>';
+  };
+  var catsHTML = '<div class="b6-fcats"><div class="b6-fld-l">Категории <span class="b6-fld-h">' + (f.cats.length ? 'избрани ' + f.cats.length + ' · продукти от поне една от тях' : 'избери една или няколко') + '</span></div>' +
+    '<div class="b6-cks">' + visible.map(catBox).join('') + '</div>' +
+    (cl.main.length > visible.length ? '<button type="button" class="b6-link" id="b6-catsall">Покажи всички категории (' + cl.main.length + ')</button>' : (state.catsAll && cl.main.length > 9 ? '<button type="button" class="b6-link" id="b6-catsall">Скрий част от категориите</button>' : '')) +
+    (cl.other ? '<div class="b6-cks other">' + catBox({ code: 'other', label: 'Без определена категория', count: cl.other.count }) + '</div>' : '') +
+    '</div>';
+  panel.innerHTML =
+    (mobile ? '<div class="b6-sheet-h"><b>Филтри</b><button type="button" class="b6-iconbtn" id="b6-fclose" aria-label="Затвори">' + I.x + '</button></div>' : '') +
+    '<div class="b6-fgrid">' +
+      sel('status', 'Статус', STATUS_OPTS, f.status) +
+      sel('period', 'Период', periodOpts(), f.period) +
+      sel('obl', 'Област', obls, f.obl) +
+      sel('rt', 'Рег. номер', RT_OPTS, f.rt) +
+    '</div>' +
+    catsHTML +
+    (mobile ? '<div class="b6-sheet-f"><button type="button" class="b6-btn" id="b6-fdraftclear">Изчисти</button><button type="button" class="b6-btn primary" id="b6-fapply">Приложи филтрите' + (activeCount(f) ? ' · ' + activeCount(f) : '') + '</button></div>' : '');
+
+  $$('select[data-fk]', panel).forEach(function (s) {
+    s.addEventListener('change', function () { fsrc()[s.getAttribute('data-fk')] = s.value; onFilterChange(); });
+  });
+  $$('input[data-cat]', panel).forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      var src = fsrc(), code = cb.getAttribute('data-cat'), i = src.cats.indexOf(code);
+      if (cb.checked && i === -1) src.cats.push(code); else if (!cb.checked && i !== -1) src.cats.splice(i, 1);
+      onFilterChange();
+    });
+  });
+  var all = $('#b6-catsall'); if (all) all.addEventListener('click', function () { state.catsAll = !state.catsAll; renderFilterPanel(); });
+  var cls = $('#b6-fclose'); if (cls) cls.addEventListener('click', function () { state.fpanel = false; state.draft = null; renderFilterPanel(); });
+  var ap = $('#b6-fapply'); if (ap) ap.addEventListener('click', function () { if (state.draft) state.f = state.draft; state.draft = null; state.fpanel = false; applyFilters(); });
+  var dc = $('#b6-fdraftclear'); if (dc) dc.addEventListener('click', function () { var q = fsrc().q; state.draft = newFilters(); state.draft.q = q; state.draft.sort = state.f.sort; renderFilterPanel(); });
+}
+
+/* Ред с активните филтри: всеки се маха с ×, плюс „Изчисти филтрите“ */
+function renderActive() {
+  var el = $('#b6-active');
+  if (!el) return;
+  var f = state.f, chips = [];
+  var chip = function (key, icon, text, val) { chips.push('<button type="button" class="b6-chip on" data-rm="' + key + '"' + (val ? ' data-val="' + esc(val) + '"' : '') + ' title="Премахни филтъра">' + (icon || '') + esc(text) + I.x + '</button>'); };
+  if (f.status) chip('status', I.warn, optLabel(STATUS_OPTS, f.status));
+  if (f.period) chip('period', I.bolt, optLabel(periodOpts(), f.period).replace(/ \(.*\)$/, ''));
+  if (f.obl) chip('obl', null, f.obl);
+  if (f.rt) chip('rt', null, 'Рег. № с „' + f.rt + '“');
+  f.cats.forEach(function (code) { chip('cat', null, code === 'other' ? 'Без определена категория' : catLabel(code), code); });
+  if (f.producer) chip('producer', I.factory, f.producerName || 'Производител');
+  if (f.trader) chip('trader', I.store, f.traderName || 'Търговец');
+  if (f.own) chip('own', null, f.producer ? 'Без посочен търговец' : 'Без посочен производител');
+  if (f.brand) chip('brand', I.layers, 'Марка: ' + f.brand);
+  if (!chips.length) { el.innerHTML = ''; el.classList.remove('has'); return; }
+  el.classList.add('has');
+  el.innerHTML = '<span class="b6-active-l">Филтри:</span>' + chips.join('') + '<button type="button" class="b6-link" id="b6-fclear">Изчисти филтрите</button>';
+  $$('[data-rm]', el).forEach(function (b) {
+    b.addEventListener('click', function () {
+      var k = b.getAttribute('data-rm');
+      if (k === 'cat') { var i = f.cats.indexOf(b.getAttribute('data-val')); if (i !== -1) f.cats.splice(i, 1); }
+      else if (k === 'producer' || k === 'trader') { f[k] = null; f[k + 'Name'] = ''; if (!f.producer && !f.trader) f.own = false; }
+      else if (k === 'own') f.own = false;
+      else if (k === 'brand') f.brand = null;
+      else f[k] = '';
+      state.draft = null; applyFilters();
+    });
+  });
+  $('#b6-fclear').addEventListener('click', function () { var q = f.q, sort = f.sort; state.f = newFilters(); state.f.q = q; state.f.sort = sort; state.draft = null; state.catsAll = false; applyFilters(); });
+}
+
+function sortSelectHTML(val) {
+  var opts = [['rel', 'По съвпадение'], ['new', 'По рег. №: най-нови'], ['date', 'По дата на уведомление'], ['old', 'По рег. №: най-стари'], ['name', 'По име: А–Я'], ['flagged', 'С най-много бележки']];
+  return '<label class="b6-sortl">Подреди: <select class="b6-sel" id="b6-sort" aria-label="Подреждане">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (val === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
 }
 
 function renderList(skeleton) {
@@ -515,51 +577,55 @@ function renderList(skeleton) {
     c.innerHTML = sk;
     return;
   }
+  var f = state.f;
+  var meta = '<div class="b6-meta"><span><b>' + nfmt(state.total) + '</b> ' + plural(state.total, 'резултат', 'резултата') + (f.q ? ' за „' + esc(f.q) + '“' : '') + (state.items.length && state.items.length < state.total ? ' · показани ' + nfmt(state.items.length) : '') + '</span>' + sortSelectHTML(f.sort) + '</div>';
   if (!state.items.length) {
     var noData = state.stats && state.stats.total === 0;
-    c.innerHTML = noData
+    c.innerHTML = meta + (noData
       ? '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Все още няма качени данни за справка.</div></div>'
-      : '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма резултати по тези критерии.</div><div>Провери изписването или промени търсенето и филтрите.</div></div>';
+      : '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма резултати по тези критерии.</div><div>Провери изписването или премахни част от филтрите.</div></div>');
+    bindSort(c);
     return;
   }
   var deepMiss = state.deepReg && !state.items.some(function (p) { return p.reg === state.deepReg; });
   var html = (deepMiss ? '<div class="b6-load-err" role="alert">Не е намерен запис с този регистрационен номер. Потърси продукта по име или фирма.</div>' : '') +
-    '<div class="b6-meta"><span><b>' + nfmt(state.total) + '</b> ' + plural(state.total, 'резултат', 'резултата') + (state.q ? ' за „' + esc(state.q) + '“' : '') + '</span><span>Показани: ' + nfmt(state.items.length) + ' от ' + nfmt(state.total) + '</span></div><div class="b6-cards">';
-  state.items.forEach(function (p) { html += cardHTML(p); });
-  html += '</div>';
+    meta + '<div class="b6-cards">' + state.items.map(function (p) { return cardHTML(p, state.openReg === p.reg); }).join('') + '</div>';
   if (state.items.length < state.total) {
     var left = state.total - state.items.length;
     html += '<div class="b6-more-wrap"><button class="b6-more" id="b6-more">Покажи още ' + Math.min(state.per, left) + '</button><div class="b6-left">' + (left === 1 ? 'Остава 1 резултат' : 'Остават ' + nfmt(left) + ' резултата') + '</div></div>';
   }
   c.innerHTML = html;
-
-  $$('.b6-card').forEach(function (card) {
+  bindSort(c);
+  bindCards(c, function (reg) { state.openReg = state.openReg === reg ? null : reg; renderList(false); return state.openReg === reg; });
+  var more = $('#b6-more');
+  if (more) more.addEventListener('click', function () { more.disabled = true; more.textContent = 'Зареждане…'; state.page++; loadProducts(true); });
+}
+function bindSort(c) {
+  var s = $('#b6-sort', c);
+  if (s) s.addEventListener('change', function (e) { state.f.sort = e.target.value; state.page = 1; loadProducts(false); });
+}
+/* Общи обработчици за картите (главен списък и списъкът в профила на фирма) */
+function bindCards(c, toggle) {
+  $$('.b6-card', c).forEach(function (card) {
     card.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); card.click(); } });
     card.addEventListener('click', function (e) {
       if (e.target.closest('.b6-act') || e.target.closest('.b6-ing') || e.target.closest('.b6-orig') || e.target.closest('.b6-plink')) return;
       var reg = card.getAttribute('data-reg');
-      state.openReg = state.openReg === reg ? null : reg;
-      renderList(false);
-      if (state.openReg === reg) {
+      if (toggle(reg)) {
         var el = $('.b6-card[data-reg="' + CSS.escape(reg) + '"]');
         if (el) setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 60);
       }
     });
   });
-  var more = $('#b6-more');
-  if (more) more.addEventListener('click', function () { more.disabled = true; more.textContent = 'Зареждане…'; state.page++; loadProducts(true); });
-  $$('.b6-ing[data-ing]').forEach(function (el) {
+  $$('.b6-ing[data-ing]', c).forEach(function (el) {
     el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
     el.addEventListener('click', function (e) {
       e.stopPropagation();
-      state.q = el.getAttribute('data-ing');
-      state.page = 1; state.openReg = null;
-      var qi = $('#b6-q'); if (qi) { qi.value = state.q; $('#b6-qclr').classList.add('show'); }
-      loadProducts(false);
-      window.scrollTo({ top: root.offsetTop - 20, behavior: 'smooth' });
+      gotoProducts({ q: el.getAttribute('data-ing') });
+      var tq = $('#b6-topq'); if (tq) tq.value = state.f.q;
     });
   });
-  $$('[data-share]').forEach(function (b) {
+  $$('[data-share]', c).forEach(function (b) {
     b.addEventListener('click', function (e) {
       e.stopPropagation();
       var url = location.origin + location.pathname + '#p=' + encodeURIComponent(b.getAttribute('data-share'));
@@ -570,8 +636,7 @@ function renderList(skeleton) {
   });
 }
 
-function cardHTML(p) {
-  var open = state.openReg === p.reg;
+function cardHTML(p, open) {
   var cat = p.cat || 'other';
   var col = CAT_COLORS[cat] || '#9AA0AB';
   var flags = (p.f || []).slice(0, 2).map(function (f) {
@@ -581,14 +646,14 @@ function cardHTML(p) {
   var producerFirm = p.p && p.pk === 'firm';
   var firm = traderFirm ? firstPart(p.tr) : (producerFirm ? firstPart(p.p) : firstPart(p.p || ''));
   var firmIcon = traderFirm ? I.store : (producerFirm ? I.factory : I.flag);
-  var infTag = (traderFirm && p.ti) ? '<span class="b6-tag info" title="Търговецът е определен автоматично по марката в наименованието; регистърът не го посочва">по името</span>' : '';
-  return '<div class="b6-card' + ((p.f || []).length ? ' flagged' : '') + (open ? ' open' : '') + '" data-reg="' + esc(p.reg) + '" role="button" tabindex="0" aria-expanded="' + (open ? 'true' : 'false') + '" aria-label="' + (open ? 'Скрий подробностите за ' : 'Покажи подробности за ') + esc(p.n) + '">' +
+  var gone = p.x ? '<span class="b6-tag danger" title="Записът липсва в последното качване на регистъра">Заличен</span>' : '';
+  return '<div class="b6-card' + ((p.f || []).length ? ' flagged' : '') + (open ? ' open' : '') + (p.x ? ' gone' : '') + '" data-reg="' + esc(p.reg) + '" role="button" tabindex="0" aria-expanded="' + (open ? 'true' : 'false') + '" aria-label="' + (open ? 'Скрий подробностите за ' : 'Покажи подробности за ') + esc(p.n) + '">' +
     '<div class="b6-ch">' +
       '<div class="b6-tile" style="background:' + col + '1C;color:' + col + '" title="' + esc(catLabel(cat, p.catl)) + '" aria-label="Автоматична категория: ' + esc(catLabel(cat, p.catl)) + '">' + (CAT_ICONS[cat] || CAT_ICONS.other) + '</div>' +
       '<div style="min-width:0"><div class="b6-cn">' + esc(p.n) + '</div>' +
         '<div class="b6-cm"><span class="b6-reg">' + esc(p.reg) + '</span>' +
-        (firm ? '<span class="b6-firm">' + firmIcon + esc(firm) + '</span>' : '') + infTag +
-        flags + '</div>' +
+        (firm ? '<span class="b6-firm">' + firmIcon + esc(firm) + '</span>' : '') +
+        gone + flags + '</div>' +
       '</div>' +
       '<div class="b6-cd">' + (p.nd ? '<span class="b6-date" title="Дата на уведомление" aria-label="Дата на уведомление: ' + fmtDate(p.nd) + '">' + fmtDate(p.nd) + '</span>' : '') + '<span class="b6-chev" aria-hidden="true">' + I.chev + '</span></div>' +
     '</div>' +
@@ -612,24 +677,17 @@ function bodyHTML(p) {
     }).join('<div style="height:6px"></div>') +
     '<div class="b6-flagnote">Това е автоматично съвпадение по текст, а не становище за продукта. Бележката не определя статуса на продукта.</div></div></div>';
   }
-
   var rows = '';
   if (p.p) {
     if (p.pk === 'country') rows += '<span class="l">Държава в полето „Производител“</span><span class="v">' + esc(p.p) + '</span>';
     else rows += '<span class="l">Производител</span><span class="v">' + partyLink('p', p.pn, firstPart(p.p)) + (restPart(p.p) ? '<div style="font-size:11.5px;color:var(--t3)">' + esc(restPart(p.p)) + '</div>' : '') + '</span>';
   }
-  if (p.tr && p.tk === 'firm') {
-    if (p.ti) {
-      rows += '<span class="l">Търговец <span class="b6-tag info">по името</span></span><span class="v">' + partyLink('t', p.tn, firstPart(p.tr)) +
-        '<div style="font-size:11.5px;color:var(--t3);margin-top:3px">В регистъра търговец не е посочен' + (p.tro ? ' (записано: „' + esc(p.tro) + '“)' : '') + '. Определен е автоматично по марката в наименованието, както при други продукти, вписани с този търговец. Не е информация от БАБХ.</div></span>';
-    } else {
-      rows += '<span class="l">Търговец</span><span class="v">' + partyLink('t', p.tn, firstPart(p.tr)) + (restPart(p.tr) ? '<div style="font-size:11.5px;color:var(--t3)">' + esc(restPart(p.tr)) + '</div>' : '') + '</span>';
-    }
-  }
+  if (p.tr && p.tk === 'firm') rows += '<span class="l">Търговец</span><span class="v">' + partyLink('t', p.tn, firstPart(p.tr)) + (!p.ti && restPart(p.tr) ? '<div style="font-size:11.5px;color:var(--t3)">' + esc(restPart(p.tr)) + '</div>' : '') + '</span>';
   if (p.nd) rows += '<span class="l">Дата на уведомление</span><span class="v">' + fmtDate(p.nd) + '</span>';
   if (p.ld) rows += '<span class="l">Дата на пускане на пазара</span><span class="v">' + fmtDate(p.ld) + '</span>';
   if (p.o) rows += '<span class="l">Област според рег. №</span><span class="v">' + esc(p.o) + '</span>';
   if (p.st) rows += '<span class="l">Данни за съхранение</span><span class="v" style="font-size:12.5px">' + esc(p.st) + '</span>';
+  if (p.x) rows += '<span class="l">Статус</span><span class="v" style="color:var(--red);font-weight:600">Заличен: записът липсва в последното качване на регистъра.</span>';
   if (p.del) rows += '<span class="l">Бележка за заличаване</span><span class="v" style="color:var(--red);font-weight:600">' + (p.dn ? esc(p.dn) : 'В източника има бележка за заличаване.') + '</span>';
 
   return '<div class="b6-body"><div>' +
@@ -723,16 +781,16 @@ function renderNovel(c) {
 /* ===== Pro: Производители / Търговци ===== */
 function partyToolbarHTML(kind) {
   var ps = state.plist[kind], isP = kind === 'p';
-  return '<div class="b6-fbar flat">' +
+  return '<div class="b6-ptool">' +
       '<div class="b6-fq">' + I.search + '<input id="b6-pq-' + kind + '" type="text" placeholder="' + (isP ? 'Търси производител…' : 'Търси търговец…') + '" aria-label="' + (isP ? 'Търсене на производител' : 'Търсене на търговец') + '" value="' + esc(ps.q) + '" autocomplete="off"><button class="clr' + (ps.q ? ' show' : '') + '" id="b6-pqclr-' + kind + '" aria-label="Изчисти търсенето">' + I.x + '</button></div>' +
-      '<button class="b6-chip' + (ps.all ? '' : ' on') + '" id="b6-pbg-' + kind + '" aria-pressed="' + (ps.all ? 'false' : 'true') + '" title="Определено по името и адреса в регистъра">' + I.flag + (ps.all ? 'Всички, вкл. чуждестранни' : 'Само с българска регистрация') + '</button>' +
-      '<select class="b6-sel" id="b6-psort-' + kind + '" aria-label="Подреждане">' +
+      '<button class="b6-chip' + (ps.all ? '' : ' on') + '" id="b6-pbg-' + kind + '" aria-pressed="' + (ps.all ? 'false' : 'true') + '" title="Определено по наименованието и адреса в регистъра">' + I.flag + (ps.all ? 'Всички, вкл. чуждестранни' : 'Само с българска регистрация') + '</button>' +
+      '<label class="b6-sortl">Подреди: <select class="b6-sel" id="b6-psort-' + kind + '" aria-label="Подреждане">' +
         '<option value="products"' + (ps.sort === 'products' ? ' selected' : '') + '>Най-много продукти</option>' +
         '<option value="partners"' + (ps.sort === 'partners' ? ' selected' : '') + '>Най-много ' + (isP ? 'клиенти' : 'доставчици') + '</option>' +
         '<option value="flagged"' + (ps.sort === 'flagged' ? ' selected' : '') + '>Най-много за проверка</option>' +
         '<option value="newest"' + (ps.sort === 'newest' ? ' selected' : '') + '>Най-нови регистрации</option>' +
         '<option value="name"' + (ps.sort === 'name' ? ' selected' : '') + '>По име</option>' +
-      '</select>' +
+      '</select></label>' +
     '</div>';
 }
 function bindPartyToolbar(kind) {
@@ -752,13 +810,11 @@ function bindPartyToolbar(kind) {
   });
   $('#b6-psort-' + kind).addEventListener('change', function (e) { ps.sort = e.target.value; ps.page = 1; loadParties(kind, false); });
 }
-/* Показва списъка, ако вече е зареден с подходящ размер; иначе го зарежда */
 function ensureParties(kind) {
-  var ps = state.plist[kind], per = state.tab === 'register' ? 8 : 40;
-  if (ps.loaded && ps.per === per) { renderPartyList(kind, false); return; }
-  if (ps.loading && ps.per === per) { renderPartyList(kind, true); return; }  /* заявката тече; ще се покаже в новия контейнер */
-  ps.per = per; ps.page = 1; ps.loaded = false;
-  loadParties(kind, false);
+  var ps = state.plist[kind];
+  if (ps.loaded) { renderPartyList(kind, false); return; }
+  if (ps.loading) { renderPartyList(kind, true); return; }
+  ps.page = 1; loadParties(kind, false);
 }
 function loadParties(kind, append) {
   var ps = state.plist[kind];
@@ -777,7 +833,8 @@ function loadParties(kind, append) {
 }
 function openParty(kind, norm) {
   var ps = state.party;
-  ps.kind = kind; ps.open = norm; ps.detail = null;
+  ps.kind = kind; ps.open = norm; ps.detail = null; ps.view = 'partners';
+  ps.prod = { items: [], total: 0, page: 1, loading: false, openReg: null };
   var tab = kind === 'p' ? 'producers' : 'traders';
   if (state.tab !== tab) { state.tab = tab; state.page = 1; state.openReg = null; closeSidebar();
     $$('.b6-item').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === state.tab); });
@@ -789,56 +846,55 @@ function openParty(kind, norm) {
     var c = $('#b6-content');
     c.innerHTML = '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Грешка при зареждане</div><div>' + esc(e.message) + '</div></div>';
   });
-  window.scrollTo({ top: root.offsetTop - 20, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-/* Пълен раздел: списък + профил */
 function renderParties(c, kind) {
   var ps = state.party;
   if (ps.open && ps.kind === kind) { renderPartyDetail(c); return; }
   var isP = kind === 'p';
   c.innerHTML =
     '<div class="b6-head"><div>' +
-      '<div class="b6-title">' + (isP ? 'Производители' : 'Търговци') + ' <span class="b6-pro-badge">PRO</span></div>' +
-      '<div class="b6-sub">' + (isP ? 'Кой за кого произвежда: клиентите на всеки производител и колко продукта има при всеки от тях.' : 'Кой доставя на кого: производителите зад всеки търговец и с колко продукта.') + ' Само записи, налични в последното качване. Фирмите са групирани автоматично по името в регистъра; „българска регистрация“ е определена по името и адреса.</div>' +
+      '<div class="b6-title">' + (isP ? 'Производители' : 'Търговци') + '</div>' +
+      '<div class="b6-sub">' + (isP ? 'Отвори производител, за да видиш клиентите му (фирмите, за които произвежда), марките и всичките му продукти.' : 'Отвори търговец, за да видиш марките, които продава, производителите зад тях и всички продукти, регистрирани с него като търговец.') + ' По подразбиране са показани само дружества с българска регистрация и седалище (определено по наименованието и адреса в регистъра). Фирмите са групирани автоматично по името.</div>' +
     '</div><div class="b6-actions"><button class="b6-btn" id="b6-pexport">' + I.dl + '<span>CSV на списъка</span></button></div></div>' +
     partyToolbarHTML(kind) +
     '<div id="b6-plist-' + kind + '"></div>';
   bindPartyToolbar(kind);
   $('#b6-pexport').addEventListener('click', function () {
     var pl = state.plist[kind];
-    var rows = [[isP ? 'Производител' : 'Търговец', 'Българска регистрация (автоматично, по име и адрес)', 'Продукти', 'От тях с търговец по името (автоматично)', isP ? 'Клиенти' : 'Доставчици', 'С бележки за проверка', 'От година', 'До година']];
-    pl.items.forEach(function (it) { rows.push([it.name, it.bg ? 'да' : '', it.products, it.inferred || 0, it.partners, it.flagged, it.y1 || '', it.y2 || '']); });
+    var rows = [[isP ? 'Производител' : 'Търговец', 'Българска регистрация (автоматично, по име и адрес)', 'Продукти', isP ? 'Клиенти' : 'Доставчици', 'С бележки за проверка', 'От година', 'До година']];
+    pl.items.forEach(function (it) { rows.push([it.name, it.bg ? 'да' : '', it.products, it.partners, it.flagged, it.y1 || '', it.y2 || '']); });
     downloadCSV(rows, (isP ? 'proizvoditeli' : 'targovci') + '.csv');
   });
   ensureParties(kind);
 }
+function yearsLabel(y1, y2) { if (!y1 && !y2) return '—'; if (!y1) return String(y2); if (!y2 || y1 === y2) return String(y1); return y1 + '–' + y2; }
 function renderPartyList(kind, skeleton) {
   var ps = state.plist[kind], c = $('#b6-plist-' + kind);
   if (!c) return;
-  var isP = kind === 'p', compact = state.tab === 'register';
+  var isP = kind === 'p';
   if (skeleton && ps.loading && !ps.items.length) {
-    var sk = ''; for (var i = 0; i < (compact ? 4 : 6); i++) sk += '<div class="b6-sk"><div class="b6-sk-line" style="width:' + (30 + i * 9) % 60 + '%"></div></div>';
+    var sk = ''; for (var i = 0; i < 6; i++) sk += '<div class="b6-sk"><div class="b6-sk-line" style="width:' + (30 + i * 9) % 60 + '%"></div></div>';
     c.innerHTML = sk; return;
   }
   if (!ps.items.length) {
     c.innerHTML = '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма съвпадения</div><div>' + (ps.all ? 'Опитай по-кратка дума.' : 'Опитай по-кратка дума или включи и чуждестранните фирми.') + '</div></div>';
     return;
   }
-  var scope = ps.all ? '(вкл. чуждестранни)' : 'с българска регистрация';
-  var html = '<div class="b6-meta"><span><b>' + nfmt(ps.total) + '</b> ' + plural(ps.total, 'фирма', 'фирми') + ' ' + scope + (ps.q ? ' за „' + esc(ps.q) + '“' : '') + (ps.allN ? ' · общо в регистъра ' + nfmt(ps.allN) + ' (' + nfmt(ps.allBg) + ' български)' : '') + '</span><span>Показани ' + ps.items.length + '</span></div>' +
-    '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>Фирма</th><th class="num">Продукти</th><th class="num">' + (isP ? 'Клиенти' : 'Доставчици') + '</th><th class="num" title="Продукти с автоматична бележка за проверка">За проверка</th>' + (compact ? '' : '<th class="num">Години</th>') + '</tr></thead><tbody>';
+  var html = '<div class="b6-meta"><span><b>' + nfmt(ps.total) + '</b> ' + plural(ps.total, 'фирма', 'фирми') + (ps.all ? ' (вкл. чуждестранни)' : ' с българска регистрация') + (ps.q ? ' за „' + esc(ps.q) + '“' : '') + (ps.allN ? ' · общо в регистъра ' + nfmt(ps.allN) + ' (' + nfmt(ps.allBg) + ' български)' : '') + '</span><span>Показани ' + ps.items.length + '</span></div>' +
+    '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>Фирма</th><th class="num">Продукти</th><th class="num">' + (isP ? 'Клиенти' : 'Доставчици') + '</th><th class="num" title="Продукти с автоматична бележка за проверка">За проверка</th><th class="num" title="Години от регистрационните номера">Години</th></tr></thead><tbody>';
   ps.items.forEach(function (it, i) {
     html += '<tr class="b6-prow" data-party="' + esc(kind) + '|' + esc(it.norm) + '" tabindex="0" role="link" aria-label="Профил на ' + esc(it.name) + '">' +
       '<td class="idx">' + (i + 1) + '</td>' +
-      '<td><div class="b6-pname">' + esc(it.name) + (it.bg ? ' <span class="b6-tag green" title="Българска регистрация — определено по името и адреса в регистъра">' + I.flag + 'БГ</span>' : '') + '</div></td>' +
-      '<td class="num"><b>' + nfmt(it.products) + '</b>' + (it.inferred ? '<div class="b6-inf" title="Продукти, при които търговецът е определен по името (регистърът не го посочва)">' + nfmt(it.inferred) + ' по името</div>' : '') + '</td>' +
+      '<td><div class="b6-pname">' + esc(it.name) + (it.bg ? ' <span class="b6-tag green" title="Българска регистрация — определено по наименованието и адреса в регистъра">' + I.flag + 'БГ</span>' : '') + '</div></td>' +
+      '<td class="num"><b>' + nfmt(it.products) + '</b></td>' +
       '<td class="num">' + nfmt(it.partners) + '</td>' +
       '<td class="num">' + (it.flagged ? '<span class="b6-tag warn">' + nfmt(it.flagged) + '</span>' : '<span style="color:var(--t4)">0</span>') + '</td>' +
-      (compact ? '' : '<td class="num" style="color:var(--t3)">' + (it.y1 ? (it.y1 === it.y2 ? it.y1 : it.y1 + '–' + it.y2) : '—') + '</td>') +
+      '<td class="num" style="color:var(--t3)">' + yearsLabel(it.y1, it.y2) + '</td>' +
     '</tr>';
   });
   html += '</tbody></table></div>';
-  if (ps.items.length < ps.total) html += '<div class="b6-more-wrap" style="margin-top:10px"><button class="b6-more" id="b6-pmore-' + kind + '">Покажи още ' + Math.min(ps.per, ps.total - ps.items.length) + '</button><div class="b6-left">' + nfmt(ps.total - ps.items.length) + ' остават' + (compact ? ' · пълният списък е в раздел „' + (isP ? 'Производители' : 'Търговци') + '“' : '') + '</div></div>';
+  if (ps.items.length < ps.total) html += '<div class="b6-more-wrap" style="margin-top:10px"><button class="b6-more" id="b6-pmore-' + kind + '">Покажи още ' + Math.min(ps.per, ps.total - ps.items.length) + '</button><div class="b6-left">' + nfmt(ps.total - ps.items.length) + ' остават</div></div>';
   c.innerHTML = html;
   var more = $('#b6-pmore-' + kind);
   if (more) more.addEventListener('click', function () { more.disabled = true; more.textContent = 'Зареждане…'; ps.page++; loadParties(kind, true); });
@@ -846,6 +902,8 @@ function renderPartyList(kind, skeleton) {
     tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tr.click(); } });
   });
 }
+
+/* Профил: KPI + изгледи „Клиенти/Доставчици“ · „Марки“ · „Продукти“ */
 function renderPartyDetail(c) {
   var ps = state.party, d = ps.detail, isP = ps.kind === 'p';
   var back = '<button class="b6-back" id="b6-pback">' + I.chev + 'Всички ' + (isP ? 'производители' : 'търговци') + '</button>';
@@ -855,112 +913,125 @@ function renderPartyDetail(c) {
     return;
   }
   var partnersLbl = isP ? 'Клиенти' : 'Доставчици';
-  var partnerKind = isP ? 't' : 'p';
-  var maxC = 1; d.partners.forEach(function (x) { if (x.count > maxC) maxC = x.count; });
-  var rows = d.partners.map(function (x, i) {
-    return '<tr>' +
-      '<td class="idx">' + (i + 1) + '</td>' +
-      '<td><div class="b6-pname"><a href="#" class="b6-plink" data-party="' + esc(partnerKind) + '|' + esc(x.norm) + '">' + esc(x.name) + '</a></div>' +
-        '<div class="b6-share"><i style="width:' + Math.max(2, Math.round(100 * x.count / maxC)) + '%"></i></div></td>' +
-      '<td class="num"><a href="#" class="b6-plink num" data-products="' + esc(x.norm) + '" title="Покажи продуктите"><b>' + nfmt(x.count) + '</b></a>' +
-        (x.inferred ? '<div class="b6-inf" title="Продукти без посочен търговец в регистъра, отнесени тук по марката в наименованието">' + nfmt(x.inferred) + ' по името</div>' : '') + '</td>' +
-      '<td class="num" style="color:var(--t3)">' + x.share + '%</td>' +
-      '<td class="num">' + (x.flagged ? '<span class="b6-tag warn">' + nfmt(x.flagged) + '</span>' : '<span style="color:var(--t4)">0</span>') + '</td>' +
-      '<td class="num" style="color:var(--t3);white-space:nowrap">' + (x.first ? fmtDate(x.first).slice(3) : '—') + (x.last && x.last !== x.first ? ' – ' + fmtDate(x.last).slice(3) : '') + '</td>' +
-    '</tr>';
-  }).join('');
-  var yrs = '';
-  if (d.years.length) {
-    var ymax = 1; d.years.forEach(function (y) { if (y.c > ymax) ymax = y.c; });
-    yrs = '<div class="b6-yrs">' + d.years.map(function (y) { return '<div class="b6-yr" title="' + y.y + ': ' + y.c + '"><i style="height:' + Math.max(6, Math.round(100 * y.c / ymax)) + '%"></i><span>' + String(y.y).slice(2) + '</span></div>'; }).join('') + '</div>';
-  }
-  var cats = d.cats.map(function (ct) { return '<span class="b6-chip" style="cursor:default"><span class="dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + (CAT_COLORS[ct.code] || '#999') + '"></span>' + esc(ct.label) + '<span class="c">' + nfmt(ct.count) + '</span></span>'; }).join('');
-  var hasInf = d.inferred > 0;
+  var self = {}; self[isP ? 'producer' : 'trader'] = d.norm; self[isP ? 'producerName' : 'traderName'] = d.name;
+  var views = [['partners', partnersLbl + ' (' + nfmt(d.partners.length) + ')'], ['brands', 'Марки (' + nfmt((d.brands || []).length) + ')'], ['products', 'Продукти (' + nfmt(d.products) + ')']];
   c.innerHTML = back +
     '<div class="b6-head" style="margin-top:12px"><div>' +
-      '<div class="b6-title" style="font-size:24px">' + (isP ? I.factory : I.store) + ' ' + esc(d.name) + (d.bg ? ' <span class="b6-tag green" title="Българска регистрация — определено по името и адреса в регистъра">' + I.flag + 'БГ</span>' : ' <span class="b6-tag" style="background:var(--bg-soft);color:var(--t3)" title="Не е разпозната българска регистрация по името и адреса">чуждестранна</span>') + '</div>' +
-      (d.full && d.full !== d.name ? '<div class="b6-sub">' + esc(d.full) + '</div>' : '') +
+      '<div class="b6-title" style="font-size:24px">' + (isP ? I.factory : I.store) + ' ' + esc(d.name) + (d.bg ? ' <span class="b6-tag green" title="Българска регистрация — определено по наименованието и адреса в регистъра">' + I.flag + 'БГ</span>' : ' <span class="b6-tag" style="background:var(--bg-soft);color:var(--t3)" title="Не е разпозната българска регистрация по наименованието и адреса">чуждестранна</span>') + '</div>' +
+      '<div class="b6-sub">' + (d.full && d.full !== d.name ? esc(d.full) + ' · ' : '') + (isP ? 'производител' : 'търговец') + ' според регистъра' + (d.y1 || d.y2 ? ' · регистрации ' + yearsLabel(d.y1, d.y2) : '') + '</div>' +
     '</div><div class="b6-actions">' +
-      '<button class="b6-btn" id="b6-pall">' + I.search + '<span>Всички продукти</span></button>' +
+      '<button class="b6-btn" id="b6-pall">' + I.search + '<span>Отвори в „Продукти“</span></button>' +
       '<button class="b6-btn" id="b6-pcsv">' + I.dl + '<span>CSV ' + partnersLbl.toLowerCase() + '</span></button>' +
     '</div></div>' +
     '<div class="b6-kpis">' +
-      '<div class="b6-bc"><div class="b6-bc-l">' + I.layers + 'Продукти в наличните данни</div><div class="b6-bc-n">' + nfmt(d.products) + '</div><div class="b6-bc-s">' + (d.y1 ? 'рег. номера ' + d.y1 + (d.y2 && d.y2 !== d.y1 ? '–' + d.y2 : '') : '') + (d.deleted ? ' · ' + nfmt(d.deleted) + ' липсващи в последващ файл' : '') + '</div></div>' +
-      '<div class="b6-bc tint"><div class="b6-bc-l">' + (isP ? I.store : I.factory) + partnersLbl + '</div><div class="b6-bc-n">' + nfmt(d.partners.length) + '</div><div class="b6-bc-s">' + (isP ? 'фирми, за които произвежда' : 'фирми, които произвеждат за него') + (hasInf ? ' · <a href="#" class="b6-plink" id="b6-pinf">' + nfmt(d.inferred) + ' продукта по името</a>' : '') + '</div></div>' +
-      '<div class="b6-bc"><div class="b6-bc-l">' + I.flag + (isP ? 'Собствени / без търговец' : 'Без посочен производител') + '</div><div class="b6-bc-n"><a href="#" class="b6-plink" id="b6-pown">' + nfmt(d.own) + '</a></div><div class="b6-bc-s">' + (isP ? 'продукти без насрещна фирма' : 'или производителят е държава') + '</div></div>' +
-      '<div class="b6-bc"><div class="b6-bc-l">' + I.warn + 'За проверка</div><div class="b6-bc-n">' + nfmt(d.flagged) + '</div><div class="b6-bc-s">с автоматична бележка</div></div>' +
+      '<div class="b6-bc link" data-view="products" role="button" tabindex="0"><div class="b6-bc-l">' + I.layers + 'Продукти</div><div class="b6-bc-n">' + nfmt(d.products) + '</div><div class="b6-bc-s">' + (d.deleted ? nfmt(d.deleted) + ' заличени отделно' : 'в наличните данни') + '</div></div>' +
+      '<div class="b6-bc tint link" data-view="partners" role="button" tabindex="0"><div class="b6-bc-l">' + (isP ? I.store : I.factory) + partnersLbl + '</div><div class="b6-bc-n">' + nfmt(d.partners.length) + '</div><div class="b6-bc-s">' + (isP ? 'фирми, за които произвежда' : 'фирми, които произвеждат за него') + '</div></div>' +
+      '<div class="b6-bc link" data-view="brands" role="button" tabindex="0"><div class="b6-bc-l">' + I.layers + 'Марки</div><div class="b6-bc-n">' + nfmt((d.brands || []).length) + '</div><div class="b6-bc-s">по първата дума в наименованията</div></div>' +
+      '<div class="b6-bc link" data-own="1" role="button" tabindex="0"><div class="b6-bc-l">' + I.flag + (isP ? 'Без посочен търговец' : 'Без посочен производител') + '</div><div class="b6-bc-n">' + nfmt(d.own) + '</div><div class="b6-bc-s">' + (isP ? 'собствена марка или празно поле' : 'или производителят е държава') + '</div></div>' +
+      '<div class="b6-bc link" data-flagged="1" role="button" tabindex="0"><div class="b6-bc-l">' + I.warn + 'За проверка</div><div class="b6-bc-n">' + nfmt(d.flagged) + '</div><div class="b6-bc-s">с автоматична бележка</div></div>' +
     '</div>' +
-    (yrs || cats ? '<div class="b6-pmeta">' + (yrs ? '<div><div class="b6-sec-l">Регистрации по години</div>' + yrs + '</div>' : '') + (cats ? '<div><div class="b6-sec-l">Категории</div><div class="b6-pcats">' + cats + '</div></div>' : '') + '</div>' : '') +
-    '<div class="b6-meta" style="margin-top:18px"><span><b>' + nfmt(d.partners.length) + '</b> ' + partnersLbl.toLowerCase() + ' според полето „' + (isP ? 'Търговец' : 'Производител') + '“ в регистъра' + (hasInf ? ', допълнено по името на продукта' : '') + ' · клик на числото показва продуктите</span></div>' +
-    (d.partners.length
-      ? '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>' + (isP ? 'Клиент (търговец)' : 'Производител') + '</th><th class="num">Продукти</th><th class="num">Дял</th><th class="num" title="Продукти с автоматична бележка за проверка">За проверка</th><th class="num">Период</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-        (hasInf ? '<div class="b6-flagnote">„По името“: продукти, при които регистърът не посочва търговец (или посочва държава / самия производител), а марката в наименованието съвпада с други продукти, правилно вписани с този търговец. Това е автоматично предположение, не данни на БАБХ.</div>' : '')
-      : '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма ' + partnersLbl.toLowerCase() + '</div><div>Всички продукти са без насрещна фирма (собствена марка / без търговец).</div></div>') +
-    brandsHTML(d, isP);
+    '<div class="b6-seg" role="tablist">' + views.map(function (v) { return '<button role="tab" class="b6-seg-b' + (ps.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '" aria-selected="' + (ps.view === v[0] ? 'true' : 'false') + '">' + v[1] + '</button>'; }).join('') + '</div>' +
+    '<div id="b6-pview"></div>';
   $('#b6-pback').addEventListener('click', function () { ps.open = null; ps.detail = null; render(); });
-  $$('[data-brand]', c).forEach(function (a) {
-    a.addEventListener('click', function (e) {
-      e.preventDefault(); e.stopPropagation();
-      var f = { brand: a.getAttribute('data-brand') };
-      var pn = a.getAttribute('data-brand-producer');
-      if (pn) { f.producer = pn; f.producerName = a.getAttribute('data-brand-pname') || ''; }
-      else if (isP) { f.producer = d.norm; f.producerName = d.name; f.own = true; }
-      gotoProducts(f);
-    });
-  });
-  var self = {}; self[isP ? 'producer' : 'trader'] = d.norm; self[isP ? 'producerName' : 'traderName'] = d.name;
   $('#b6-pall').addEventListener('click', function () { gotoProducts(self); });
-  $('#b6-pown').addEventListener('click', function (e) { e.preventDefault(); var f = {}; f[isP ? 'producer' : 'trader'] = d.norm; f[isP ? 'producerName' : 'traderName'] = d.name; f.own = true; gotoProducts(f); });
-  var pinf = $('#b6-pinf');
-  if (pinf) pinf.addEventListener('click', function (e) { e.preventDefault(); var f = {}; f[isP ? 'producer' : 'trader'] = d.norm; f[isP ? 'producerName' : 'traderName'] = d.name; f.inferred = true; gotoProducts(f); });
+  $$('[data-view]', c).forEach(function (el) {
+    var go = function () { ps.view = el.getAttribute('data-view'); $$('.b6-seg-b', c).forEach(function (b) { var on = b.getAttribute('data-view') === ps.view; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); }); renderPartyView(); };
+    el.addEventListener('click', go);
+    if (el.getAttribute('role') === 'button') el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  var own = $('[data-own]', c); own.addEventListener('click', function () { var f = JSON.parse(JSON.stringify(self)); f.own = true; gotoProducts(f); });
+  var fl = $('[data-flagged]', c); fl.addEventListener('click', function () { var f = JSON.parse(JSON.stringify(self)); f.status = 'flagged'; gotoProducts(f); });
   $('#b6-pcsv').addEventListener('click', function () {
-    var rows = [[isP ? 'Производител' : 'Търговец', isP ? 'Клиент' : 'Доставчик', 'Продукти', 'От тях с търговец по името (автоматично)', 'Дял %', 'С бележки за проверка', 'Първо уведомление', 'Последно уведомление']];
-    d.partners.forEach(function (x) { rows.push([d.name, x.name, x.count, x.inferred || 0, x.share, x.flagged, x.first || '', x.last || '']); });
+    var rows = [[isP ? 'Производител' : 'Търговец', isP ? 'Клиент' : 'Доставчик', 'Продукти', 'Дял %', 'С бележки за проверка', 'Първо уведомление', 'Последно уведомление']];
+    d.partners.forEach(function (x) { rows.push([d.name, x.name, x.count, x.share, x.flagged, x.first || '', x.last || '']); });
     var fn = d.norm.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
     downloadCSV(rows, (isP ? 'klienti-' : 'dostavchici-') + (fn || d.norm.length) + '.csv');
   });
-  $$('[data-products]', c).forEach(function (a) {
-    a.addEventListener('click', function (e) {
-      e.preventDefault(); e.stopPropagation();
-      var norm = a.getAttribute('data-products'), p = null;
-      d.partners.forEach(function (x) { if (x.norm === norm) p = x; });
-      var f = {};
-      f[isP ? 'producer' : 'trader'] = d.norm; f[isP ? 'producerName' : 'traderName'] = d.name;
-      f[isP ? 'trader' : 'producer'] = norm; f[isP ? 'traderName' : 'producerName'] = p ? p.name : '';
-      gotoProducts(f);
+  renderPartyView();
+}
+function renderPartyView() {
+  var ps = state.party, d = ps.detail, isP = ps.kind === 'p', c = $('#b6-pview');
+  if (!c || !d) return;
+  var self = {}; self[isP ? 'producer' : 'trader'] = d.norm; self[isP ? 'producerName' : 'traderName'] = d.name;
+  if (ps.view === 'partners') {
+    var partnerKind = isP ? 't' : 'p', partnersLbl = isP ? 'клиенти' : 'доставчици';
+    var maxC = 1; d.partners.forEach(function (x) { if (x.count > maxC) maxC = x.count; });
+    var rows = d.partners.map(function (x, i) {
+      return '<tr>' +
+        '<td class="idx">' + (i + 1) + '</td>' +
+        '<td><div class="b6-pname"><a href="#" class="b6-plink" data-party="' + esc(partnerKind) + '|' + esc(x.norm) + '">' + esc(x.name) + '</a></div>' +
+          '<div class="b6-share"><i style="width:' + Math.max(2, Math.round(100 * x.count / maxC)) + '%"></i></div></td>' +
+        '<td class="num"><a href="#" class="b6-plink num" data-products="' + esc(x.norm) + '" title="Покажи продуктите"><b>' + nfmt(x.count) + '</b></a></td>' +
+        '<td class="num" style="color:var(--t3)">' + x.share + '%</td>' +
+        '<td class="num">' + (x.flagged ? '<span class="b6-tag warn">' + nfmt(x.flagged) + '</span>' : '<span style="color:var(--t4)">0</span>') + '</td>' +
+        '<td class="num" style="color:var(--t3);white-space:nowrap">' + (x.first ? fmtDate(x.first).slice(3) : '—') + (x.last && x.last !== x.first ? ' – ' + fmtDate(x.last).slice(3) : '') + '</td>' +
+      '</tr>';
+    }).join('');
+    c.innerHTML = '<div class="b6-meta"><span><b>' + nfmt(d.partners.length) + '</b> ' + partnersLbl + ' според полето „' + (isP ? 'Търговец' : 'Производител') + '“ в регистъра · клик на числото показва продуктите</span></div>' +
+      (d.partners.length
+        ? '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>' + (isP ? 'Клиент (търговец)' : 'Производител') + '</th><th class="num">Продукти</th><th class="num">Дял</th><th class="num" title="Продукти с автоматична бележка за проверка">За проверка</th><th class="num">Период</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+        : '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма ' + partnersLbl + '</div><div>Всички продукти са без насрещна фирма (собствена марка / без търговец).</div></div>');
+    $$('[data-products]', c).forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var norm = a.getAttribute('data-products'), p = null;
+        d.partners.forEach(function (x) { if (x.norm === norm) p = x; });
+        var f = JSON.parse(JSON.stringify(self));
+        f[isP ? 'trader' : 'producer'] = norm; f[isP ? 'traderName' : 'producerName'] = p ? p.name : '';
+        gotoProducts(f);
+      });
     });
+    return;
+  }
+  if (ps.view === 'brands') {
+    var b = d.brands || [];
+    var cpLbl = isP ? 'Най-често с търговец' : 'Най-често от производител';
+    c.innerHTML = '<div class="b6-meta"><span><b>' + nfmt(b.length) + '</b> ' + (b.length === 1 ? 'марка' : 'марки') + ' по първата дума в наименованията на продуктите · клик на числото показва продуктите</span></div>' +
+      (b.length
+        ? '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>Марка</th><th class="num">Продукти</th><th>' + cpLbl + '</th></tr></thead><tbody>' +
+          b.map(function (x, i) {
+            return '<tr><td class="idx">' + (i + 1) + '</td>' +
+              '<td><div class="b6-pname">' + esc(x.token.toUpperCase()) + '</div></td>' +
+              '<td class="num"><a href="#" class="b6-plink num" data-brand="' + esc(x.token) + '" title="Покажи продуктите"><b>' + nfmt(x.count) + '</b></a></td>' +
+              '<td>' + (x.match ? '<a href="#" class="b6-plink" data-party="' + esc(x.match.kind) + '|' + esc(x.match.norm) + '">' + esc(x.match.name) + '</a> <span style="color:var(--t4);font-size:11px">(' + nfmt(x.match.count) + ')</span>' : '<span style="color:var(--t4)">—</span>') + '</td></tr>';
+          }).join('') + '</tbody></table></div>' +
+          '<div class="b6-flagnote">Марките са определени автоматично по първата дума в наименованието на продукта. Това е предположение, не поле от регистъра на БАБХ.</div>'
+        : '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма разпознати марки</div></div>');
+    $$('[data-brand]', c).forEach(function (a) {
+      a.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); var f = JSON.parse(JSON.stringify(self)); f.brand = a.getAttribute('data-brand'); gotoProducts(f); });
+    });
+    return;
+  }
+  /* products: списък в профила */
+  renderPartyProducts(true);
+  if (!ps.prod.items.length && !ps.prod.loading) loadPartyProducts(false);
+}
+function loadPartyProducts(append) {
+  var ps = state.party, pr = ps.prod, isP = ps.kind === 'p';
+  pr.loading = true;
+  var p = { page: pr.page, per: 20, sort: 'new' };
+  p[isP ? 'producer' : 'trader'] = ps.open;
+  return api('/products', p).then(function (r) {
+    pr.total = r.total; pr.items = append ? pr.items.concat(r.items) : r.items; pr.loading = false;
+    renderPartyProducts(false);
+  }).catch(function (e) {
+    pr.loading = false;
+    var c = $('#b6-pview'); if (c) c.innerHTML = '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Грешка при зареждане</div><div>' + esc(e.message) + '</div></div>';
   });
 }
-/* Марки по първата дума в наименованието — автоматично; регистърът често не посочва търговец */
-function brandsHTML(d, isP) {
-  var b = d.brands || [];
-  if (!b.length) return '';
-  var head, note, rows;
-  if (isP) {
-    head = 'Марки в имената на продуктите без посочен търговец';
-    note = 'Определени автоматично по първата дума в наименованието на продуктите, при които регистърът не посочва търговец. „Възможна фирма“ е фирма от регистъра със същото начало на името. Това е предположение, не данни на БАБХ.';
-    rows = b.map(function (x, i) {
-      return '<tr><td class="idx">' + (i + 1) + '</td>' +
-        '<td><div class="b6-pname">' + esc(x.token.toUpperCase()) + '</div></td>' +
-        '<td class="num"><a href="#" class="b6-plink num" data-brand="' + esc(x.token) + '" title="Покажи продуктите"><b>' + nfmt(x.count) + '</b></a></td>' +
-        '<td>' + (x.match ? '<a href="#" class="b6-plink" data-party="' + esc(x.match.kind) + '|' + esc(x.match.norm) + '">' + esc(x.match.name) + '</a> <span style="color:var(--t4);font-size:11px">(' + (x.match.kind === 't' ? 'търговец' : 'производител') + ')</span>' : '<span style="color:var(--t4)">—</span>') + '</td></tr>';
-    }).join('');
-    return '<div class="b6-meta" style="margin-top:22px"><span><b>' + nfmt(b.length) + '</b> ' + (b.length === 1 ? 'марка' : 'марки') + ' в имената на продуктите</span></div>' +
-      '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>Марка (първа дума)</th><th class="num">Продукти</th><th>Възможна фирма</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '<div class="b6-flagnote">' + note + '</div>';
-  }
-  head = 'Продукти с марка „' + esc((d.brand_token || '').toUpperCase()) + '“ при други производители';
-  note = 'Продукти, чието наименование започва с първата дума от името на фирмата, а в регистъра е посочен друг производител без този търговец. Определено автоматично по името, не по данни на БАБХ.';
-  var total = 0; b.forEach(function (x) { total += x.count; });
-  rows = b.filter(function (x) { return x.match; }).map(function (x, i) {
-    return '<tr><td class="idx">' + (i + 1) + '</td>' +
-      '<td><div class="b6-pname"><a href="#" class="b6-plink" data-party="p|' + esc(x.match.norm) + '">' + esc(x.match.name) + '</a></div></td>' +
-      '<td class="num"><a href="#" class="b6-plink num" data-brand="' + esc(x.token) + '" data-brand-producer="' + esc(x.match.norm) + '" data-brand-pname="' + esc(x.match.name) + '" title="Покажи продуктите"><b>' + nfmt(x.count) + '</b></a></td></tr>';
-  }).join('');
-  return '<div class="b6-meta" style="margin-top:22px"><span><b>' + nfmt(total) + '</b> ' + (total === 1 ? 'продукт' : 'продукта') + ' · ' + head + '</span></div>' +
-    '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>Производител</th><th class="num">Продукти</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-    '<div class="b6-flagnote">' + note + '</div>';
+function renderPartyProducts(skeleton) {
+  var ps = state.party, pr = ps.prod, c = $('#b6-pview');
+  if (!c) return;
+  if (skeleton && !pr.items.length) { c.innerHTML = '<div class="b6-sk"><div class="b6-sk-line" style="width:40%"></div><div class="b6-sk-line" style="width:75%;margin-top:10px"></div></div>'; return; }
+  var html = '<div class="b6-meta"><span><b>' + nfmt(pr.total) + '</b> ' + plural(pr.total, 'продукт', 'продукта') + (ps.kind === 'p' ? ' с този производител' : ' с този търговец') + ' · по рег. №, най-новите първи</span><span><a href="#" class="b6-plink" id="b6-pview-all">Отвори с филтри в „Продукти“</a></span></div>' +
+    '<div class="b6-cards">' + pr.items.map(function (p) { return cardHTML(p, pr.openReg === p.reg); }).join('') + '</div>';
+  if (pr.items.length < pr.total) html += '<div class="b6-more-wrap"><button class="b6-more" id="b6-ppmore">Покажи още ' + Math.min(20, pr.total - pr.items.length) + '</button><div class="b6-left">Остават ' + nfmt(pr.total - pr.items.length) + '</div></div>';
+  c.innerHTML = html;
+  bindCards(c, function (reg) { pr.openReg = pr.openReg === reg ? null : reg; renderPartyProducts(false); return pr.openReg === reg; });
+  var more = $('#b6-ppmore'); if (more) more.addEventListener('click', function () { more.disabled = true; pr.page++; loadPartyProducts(true); });
+  $('#b6-pview-all').addEventListener('click', function (e) { e.preventDefault(); var f = {}; f[ps.kind === 'p' ? 'producer' : 'trader'] = ps.open; f[ps.kind === 'p' ? 'producerName' : 'traderName'] = ps.detail ? ps.detail.name : ''; gotoProducts(f); });
 }
+
 function downloadCSV(rows, filename) {
   var csv = '\uFEFF' + rows.map(function (r) { return r.map(function (v) { v = String(v == null ? '' : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(';'); }).join('\r\n');
   var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -1006,13 +1077,23 @@ function renderSoon(c, title, desc, source, isPro) {
 if (String(CFG.locked) === '1') { renderGate(); return; }
 renderShell();
 var m = location.hash.match(/#p=([^&]+)/);
-if (m) { state.q = decodeURIComponent(m[1]); state.deepReg = state.q; }
+if (m) { state.tab = 'products'; state.f.q = decodeURIComponent(m[1]); state.deepReg = state.f.q; $('#b6-topq').value = state.f.q;
+  $$('.b6-item').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === 'products'); });
+  $$('.b6-bnav button[data-tab]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === 'products'); }); }
 render();
-loadStats().then(function () { if (state.tab === 'register') render(); loadProducts(false).then(function () {
-  if (state.deepReg) { var hit = state.items.filter(function (p) { return p.reg === state.deepReg; })[0]; if (hit) { state.openReg = hit.reg; } renderList(false); }
-}); }).catch(function () {
-  loadProducts(false);
-});
+if (state.tab === 'products') loadProducts(false);
+loadStats().then(function () {
+  if (state.tab === 'overview') render();
+  else if (state.tab === 'products') { renderFilterPanel(); renderActive(); }
+  if (state.deepReg && state.tab === 'products') {
+    loadProducts(false).then(function () {
+      var hit = state.items.filter(function (p) { return p.reg === state.deepReg; })[0];
+      if (hit) state.openReg = hit.reg;
+      renderList(false);
+    });
+  }
+}).catch(function () { render(); });
+window.addEventListener('resize', function () { if (state.tab === 'products') { if (!isMobile()) { state.fpanel = false; if (state.draft) { state.draft = null; } } renderFilterPanel(); } });
 document.addEventListener('click', function (e) {
   var b = e.target.closest ? e.target.closest('[data-goto-pro]') : null;
   if (b && root.contains(b)) { e.stopPropagation(); setTab(b.getAttribute('data-goto-pro')); return; }

@@ -171,46 +171,36 @@ function babh6_rest_party($req) {
     $full_name = (string)$wpdb->get_var($wpdb->prepare(
         "SELECT $name_col FROM $t WHERE $own_cond ORDER BY CHAR_LENGTH($name_col) DESC LIMIT 1", $norm));
 
-    /* Марки по първата дума в наименованието (автоматично). Регистърът често не
-       посочва търговец, а марката е само в името („АНСА …" при производител Нутренд). */
-    $brands = array(); $brand_token = '';
-    if ($kind === 'p') {
-        $names = $wpdb->get_col($wpdb->prepare(
-            "SELECT name FROM $t WHERE deleted_at IS NULL AND producer_norm = %s AND trader_inf_norm = ''
-             AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)", $norm));
-        $counts = array();
-        foreach ((array)$names as $nm) {
-            $tok = babh6_brand_token($nm);
-            if ($tok === '') continue;
-            $key = babh6_translit_bg2lat($tok);
-            if (!isset($counts[$key])) $counts[$key] = array('n' => 0, 'label' => $tok, 'variants' => array());
-            $counts[$key]['n']++;
-            $counts[$key]['variants'][$tok] = 1;
+    /* Марки по първата дума в наименованието (автоматично) — кои марки прави производителят /
+       продава търговецът, и с коя насрещна фирма е най-често всяка марка. */
+    $brands = array();
+    $cp_norm = $kind === 'p' ? $eff_norm : 'producer_norm';
+    $cp_name = $kind === 'p' ? $eff_name : 'producer_name';
+    $brows = $wpdb->get_results($wpdb->prepare(
+        "SELECT name, $cp_norm AS cn, SUBSTRING_INDEX($cp_name, ',', 1) AS cname, ($other_ok) AS ok
+         FROM $t WHERE deleted_at IS NULL AND $own_cond", $norm));
+    $counts = array();
+    foreach ((array)$brows as $r) {
+        $tok = babh6_brand_token($r->name);
+        if ($tok === '') continue;
+        $key = babh6_translit_bg2lat($tok);
+        if (!isset($counts[$key])) $counts[$key] = array('n' => 0, 'label' => $tok, 'cp' => array());
+        $counts[$key]['n']++;
+        if (mb_strlen($tok, 'UTF-8') > mb_strlen($counts[$key]['label'], 'UTF-8')) $counts[$key]['label'] = $tok;
+        if ((int)$r->ok && $r->cn !== '') {
+            if (!isset($counts[$key]['cp'][$r->cn])) $counts[$key]['cp'][$r->cn] = array('n' => 0, 'name' => trim((string)$r->cname));
+            $counts[$key]['cp'][$r->cn]['n']++;
         }
-        uasort($counts, function ($a, $b) { return $b['n'] - $a['n']; });
-        $i = 0;
-        foreach ($counts as $key => $c) {
-            if ($c['n'] < 2 || $i >= 15) break;
-            $i++;
-            $match = babh6_brand_match_firm($key, array_keys($c['variants']), $norm);
-            $brands[] = array('token' => $c['label'], 'key' => $key, 'count' => (int)$c['n'], 'match' => $match);
-        }
-    } else {
-        $brand_token = babh6_brand_token($party->name);
-        if ($brand_token !== '') {
-            $conds = array(); $args = array();
-            foreach (babh6_brand_like_variants($brand_token) as $v) { $conds[] = 'name LIKE %s'; $args[] = $v; }
-            $args[] = $norm; $args[] = $norm;
-            $rows = $wpdb->get_results($wpdb->prepare(
-                "SELECT producer_norm AS norm, SUBSTRING_INDEX(MAX(producer_name), ',', 1) AS name, COUNT(*) AS c
-                 FROM $t WHERE deleted_at IS NULL AND (" . implode(' OR ', $conds) . ") AND trader_norm <> %s AND trader_inf_norm <> %s
-                 AND producer_kind = 'firm' AND producer_norm <> ''
-                 GROUP BY producer_norm ORDER BY c DESC LIMIT 30", $args));
-            foreach ((array)$rows as $r) {
-                $brands[] = array('token' => $brand_token, 'key' => babh6_translit_bg2lat($brand_token), 'count' => (int)$r->c,
-                    'match' => array('kind' => 'p', 'norm' => $r->norm, 'name' => trim((string)$r->name)));
-            }
-        }
+    }
+    uasort($counts, function ($a, $b) { return $b['n'] - $a['n']; });
+    $i = 0;
+    foreach ($counts as $key => $c) {
+        if ($i >= 40) break;
+        $i++;
+        $top = null;
+        foreach ($c['cp'] as $cn => $cc) { if ($top === null || $cc['n'] > $top['n']) $top = array('norm' => $cn, 'name' => $cc['name'], 'n' => $cc['n']); }
+        $brands[] = array('token' => $c['label'], 'key' => $key, 'count' => (int)$c['n'],
+            'match' => $top ? array('kind' => $kind === 'p' ? 't' : 'p', 'norm' => $top['norm'], 'name' => $top['name'], 'count' => (int)$top['n']) : null);
     }
 
     return rest_ensure_response(array(
@@ -218,7 +208,7 @@ function babh6_rest_party($req) {
         'products' => $total, 'flagged' => (int)$party->flagged_count, 'deleted' => $deleted,
         'y1' => $party->first_year ? (int)$party->first_year : null, 'y2' => $party->last_year ? (int)$party->last_year : null,
         'own' => $own, 'inferred' => $inferred, 'partners' => $plist, 'cats' => $cats, 'years' => $years,
-        'brands' => $brands, 'brand_token' => $brand_token,
+        'brands' => $brands,
     ));
 }
 

@@ -55,8 +55,12 @@ function babh6_build_where($req, &$where, &$args) {
     if ($rt === '' && $req->get_param('bg')) $rt = 'П';
     if (in_array($rt, array('П', 'Т'), true)) { $where[] = 'rtype = %s'; $args[] = $rt; }
 
-    $cat = sanitize_key((string)$req->get_param('cat'));
-    if ($cat !== '') { $where[] = 'category = %s'; $args[] = $cat; }
+    /* Категории: една или няколко през запетая (продукти от поне една от тях) */
+    $cats = array_filter(array_map('sanitize_key', explode(',', (string)$req->get_param('cat'))));
+    if ($cats) {
+        $where[] = 'category IN (' . implode(',', array_fill(0, count($cats), '%s')) . ')';
+        foreach ($cats as $c) $args[] = $c;
+    }
 
     $year = (int)$req->get_param('year');
     if ($year >= 1990 && $year <= 2100) { $where[] = 'ryear = %d'; $args[] = $year; }
@@ -211,6 +215,7 @@ function babh6_row_to_item($r) {
         'cat'  => $r->category,
         'catl' => babh6_category_label($r->category ? $r->category : 'other'),
         'f'    => $flags,
+        'x'    => !empty($r->deleted_at) ? 1 : 0,
         'del'  => !empty($r->deletion),
         'dn'   => isset($r->deletion) ? (string)$r->deletion : '',
     );
@@ -232,7 +237,7 @@ function babh6_rest_products($req) {
     $offset = ($page - 1) * $per;
 
     $sort  = (string)$req->get_param('sort');
-    $cols  = 'reg, rtype, ryear, oblast, name, purpose, composition, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, trader_inf_name, storage, notif_date, launch_date, deletion, category, flags, flag_count';
+    $cols  = 'reg, rtype, ryear, oblast, name, purpose, composition, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, trader_inf_name, storage, notif_date, launch_date, deletion, category, flags, flag_count, deleted_at';
 
     /* При търсене без изрично подреждане: по съвпадение (име > фирма > състав), после по рег. № */
     $rel_args = array(); $rel = '';
@@ -343,7 +348,7 @@ function babh6_rest_export($req) {
     header('Content-Disposition: attachment; filename="babh-register-export.csv"');
     echo "\xEF\xBB\xBF";
     $fh = fopen('php://output', 'w');
-    fputcsv($fh, array('Регистрационен №', 'Наименование на продукта', 'Производител', 'Тип на полето „Производител“', 'Търговец', 'Тип на полето „Търговец“', 'Търговец по името на продукта (автоматично, не данни на БАБХ)', 'Дата на уведомление', 'Автоматична категория', 'Бележки за проверка (автоматични съвпадения по дума, не становище)'));
+    fputcsv($fh, array('Регистрационен №', 'Наименование на продукта', 'Производител', 'Тип на полето „Производител“', 'Търговец', 'Тип на полето „Търговец“', 'Търговец, допълнен автоматично по марката (не е поле на БАБХ)', 'Дата на уведомление', 'Автоматична категория', 'Бележки за проверка (автоматични съвпадения по дума, не становище)'));
     $kinds = array('firm' => 'фирма', 'country' => 'посочена държава', '' => '');
     foreach ((array)$rows as $r) {
         $flags = implode('; ', array_map(function ($f) { return $f['label'] . ' (в ' . babh6_field_label($f['field']) . ': ' . $f['term'] . ')'; },
