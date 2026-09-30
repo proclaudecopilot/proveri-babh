@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Регистър на добавките — версия 6
  * Description: Търсене в данни от регистъра на хранителните добавки на БАБХ. Качване на Excel файловете на регистъра или автоматично изтегляне от портала на БАБХ по график, преглед на продукти, профили на производители и търговци, изтегляне на резултатите в CSV. За вграждане в страница: [babh_register].
- * Version: 6.3.1
+ * Version: 6.4.0
  * GitHub Plugin URI: proclaudecopilot/proveri-babh
  * Author: BABH Register
  * Requires PHP: 7.4
@@ -11,7 +11,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BABH6_VERSION', '6.3.1');
+define('BABH6_VERSION', '6.4.0');
 define('BABH6_PATH', plugin_dir_path(__FILE__));
 define('BABH6_URL', plugin_dir_url(__FILE__));
 
@@ -23,6 +23,7 @@ require_once BABH6_PATH . 'includes/sync.php';
 require_once BABH6_PATH . 'includes/ai.php';
 require_once BABH6_PATH . 'includes/rest.php';
 require_once BABH6_PATH . 'includes/parties.php';
+require_once BABH6_PATH . 'includes/infer.php';
 require_once BABH6_PATH . 'includes/frontend.php';
 require_once BABH6_PATH . 'includes/site.php';
 require_once BABH6_PATH . 'includes/admin.php';
@@ -45,7 +46,7 @@ add_action('init', function () {
     if (get_option('babh6_version') !== BABH6_VERSION) {
         babh6_create_tables();
         update_option('babh6_version', BABH6_VERSION);
-        /* нови колони в parties (partner_count) → преизчисли от продуктите */
+        /* нови колони (partner_count, inferred_count, trader_inf_*) → преизчисли от продуктите */
         if (!get_option('babh6_job')) { babh6_rebuild_parties(); delete_transient('babh6_stats'); }
     }
 });

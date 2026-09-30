@@ -328,3 +328,26 @@ body.babh6-body { margin: 0; background: #ECECE8; font-family: 'Geist', system-u
 .b6-wl-label { display: block; font-size: 12px; font-weight: 500; color: var(--t2); margin-bottom: 6px; }
 .b6-wl-err { font-size: 12px; color: var(--red); margin-top: 6px; min-height: 1em; }
 .b6-card:focus-visible, .b6-ing:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+/* ===== v6.4: табло „Регистър“ с три секции, „Още филтри“, търговец по името ===== */
+.b6-section { margin-top: 36px; scroll-margin-top: 80px; }
+.b6-section#b6-s-products { margin-top: 0; }
+.b6-sech { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+.b6-sech-t { font-size: 18px; font-weight: 600; letter-spacing: -.3px; display: flex; align-items: center; gap: 8px; }
+.b6-sech-t svg { width: 17px; height: 17px; color: var(--acc); }
+.b6-sech-t .b6-pro-badge { transform: none; }
+.b6-sech-s { font-size: 12.5px; color: var(--t3); margin-top: 4px; line-height: 1.55; max-width: 760px; }
+.b6-fbar.flat { position: static; box-shadow: none; }
+.b6-fmore { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; padding: 10px 16px; margin: -2px 0 10px; background: var(--bg-soft); border: 1px solid var(--bd); border-radius: 12px; }
+.b6-fmore[hidden] { display: none; }
+.b6-fmore-l { font-size: 10.5px; color: var(--t3); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-right: 2px; }
+#b6-fmore svg { transition: transform .15s; }
+#b6-fmore[aria-expanded="true"] svg { transform: rotate(180deg); }
+.b6-inf { font-size: 10.5px; color: var(--blue); font-family: 'Geist Mono', monospace; white-space: nowrap; margin-top: 2px; }
+.b6-lock { background: var(--bg-card); border: 1px dashed var(--bd-hover); border-radius: 14px; padding: 16px 20px; display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13px; color: var(--t2); line-height: 1.5; }
+.b6-bc.link { cursor: pointer; }
+.b6-bc.link:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.b6-prow:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+.b6-cm .b6-tag.info { margin-left: -4px; }
+.b6-grid .l .b6-tag { margin-left: 4px; vertical-align: middle; }
+@media (max-width: 680px) { .b6-sech-t { font-size: 16px; } .b6-section { margin-top: 28px; } }

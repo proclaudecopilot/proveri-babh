@@ -427,44 +427,68 @@ function babh6_rebuild_parties() {
     $parties_t  = babh6_table('parties');
     $now = current_time('mysql');
 
+    /* Първо: търговец по името на продукта (includes/infer.php), за да влезе в броенето */
+    if (function_exists('babh6_infer_traders')) babh6_infer_traders();
+
     $wpdb->query("TRUNCATE TABLE $parties_t");
 
-    foreach (array('p' => array('producer_norm', 'producer_name', 'producer_kind', 'trader_norm', 'trader_kind'),
-                   't' => array('trader_norm', 'trader_name', 'trader_kind', 'producer_norm', 'producer_kind')) as $kind => $cols) {
-        list($norm_col, $name_col, $kind_col, $other_norm, $other_kind) = $cols;
-        /* partner_count: различни насрещни фирми (клиенти на производителя / доставчици на търговеца) */
+    /* Ефективен търговец: посоченият в регистъра, а ако липсва — определеният по името */
+    $eff_norm = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm)";
+    $eff_name = "IF(trader_inf_norm <> '', trader_inf_name, trader_name)";
+    $eff_ok   = "(trader_inf_norm <> '' OR (trader_kind = 'firm' AND trader_norm <> ''))";
+    $longest  = function ($col) { return "SUBSTRING(MAX(CONCAT(LPAD(CHAR_LENGTH($col), 5, '0'), $col)), 6)"; };
+
+    $kinds = array(
+        'p' => array(
+            'norm'     => 'producer_norm',
+            'name'     => 'producer_name',
+            'where'    => "producer_kind = 'firm' AND producer_norm <> ''",
+            'partners' => "COUNT(DISTINCT CASE WHEN $eff_ok AND $eff_norm <> '' AND $eff_norm <> producer_norm THEN $eff_norm END)",
+        ),
+        't' => array(
+            'norm'     => $eff_norm,
+            'name'     => $eff_name,
+            'where'    => $eff_ok . " AND $eff_norm <> ''",
+            'partners' => "COUNT(DISTINCT CASE WHEN producer_kind = 'firm' AND producer_norm <> '' AND producer_norm <> $eff_norm THEN producer_norm END)",
+        ),
+    );
+    foreach ($kinds as $kind => $k) {
+        $full = $longest($k['name']);
         $agg = $wpdb->get_results(
-            "SELECT $norm_col AS norm,
-                    SUBSTRING_INDEX(MAX($name_col), ',', 1) AS name,
+            "SELECT {$k['norm']} AS norm,
+                    SUBSTRING_INDEX(MAX({$k['name']}), ',', 1) AS name,
+                    $full AS full_name,
                     COUNT(*) AS cnt,
                     SUM(CASE WHEN flag_count > 0 THEN 1 ELSE 0 END) AS flagged,
-                    COUNT(DISTINCT CASE WHEN $other_kind = 'firm' AND $other_norm <> '' AND $other_norm <> $norm_col THEN $other_norm END) AS partners,
+                    {$k['partners']} AS partners,
+                    SUM(CASE WHEN trader_inf_norm <> '' THEN 1 ELSE 0 END) AS inferred,
                     MIN(ryear) AS y1, MAX(ryear) AS y2
              FROM $products_t
-             WHERE $kind_col = 'firm' AND $norm_col <> '' AND deleted_at IS NULL
-             GROUP BY $norm_col"
+             WHERE {$k['where']} AND deleted_at IS NULL
+             GROUP BY {$k['norm']}"
         );
         $batch = array();
-        foreach ($agg as $a) {
+        foreach ((array)$agg as $a) {
             $batch[] = '(' . implode(',', array(
                 $wpdb->prepare('%s', $kind),
                 $wpdb->prepare('%s', $a->norm),
                 $wpdb->prepare('%s', trim((string)$a->name)),
-                babh6_is_bg_firm((string)$a->name) ? 1 : 0,
+                babh6_is_bg_firm((string)$a->full_name) ? 1 : 0,
                 intval($a->cnt),
                 intval($a->flagged),
                 intval($a->partners),
+                intval($a->inferred),
                 $a->y1 ? intval($a->y1) : 'NULL',
                 $a->y2 ? intval($a->y2) : 'NULL',
                 $wpdb->prepare('%s', $now),
             )) . ')';
             if (count($batch) >= 300) {
-                $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
+                $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,inferred_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
                 $batch = array();
             }
         }
         if ($batch) {
-            $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
+            $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,inferred_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
         }
     }
 }

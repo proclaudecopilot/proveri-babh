@@ -38,14 +38,49 @@ function babh6_norm_firm($s) {
     return mb_substr($s, 0, 190, 'UTF-8');
 }
 
+/**
+ * Дали фирмата е с българска регистрация и седалище. Подава се целият текст от
+ * полето (име + адрес след запетаята), защото адресът е най-сигурният белег:
+ * „…ЕООД, гр. София, ул. …“ е българска; „…GmbH, Германия“ / „…, Warszawa, Polska“ не е.
+ *
+ * Ред на проверката:
+ *   1. изрично „България/Bulgaria“ в текста → българска;
+ *   2. чужда правна форма, чужда държава или град (кирилица или латиница) → чужда;
+ *   3. българска правна форма (ЕООД, ООД, АД…), български град/адресни съкращения → българска;
+ *   4. иначе: предимно кирилица → българска.
+ */
 function babh6_is_bg_firm($s) {
     $s = trim((string)$s);
     if ($s === '' || mb_strlen($s, 'UTF-8') < 3) return false;
     if (babh6_is_country($s)) return false;
-    if (preg_match('/\b(gmbh|s\.?r\.?l\.?|s\.?p\.?a\.?|sp\.?\s*z\s*o\.?\s*o\.?|spółka|spolka|b\.?v\.?|n\.?v\.?|kft|ltd\.?|inc\.?|llc|llp|corp\.?|oyj|aktiebolag)\b/iu', $s)) return false;
-    if (preg_match('/\b(germany|deutschland|poland|polska|italy|italia|france|spain|españa|netherlands|nederland|belgium|austria|österreich|hungary|czech|česká|slovakia|slovensko|usa|united states|united kingdom|england|london|berlin|paris|warszawa|warsaw|wien|vienna|prague|praha|amsterdam|opole|kraków|krakow|budapest|kingdom)\b/iu', $s)) return false;
-    if (preg_match('/\b(еоод|оод|еад|ад|ет|сд)\b/iu', $s)) return true;
-    if (preg_match('/(гр\.|с\.|ул\.|бул\.|жк|кв\.|пл\.)/u', $s)) return true;
+    $l = mb_strtolower($s, 'UTF-8');
+
+    if (preg_match('/(^|[^\p{L}])(българия|bulgaria|bulgarien|bulgarie)([^\p{L}]|$)/u', $l)) return true;
+
+    $bg_legal = (bool)preg_match('/(^|[^\p{L}])(еоод|оод|еад|ад|ет|сд|кд|кда|адсиц)([^\p{L}]|$)/u', $l);
+    $bg_place = (bool)preg_match('/(гр\.|с\.|ул\.|бул\.|ж\.?к\.?|кв\.|пл\.|бл\.|обл\.|общ\.|община|п\.к\.)/u', $l)
+        || (bool)preg_match('/(^|[^\p{L}])(софия|пловдив|варна|бургас|русе|стара загора|плевен|велико търново|благоевград|шумен|сливен|добрич|хасково|кърджали|кюстендил|ловеч|монтана|пазарджик|перник|разград|силистра|смолян|търговище|видин|враца|габрово|ямбол|асеновград|казанлък|димитровград|дупница|троян|ботевград|самоков|карлово|пещера|свищов|горна оряховица|севлиево|лом|петрич|сандански|гоце делчев|велинград|панагюрище|айтос|карнобат|несебър|поморие|созопол|провадия|девня|балчик|каварна|нова загора|чирпан|раднево|харманли|свиленград|момчилград|елхово|тутракан|исперих|попово|омуртаг|козлодуй|мездра|берковица|банкя|костинброд|елин пелин|ихтиман|сливница|своге|правец|етрополе|радомир|брезник|тетевен|луковит|червен бряг|левски|белене|павликени|бяла|разлог|банско|якоруда|sofia|plovdiv|varna|burgas|bourgas|ruse|rousse|stara zagora|pleven|veliko tarnovo|blagoevgrad|shumen|sliven|dobrich|haskovo|kardzhali|kyustendil|lovech|montana|pazardzhik|pernik|razgrad|silistra|smolyan|targovishte|vidin|vratsa|gabrovo|yambol|asenovgrad|kazanlak|dimitrovgrad|dupnitsa|troyan|botevgrad|samokov|karlovo)([^\p{L}]|$)/u', $l);
+
+    /* Чужди правни форми (без български белег за седалище) */
+    if (!$bg_legal && !$bg_place
+        && preg_match('/(^|[^\p{L}])(gmbh|s\.?r\.?l\.?|s\.?p\.?a\.?|s\.?a\.?s\.?|sp\.?\s*z\s*o\.?\s*o\.?|spółka|spolka|b\.?v\.?|n\.?v\.?|kft|zrt|d\.?o\.?o\.?|a\.?s\.?|s\.?r\.?o\.?|ltd\.?|limited|inc\.?|llc|llp|corp\.?|co\.?,?\s*ltd|oyj|aktiebolag|ab|ag|sa|sarl|sas|plc|pty|oy|aps|a\/s|ug)([^\p{L}]|$)/iu', $l)) return false;
+    /* Чужди държави и градове на латиница */
+    if (preg_match('/(^|[^\p{L}])(germany|deutschland|poland|polska|italy|italia|france|spain|españa|espana|netherlands|nederland|holland|belgium|belgique|austria|österreich|hungary|magyarország|czech|česká|czechia|slovakia|slovensko|slovenia|slovenija|croatia|hrvatska|serbia|srbija|romania|românia|greece|hellas|turkey|türkiye|usa|u\.s\.a|united states|united kingdom|england|uk|ireland|switzerland|schweiz|suisse|sweden|sverige|denmark|danmark|norway|norge|finland|suomi|portugal|lithuania|lietuva|latvia|latvija|estonia|eesti|cyprus|malta|ukraine|russia|china|india|japan|korea|canada|australia|israel|london|berlin|münchen|munich|hamburg|paris|warszawa|warsaw|kraków|krakow|wrocław|poznań|gdańsk|łódź|opole|wien|vienna|prague|praha|brno|bratislava|budapest|amsterdam|rotterdam|brussels|bruxelles|madrid|barcelona|lisboa|lisbon|milano|milan|roma|rome|torino|bologna|athens|athina|thessaloniki|bucharest|bucurești|bucuresti|zagreb|ljubljana|beograd|belgrade|istanbul|ankara|moscow|kyiv|kiev|stockholm|copenhagen|københavn|oslo|helsinki|dublin|zürich|zurich|geneva|nicosia|limassol|new york|chicago|los angeles|florida|california|texas|nevada|utah)([^\p{L}]|$)/iu', $l)) return false;
+    /* Чужди държави и градове на кирилица (без България) */
+    static $foreign_cyr = null;
+    if ($foreign_cyr === null) {
+        $names = array_keys(babh6_countries());
+        unset($names[array_search('българия', $names, true)]);
+        $names = array_merge($names, array('варшава','краков','вроцлав','познан','гданск','лодз','катовице','ополе','прага','бърно','острава','братислава','кошице','виена','залцбург','грац','берлин','мюнхен','хамбург','франкфурт','кьолн','щутгарт','дюселдорф','париж','лион','марсилия','лондон','манчестър','дъблин','амстердам','ротердам','брюксел','антверпен','мадрид','барселона','валенсия','лисабон','порто','милано','рим','торино','болоня','неапол','флоренция','атина','солун','букурещ','клуж','тимишоара','яш','будапеща','дебрецен','любляна','загреб','белград','нови сад','скопие','истанбул','анкара','измир','москва','санкт петербург','киев','одеса','стокхолм','гьотеборг','копенхаген','осло','хелзинки','цюрих','женева','берн','никозия','лимасол','ню йорк','чикаго','лос анджелис','флорида','калифорния','тексас','торонто','монреал','ванкувър','сидни','мелбърн','токио','сеул','шанхай','пекин','мумбай','делхи','тел авив'));
+        $foreign_cyr = $names;
+    }
+    foreach ($foreign_cyr as $n) {
+        if (mb_strpos($l, $n) !== false && preg_match('/(^|[^\p{L}])' . preg_quote($n, '/') . '([^\p{L}]|$)/u', $l)) return false;
+    }
+
+    /* Българска правна форма или адресни белези */
+    if ($bg_legal || $bg_place) return true;
+
     $cyr = preg_match_all('/[А-Яа-я]/u', $s);
     $lat = preg_match_all('/[A-Za-z]/', $s);
     return ($cyr > $lat && $cyr > 5);

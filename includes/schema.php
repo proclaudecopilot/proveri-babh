@@ -28,6 +28,8 @@ function babh6_create_tables() {
         trader_name VARCHAR(500) NOT NULL DEFAULT '',
         trader_norm VARCHAR(191) NOT NULL DEFAULT '',
         trader_kind VARCHAR(10) NOT NULL DEFAULT '',
+        trader_inf_norm VARCHAR(191) NOT NULL DEFAULT '',
+        trader_inf_name VARCHAR(500) NOT NULL DEFAULT '',
         storage TEXT NULL,
         notif_no VARCHAR(100) NOT NULL DEFAULT '',
         notif_date DATE NULL,
@@ -46,6 +48,7 @@ function babh6_create_tables() {
         UNIQUE KEY reg (reg),
         KEY producer_norm (producer_norm),
         KEY trader_norm (trader_norm),
+        KEY trader_inf_norm (trader_inf_norm),
         KEY category (category),
         KEY ryear (ryear),
         KEY flag_count (flag_count),
@@ -63,12 +66,14 @@ function babh6_create_tables() {
         product_count INT UNSIGNED NOT NULL DEFAULT 0,
         flagged_count INT UNSIGNED NOT NULL DEFAULT 0,
         partner_count INT UNSIGNED NOT NULL DEFAULT 0,
+        inferred_count INT UNSIGNED NOT NULL DEFAULT 0,
         first_year SMALLINT UNSIGNED NULL,
         last_year SMALLINT UNSIGNED NULL,
         updated_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
         UNIQUE KEY kindnorm (kind, norm),
-        KEY product_count (product_count)
+        KEY product_count (product_count),
+        KEY kindbg (kind, is_bg)
     ) $charset;");
 
     $uploads = babh6_table('uploads');
