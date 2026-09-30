@@ -72,6 +72,12 @@ function babh6_build_where($req, &$where, &$args) {
         elseif ($tn !== '') $where[] = "(producer_kind <> 'firm' OR producer_norm = '' OR producer_norm = trader_norm)";
     }
     if ($req->get_param('deleted')) { $where[0] = 'deleted_at IS NOT NULL'; }
+    $brand = trim((string)$req->get_param('brand'));
+    if ($brand !== '' && function_exists('babh6_brand_like_variants')) {
+        $ors = array();
+        foreach (babh6_brand_like_variants(mb_substr($brand, 0, 60, 'UTF-8')) as $v) { $ors[] = 'name LIKE %s'; $args[] = $v; }
+        $where[] = '(' . implode(' OR ', $ors) . ')';
+    }
 
     if ($req->get_param('recent')) {
         $where[] = 'notif_date >= %s';

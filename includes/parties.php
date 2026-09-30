@@ -151,10 +151,105 @@ function babh6_rest_party($req) {
     $full_name = (string)$wpdb->get_var($wpdb->prepare(
         "SELECT " . ($kind === 'p' ? 'producer_name' : 'trader_name') . " FROM $t WHERE $own_norm = %s ORDER BY LENGTH(" . ($kind === 'p' ? 'producer_name' : 'trader_name') . ") DESC LIMIT 1", $norm));
 
+    /* Марки по първата дума в наименованието (автоматично). Регистърът често не
+       посочва търговец, а марката е само в името („АНСА …" при производител Нутренд). */
+    $brands = array(); $brand_token = '';
+    if ($kind === 'p') {
+        $names = $wpdb->get_col($wpdb->prepare(
+            "SELECT name FROM $t WHERE deleted_at IS NULL AND producer_norm = %s
+             AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)", $norm));
+        $counts = array();
+        foreach ((array)$names as $nm) {
+            $tok = babh6_brand_token($nm);
+            if ($tok === '') continue;
+            $key = babh6_translit_bg2lat($tok);
+            if (!isset($counts[$key])) $counts[$key] = array('n' => 0, 'label' => $tok, 'variants' => array());
+            $counts[$key]['n']++;
+            $counts[$key]['variants'][$tok] = 1;
+        }
+        uasort($counts, function ($a, $b) { return $b['n'] - $a['n']; });
+        $i = 0;
+        foreach ($counts as $key => $c) {
+            if ($c['n'] < 2 || $i >= 15) break;
+            $i++;
+            $match = babh6_brand_match_firm($key, array_keys($c['variants']), $norm);
+            $brands[] = array('token' => $c['label'], 'key' => $key, 'count' => (int)$c['n'], 'match' => $match);
+        }
+    } else {
+        $brand_token = babh6_brand_token($party->name);
+        if ($brand_token !== '') {
+            $conds = array(); $args = array();
+            foreach (babh6_brand_like_variants($brand_token) as $v) { $conds[] = 'name LIKE %s'; $args[] = $v; }
+            $args[] = $norm;
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT producer_norm AS norm, SUBSTRING_INDEX(MAX(producer_name), ',', 1) AS name, COUNT(*) AS c
+                 FROM $t WHERE deleted_at IS NULL AND (" . implode(' OR ', $conds) . ") AND trader_norm <> %s
+                 AND producer_kind = 'firm' AND producer_norm <> ''
+                 GROUP BY producer_norm ORDER BY c DESC LIMIT 30", $args));
+            foreach ((array)$rows as $r) {
+                $brands[] = array('token' => $brand_token, 'key' => babh6_translit_bg2lat($brand_token), 'count' => (int)$r->c,
+                    'match' => array('kind' => 'p', 'norm' => $r->norm, 'name' => trim((string)$r->name)));
+            }
+        }
+    }
+
     return rest_ensure_response(array(
         'kind' => $kind, 'norm' => $party->norm, 'name' => $party->name, 'full' => $full_name, 'bg' => (int)$party->is_bg,
         'products' => $total, 'flagged' => (int)$party->flagged_count, 'deleted' => $deleted,
         'y1' => $party->first_year ? (int)$party->first_year : null, 'y2' => $party->last_year ? (int)$party->last_year : null,
         'own' => $own, 'partners' => $plist, 'cats' => $cats, 'years' => $years,
+        'brands' => $brands, 'brand_token' => $brand_token,
     ));
+}
+
+/** Първата дума на наименование/фирма като „марка"; '' ако е обща дума, кратка или число. */
+function babh6_brand_token($name) {
+    static $stop = null;
+    if ($stop === null) {
+        $stop = array_flip(array('витамин','vitamin','vitamins','витамини','магнезий','magnesium','омега','omega','протеин','protein','колаген','collagen',
+            'цинк','zinc','калций','calcium','желязо','iron','селен','коензим','coenzyme','хранителна','добавка','капсули','таблетки','capsules','tablets',
+            'complex','комплекс','био','bio','натурален','natural','organic','органик','super','супер','пробиотик','probiotic','мултивитамин','multivitamin',
+            'екстракт','extract','масло','oil','чай','tea','прах','powder','сироп','syrup','капки','drops','детски','kids','kid','baby','бебе','men','women',
+            'формула','formula','пакет','набор','set','плюс','plus','форте','forte','актив','active','ultra','ултра','max','макс','pro','про','daily','дейли',
+            'immune','имун','имуно','имунитет','sport','спорт','sports','whey','bcaa','creatine','креатин','d3','k2','b12','c','d','e','the','на','за','от','и'));
+    }
+    $s = mb_strtolower(trim((string)$name), 'UTF-8');
+    $s = preg_replace('/^[\s„“"\'«»(\[\-–—]+/u', '', $s);
+    if (!preg_match('/^([\p{L}\p{N}][\p{L}\p{N}&+\-]*)/u', $s, $m)) return '';
+    $tok = rtrim($m[1], '-+&');
+    if (mb_strlen($tok, 'UTF-8') < 3 || preg_match('/^[\p{N}.,]+$/u', $tok)) return '';
+    if (isset($stop[$tok])) return '';
+    return $tok;
+}
+
+/** LIKE шаблони за име, започващо с марката (с кавички отпред и кирилица/латиница). */
+function babh6_brand_like_variants($tok) {
+    global $wpdb;
+    $out = array();
+    foreach (babh6_query_variants($tok) as $v) {
+        $e = $wpdb->esc_like($v);
+        foreach (array('', '„', '"', '«', "'") as $q) { $out[] = $q . $e . '%'; }
+    }
+    return array_values(array_unique($out));
+}
+
+/** Фирма, чието име започва с марката (предпочита търговец). */
+function babh6_brand_match_firm($key, $variants, $exclude_norm) {
+    global $wpdb;
+    $pt = babh6_table('parties');
+    $conds = array(); $args = array();
+    $all = $variants; $all[] = $key;
+    foreach (array_unique($all) as $v) {
+        foreach (babh6_query_variants($v) as $vv) { $conds[] = 'norm LIKE %s'; $args[] = $wpdb->esc_like($vv) . '%'; }
+    }
+    if (!$conds) return null;
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT kind, norm, name, product_count FROM $pt WHERE (" . implode(' OR ', $conds) . ") ORDER BY (kind = 't') DESC, product_count DESC LIMIT 20", $args));
+    foreach ((array)$rows as $r) {
+        if ($r->norm === $exclude_norm) continue;
+        $first = preg_split('/[\s\-]+/u', $r->norm);
+        if (!$first || babh6_translit_bg2lat($first[0]) !== $key) continue;
+        return array('kind' => $r->kind, 'norm' => $r->norm, 'name' => $r->name);
+    }
+    return null;
 }
