@@ -16,13 +16,25 @@ add_action('rest_api_init', function () {
     register_rest_route('babh6/v1', '/stats', array(
         'methods' => 'GET', 'callback' => 'babh6_rest_stats', 'permission_callback' => 'babh6_rest_permission',
     ));
+    /* v6.7.3: CSV съдържа състава на хиляди записи наведнъж — само с Pro достъп */
     register_rest_route('babh6/v1', '/export', array(
-        'methods' => 'GET', 'callback' => 'babh6_rest_export', 'permission_callback' => 'babh6_rest_permission',
+        'methods' => 'GET', 'callback' => 'babh6_rest_export', 'permission_callback' => 'babh6_rest_permission_pro',
     ));
     register_rest_route('babh6/v1', '/waitlist', array(
         'methods' => 'POST', 'callback' => 'babh6_rest_waitlist', 'permission_callback' => 'babh6_rest_permission',
     ));
 });
+
+/* v6.7.3: отговорите с данни не се кешират от хостинга/CDN — иначе детайл, отворен от един
+   посетител (или Pro отговор), може да се покаже на друг */
+add_filter('rest_post_dispatch', function ($response, $server, $request) {
+    $route = (string)$request->get_route();
+    if (preg_match('#^/babh6/v1/(products|product/|party|parties|export)#', $route) && $response instanceof WP_REST_Response) {
+        $response->header('Cache-Control', 'private, no-store, max-age=0');
+        $response->header('Vary', 'Cookie');
+    }
+    return $response;
+}, 10, 3);
 
 /* ============ Транслитерация за търсене (BG↔EN) ============ */
 function babh6_translit_bg2lat($s) {
@@ -304,6 +316,30 @@ function babh6_row_to_item($r) {
     );
 }
 
+/** Кратък запис за списъка: само каквото показва картата. */
+function babh6_row_to_card($r) {
+    $first = function ($v) { $p = explode(',', (string)$v); return trim($p[0]); };
+    return array(
+        'reg'  => $r->reg,
+        't'    => $r->rtype,
+        'n'    => $r->name,
+        'p'    => $first($r->producer_name),
+        'pk'   => $r->producer_kind,
+        'pn'   => isset($r->producer_norm) ? $r->producer_norm : '',
+        'tr'   => $first($r->trader_name),
+        'tk'   => $r->trader_kind,
+        'tn'   => isset($r->trader_norm) ? $r->trader_norm : '',
+        'nd'   => $r->notif_date,
+        'cat'  => $r->category,
+        'catl' => babh6_category_label($r->category ? $r->category : 'other'),
+        /* броят бележки (без текста им) — само с Pro */
+        'fc'   => babh6_flags_visible() ? (int)$r->flag_count : 0,
+        'x'    => !empty($r->deleted_at) ? 1 : 0,
+        'del'  => !empty($r->deletion),
+        'short' => 1,
+    );
+}
+
 /* ============ GET /products ============ */
 function babh6_rest_products($req) {
     global $wpdb;
@@ -314,14 +350,16 @@ function babh6_rest_products($req) {
     if ($per < 1 || $per > 50) $per = 20;
     $offset = ($page - 1) * $per;
 
-    $cols = 'id, reg, rtype, ryear, oblast, name, purpose, composition, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, trader_inf_name, storage, notif_no, notif_date, launch_date, entry_date, deletion, category, flags, flag_count, deleted_at';
+    $cols = 'id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, notif_date, deletion, category, flag_count, deleted_at';
     $sel = babh6_products_select($req, $cols, $per, $offset);
     if (is_wp_error($sel)) return $sel;
 
     $total = $wpdb->get_var(babh6_maybe_prepare("SELECT COUNT(*) FROM $t WHERE {$sel['where']}", $sel['args']));
     if ($total === null || $wpdb->last_error) return new WP_Error('babh6_db', 'Грешка в базата данни при търсенето. Опитай отново.', array('status' => 500));
 
-    $items = array_map('babh6_row_to_item', $sel['rows'] ? $sel['rows'] : array());
+    /* v6.7.3: списъкът връща само полетата на картата; съставът, предназначението, съхранението,
+       адресите и бележките идват само от /product/{reg} (детайлът, който по-късно ще се брои) */
+    $items = array_map('babh6_row_to_card', $sel['rows'] ? $sel['rows'] : array());
 
     return rest_ensure_response(array(
         'total' => (int)$total,

@@ -627,7 +627,7 @@ function renderProducts(c) {
             '<button type="button" class="b6-btn b6-fbtn" id="b6-fbtn" aria-controls="b6-fpanel" aria-expanded="false">' + I.filter + 'Филтри' + (activeCount(f) ? ' · ' + activeCount(f) : '') + '</button>' +
             sortSelectHTML(f.sort) +
             colsSegHTML() +
-            '<button type="button" class="b6-btn" id="b6-export" title="Същите резултати и подреждане като в списъка; максимум 5000 реда">' + I.dl + '<span>CSV</span></button>' +
+            (PRO ? '<button type="button" class="b6-btn" id="b6-export" title="Същите резултати и подреждане като в списъка; максимум 5000 реда">' + I.dl + '<span>CSV</span></button>' : '') +
           '</div>' +
         '</div>' +
         '<div class="b6-active" id="b6-active"></div>' +
@@ -655,7 +655,7 @@ function renderProducts(c) {
     b.addEventListener('click', function () { var v = b.getAttribute('data-sug'); qi.value = v; $('#b6-qclr').classList.add('show'); runQ(v); });
   });
   $('#b6-fbtn').addEventListener('click', function () { state.fpanel = !state.fpanel; if (state.fpanel) state.draft = null; renderFilterPanel(); if (state.fpanel && isMobile()) focusEl('#b6-fclose'); });
-  $('#b6-export').addEventListener('click', function () {
+  var exb = $('#b6-export'); if (exb) exb.addEventListener('click', function () {
     if (!state.total || state.loading) return;
     if (state.total > 5000 && !confirm('Ще се изтеглят първите 5000 от ' + nfmt(state.total) + ' резултата според избраното подреждане; обхватът е отбелязан и в самия файл. Стесни търсенето, за да включиш всички нужни записи. Да продължим ли?')) return;
     var p = filterParams(state.f);
@@ -922,8 +922,15 @@ function dwRender(isNew) {
   var body = $('#b6-dw-b');
   if (top.type === 'product') {
     markActiveCard(top.item.reg);
-    body.innerHTML = productHeadHTML(top.item) + bodyHTML(top.item);
-    bindDetail(body);
+    if (top.loading) {
+      body.innerHTML = productHeadHTML(top.item) + '<div class="b6-body" role="status" aria-label="Зареждане на записа"><div class="b6-cn-full" style="margin-bottom:14px">' + esc(top.item.n) + '</div><div class="b6-sk-line" style="width:60%"></div><div class="b6-sk-line" style="width:85%;margin-top:12px"></div><div class="b6-sk-line" style="width:70%;margin-top:12px"></div><div class="b6-sk-line" style="width:40%;margin-top:12px"></div></div>';
+    } else if (top.err) {
+      body.innerHTML = productHeadHTML(top.item) + '<div class="b6-empty" role="alert">' + I.empty + '<div class="b6-empty-t">' + esc(top.err) + '</div><div style="margin-top:12px"><button type="button" class="b6-retry" id="b6-dw-retry">Опитай отново</button></div></div>';
+      $('#b6-dw-retry').addEventListener('click', function () { var it = top.item; dwClose(false); openProduct(it, null); });
+    } else {
+      body.innerHTML = productHeadHTML(top.item) + bodyHTML(top.item);
+      bindDetail(body);
+    }
   } else {
     markActiveCard(null);
     var ps = state.party;
@@ -941,11 +948,23 @@ function productHeadHTML(p) {
     '<div><div class="b6-ccat" style="color:color-mix(in srgb,' + col + ' 58%,#0E1116)">' + esc(cat === 'other' ? 'Без определена категория' : catLabel(cat, p.catl)) + '</div>' +
     '<div class="b6-dw-reg"><span class="b6-reg">' + esc(p.reg) + '</span>' + (p.nd ? '<span class="b6-date">уведомен ' + fmtDate(p.nd) + '</span>' : '') + '</div></div></div>';
 }
+/* v6.7.3: списъкът носи само полетата на картата — пълният запис идва от /product/{reg} */
+var fullItems = {};
 function openProduct(item, opener) {
   if (!item) return;
   var top = dw[dw.length - 1];
   if (top && top.type === 'product' && top.item.reg === item.reg) return;
-  dwOpen({ type: 'product', item: item }, opener);
+  var full = item.short ? fullItems[item.reg] : item;
+  var entry = { type: 'product', item: full || item, loading: !full, err: '' };
+  dwOpen(entry, opener);
+  if (full) return;
+  api('/product/' + encodeURIComponent(item.reg)).then(function (d) {
+    fullItems[item.reg] = d; entry.item = d; entry.loading = false;
+    if (dw[dw.length - 1] === entry) dwRender(false);
+  }).catch(function (e) {
+    entry.loading = false; entry.err = e.status === 404 ? 'Записът не е намерен в наличните данни.' : (e.message || 'Грешка при зареждане.');
+    if (dw[dw.length - 1] === entry) dwRender(false);
+  });
 }
 /* Обработчици в детайла на продукт: съставки → търсене, копиране на линк */
 function bindDetail(c) {
@@ -1019,10 +1038,11 @@ function cardHTML(p) {
   var col = CAT_COLORS[cat] || '#9AA0AB';
   var catName = catLabel(cat, p.catl);
   var fl = PRO ? (p.f || []) : [];
-  var nf = fl.length;
-  var flags = fl.slice(0, 1).map(function (f) {
+  var nf = PRO ? (fl.length || p.fc || 0) : 0;
+  /* пълен запис → първата бележка по име; кратък запис от списъка → само броят */
+  var flags = fl.length ? fl.slice(0, 1).map(function (f) {
     return '<span class="b6-tag warn" title="Автоматична бележка: намерено „' + esc(f.term || f.label) + '“ в ' + esc(f.field_label || 'наличните данни') + '">' + I.warn + 'Бележка: ' + esc(f.label) + (nf > 1 ? ' +' + (nf - 1) : '') + '</span>';
-  }).join('');
+  }).join('') : (nf ? '<span class="b6-tag warn" title="Автоматични бележки — подробностите са в детайла">' + I.warn + (nf === 1 ? '1 бележка' : nf + ' бележки') + '</span>' : '');
   var traderFirm = p.tr && p.tk === 'firm';
   var producerFirm = p.p && p.pk === 'firm';
   var firm = producerFirm ? firstPart(p.p) : (traderFirm ? firstPart(p.tr) : firstPart(p.p || ''));
