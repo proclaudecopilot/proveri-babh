@@ -106,7 +106,7 @@ function babh6_rest_party($req) {
     $norm = mb_substr((string)$req->get_param('norm'), 0, 191, 'UTF-8');
 
     $party = $wpdb->get_row($wpdb->prepare("SELECT * FROM $pt WHERE kind = %s AND norm = %s", $kind, $norm));
-    if (!$party) return new WP_Error('babh6_notfound', 'Фирмата не е намерена.', array('status' => 404));
+    if (!$party) return new WP_Error('babh6_notfound', 'Фирмата не е намерена в наличните данни.', array('status' => 404));
 
     /* own = колоната на фирмата; other = насрещната страна.
        Търговецът е „ефективен“: посоченият в регистъра, а ако липсва — определеният по името (trader_inf_*). */
@@ -137,6 +137,11 @@ function babh6_rest_party($req) {
         $norm
     ));
     $total = (int)$party->product_count;
+    /* Пълен брой контрагенти — списъкът е ограничен до 500 (CO-05) */
+    $partners_total = (int)$wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(DISTINCT $other_norm) FROM $t WHERE deleted_at IS NULL AND $own_cond AND $other_ok AND $other_norm <> ''", $norm));
+    $partners_src = (int)$wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(DISTINCT $other_norm) FROM $t WHERE deleted_at IS NULL AND $own_cond AND $other_ok AND $other_norm <> '' AND trader_inf_norm = ''", $norm));
     $plist = array();
     foreach ((array)$partners as $p) {
         $dn = babh6_display_firm($p->name);
@@ -208,8 +213,9 @@ function babh6_rest_party($req) {
         'kind' => $kind, 'norm' => $party->norm, 'name' => $party->name, 'full' => $full_name, 'bg' => (int)$party->is_bg,
         'products' => $total, 'flagged' => (int)$party->flagged_count, 'deleted' => $deleted,
         'y1' => $party->first_year ? (int)$party->first_year : null, 'y2' => $party->last_year ? (int)$party->last_year : null,
-        'own' => $own, 'inferred' => $inferred, 'partners' => $plist, 'cats' => $cats, 'years' => $years,
-        'brands' => $brands,
+        'own' => $own, 'inferred' => $inferred, 'partners' => $plist, 'partners_total' => $partners_total, 'partners_src' => $partners_src,
+        'cats' => $cats, 'years' => $years,
+        'brands' => $brands, 'brands_total' => count($counts),
     ));
 }
 

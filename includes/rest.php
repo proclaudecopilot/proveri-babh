@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 /**
  * Публично REST API за фронтенда: /wp-json/babh6/v1/...
- * Само четене на регистъра + запис в Pro waitlist.
+ * Само четене на регистъра + запис в waitlist по функция.
  */
 
 add_action('rest_api_init', function () {
@@ -43,10 +43,39 @@ function babh6_query_variants($s) {
     return $out ? $out : array($s);
 }
 
+/**
+ * Общ интервал „последните 12 месеца“ (OV-02, OV-03): 12 последователни календарни
+ * месеца, включително текущия (непълен), в часовата зона на сайта. Един и същ
+ * интервал за брояча, графиката, филтъра „recent“ и CSV.
+ * @return array {from: Y-m-d (вкл.), to: Y-m-d (изкл.), keys: [Y-m × 12]}
+ */
+function babh6_recent_range($now_ts = null) {
+    $tz = function_exists('wp_timezone') ? wp_timezone() : new DateTimeZone('UTC');
+    $now = new DateTime('@' . ($now_ts === null ? time() : (int)$now_ts));
+    $now->setTimezone($tz);
+    $first = new DateTime($now->format('Y-m-01') . ' 00:00:00', $tz);
+    $from = clone $first; $from->modify('-11 months');
+    $to   = clone $first; $to->modify('+1 month');
+    $keys = array();
+    for ($i = 0; $i < 12; $i++) { $d = clone $from; if ($i) $d->modify('+' . $i . ' months'); $keys[] = $d->format('Y-m'); }
+    return array('from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'keys' => $keys);
+}
+
 /* ============ Общ query builder за products/export ============ */
+/**
+ * @return true|WP_Error
+ * Статус (status=): '' наличен в последните данни | deleted — липсва в последния пълен файл |
+ *                   delnote — в източника има бележка за заличаване | all — всички записи.
+ * flagged=1 е независим филтър (само с автоматична бележка) и се комбинира с всеки статус.
+ */
 function babh6_build_where($req, &$where, &$args) {
     global $wpdb;
-    $where = array('deleted_at IS NULL');
+    $status = (string)$req->get_param('status');
+    if ($status === '' && $req->get_param('deleted')) $status = 'deleted'; /* стар параметър */
+    if ($status === 'deleted')      $where = array('deleted_at IS NOT NULL');
+    elseif ($status === 'delnote')  $where = array("deletion <> ''");
+    elseif ($status === 'all')      $where = array('1=1');
+    else                            $where = array('deleted_at IS NULL');
     $args  = array();
 
     if ($req->get_param('flagged')) $where[] = 'flag_count > 0';
@@ -71,16 +100,20 @@ function babh6_build_where($req, &$where, &$args) {
     /* Филтри по фирма (от профилите в Pro) — по нормализирания ключ */
     $pn = (string)$req->get_param('producer');
     if ($pn !== '') { $where[] = 'producer_norm = %s'; $args[] = mb_substr($pn, 0, 191, 'UTF-8'); }
-    /* Търговец: посоченият в регистъра ИЛИ определеният по името на продукта (trader_inf_norm) */
+    /* Търговец: един модел навсякъде (CO-07) — „ефективният“ търговец: определеният по името,
+       ако има такъв, иначе посоченият в регистъра; inferred=0 ограничава до посочените. */
     $tn = (string)$req->get_param('trader');
-    if ($tn !== '') { $where[] = '(trader_norm = %s OR trader_inf_norm = %s)'; $args[] = mb_substr($tn, 0, 191, 'UTF-8'); $args[] = mb_substr($tn, 0, 191, 'UTF-8'); }
-    if ($req->get_param('inferred')) $where[] = "trader_inf_norm <> ''";
+    if ($tn !== '') {
+        if ((string)$req->get_param('inferred') === '0') { $where[] = 'trader_norm = %s'; }
+        else { $where[] = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm) = %s"; }
+        $args[] = mb_substr($tn, 0, 191, 'UTF-8');
+    }
+    if ((string)$req->get_param('inferred') === '1') $where[] = "trader_inf_norm <> ''";
     if ($req->get_param('own')) {
-        /* продукти без насрещна фирма (собствена марка / без търговец), и нищо определено по името */
+        /* продукти без насрещна фирма (без посочен търговец / производител), и нищо определено по името */
         if ($pn !== '') $where[] = "trader_inf_norm = '' AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)";
         elseif ($tn !== '') $where[] = "(producer_kind <> 'firm' OR producer_norm = '' OR producer_norm = IF(trader_inf_norm <> '', trader_inf_norm, trader_norm))";
     }
-    if ($req->get_param('deleted')) { $where[0] = 'deleted_at IS NOT NULL'; }
     $brand = trim((string)$req->get_param('brand'));
     if ($brand !== '' && function_exists('babh6_brand_like_variants')) {
         $ors = array();
@@ -89,18 +122,23 @@ function babh6_build_where($req, &$where, &$args) {
     }
 
     if ($req->get_param('recent')) {
-        $where[] = 'notif_date >= %s';
-        $args[]  = gmdate('Y-m-d', strtotime('-12 months'));
+        $rr = babh6_recent_range();
+        $where[] = 'notif_date >= %s AND notif_date < %s';
+        $args[]  = $rr['from']; $args[] = $rr['to'];
     }
 
     $q = trim((string)$req->get_param('q'));
-    if ($q !== '' && mb_strlen($q, 'UTF-8') >= 2) {
+    if ($q !== '' && mb_strlen($q, 'UTF-8') < 2) {
+        return new WP_Error('babh6_query_short', 'Въведи поне 2 знака за търсене.', array('status' => 400));
+    }
+    if ($q !== '') {
         $regq = preg_replace('/\s+/u', '', $q);
-        if (preg_match('/^[ПТптPTpt]?\d{3,}$/u', $regq)) {
-            /* Търсене по рег. номер */
-            $digits = preg_replace('/^[ПТптPTpt]/u', '', $regq);
+        if (preg_match('/^([ПТптPTpt]?)(\d{3,})(.*)$/u', $regq, $rm)) {
+            /* Търсене по рег. номер: префиксът (П/Т) и суфиксът се запазват (PR-04) */
+            $prefix = mb_strtoupper(strtr($rm[1], array('P' => 'П', 'p' => 'П', 'T' => 'Т', 't' => 'Т')), 'UTF-8');
+            $like = ($prefix !== '' ? $wpdb->esc_like($prefix) : '_') . '%' . $wpdb->esc_like($rm[2]) . '%' . ($rm[3] !== '' ? $wpdb->esc_like($rm[3]) . '%' : '');
             $where[] = 'reg LIKE %s';
-            $args[]  = '%' . $wpdb->esc_like($digits) . '%';
+            $args[]  = $like;
         } else {
             $tokens = preg_split('/\s+/u', $q, -1, PREG_SPLIT_NO_EMPTY);
             $tokens = array_slice($tokens, 0, 6);
@@ -120,8 +158,11 @@ function babh6_build_where($req, &$where, &$args) {
                     if ($grp) $expr[] = '+(' . implode(' ', $grp) . ')';
                 }
                 if ($expr) {
-                    $where[] = 'MATCH(name, composition, producer_name, trader_name) AGAINST (%s IN BOOLEAN MODE)';
-                    $args[]  = implode(' ', $expr);
+                    /* Същите полета като в LIKE режима: индексът + определеният търговец и рег. № (PR-04) */
+                    $ors = array('MATCH(name, composition, producer_name, trader_name) AGAINST (%s IN BOOLEAN MODE)');
+                    $args[] = implode(' ', $expr);
+                    foreach (babh6_query_variants($q) as $v) { $ors[] = 'trader_inf_name LIKE %s'; $args[] = '%' . $wpdb->esc_like($v) . '%'; }
+                    $where[] = '(' . implode(' OR ', $ors) . ')';
                 }
             } else {
                 foreach ($tokens as $tk) {
@@ -139,6 +180,7 @@ function babh6_build_where($req, &$where, &$args) {
             }
         }
     }
+    return true;
 }
 
 function babh6_maybe_prepare($sql, $args) {
@@ -172,15 +214,42 @@ function babh6_relevance_sql($q, &$args) {
     return $parts ? '(' . implode(' + ', $parts) . ')' : '';
 }
 
+/** Стабилно подреждане: всяка сортировка има уникален вторичен ключ (PR-09). */
 function babh6_order_sql($sort) {
     $map = array(
-        'new'     => 'reg DESC',
-        'old'     => 'reg ASC',
-        'name'    => 'name ASC',
-        'flagged' => 'flag_count DESC, reg DESC',
-        'date'    => '(notif_date IS NULL) ASC, notif_date DESC, reg DESC',
+        'new'     => 'reg DESC, id DESC',
+        'old'     => 'reg ASC, id ASC',
+        'name'    => 'name ASC, reg DESC, id DESC',
+        'flagged' => 'flag_count DESC, reg DESC, id DESC',
+        'date'    => '(notif_date IS NULL) ASC, notif_date DESC, reg DESC, id DESC',
     );
     return isset($map[$sort]) ? $map[$sort] : $map['new'];
+}
+
+/**
+ * Общ избор на редове за /products и /export — един и същ набор и подреждане (EX-01).
+ * Релевантност само при sort=rel или без сортировка (PR-09); „най-нови“ остава по рег. №.
+ */
+function babh6_products_select($req, $cols, $limit, $offset = 0) {
+    global $wpdb;
+    $t = babh6_table('products');
+    $err = babh6_build_where($req, $where, $args);
+    if (is_wp_error($err)) return $err;
+    $wsql = implode(' AND ', $where);
+    $sort = (string)$req->get_param('sort');
+    $rel_args = array(); $rel = '';
+    if ($sort === '' || $sort === 'rel') $rel = babh6_relevance_sql((string)$req->get_param('q'), $rel_args);
+    if ($rel !== '') {
+        $sql  = "SELECT $cols, $rel AS rel FROM $t WHERE $wsql ORDER BY rel DESC, reg DESC, id DESC LIMIT %d OFFSET %d";
+        $rows = $wpdb->get_results($wpdb->prepare($sql, array_merge($rel_args, $args, array($limit, $offset))));
+    } else {
+        $order = babh6_order_sql($sort);
+        $rows  = $wpdb->get_results($wpdb->prepare("SELECT $cols FROM $t WHERE $wsql ORDER BY $order LIMIT %d OFFSET %d", array_merge($args, array($limit, $offset))));
+    }
+    if ($rows === null || $wpdb->last_error) {
+        return new WP_Error('babh6_db', 'Грешка в базата данни при търсенето. Опитай отново.', array('status' => 500));
+    }
+    return array('rows' => $rows, 'where' => $wsql, 'args' => $args);
 }
 
 function babh6_row_to_item($r) {
@@ -191,7 +260,7 @@ function babh6_row_to_item($r) {
         : array();
     foreach ($flags as &$fl) { $fl['field_label'] = babh6_field_label($fl['field']); }
     unset($fl);
-    /* Търговец, определен по името на продукта (регистърът не го посочва) — вж. includes/infer.php */
+    /* Търговец, определен по името на продукта — отделно от посочения в регистъра (PR-11) */
     $inf = !empty($r->trader_inf_norm);
     return array(
         'reg'  => $r->reg,
@@ -202,20 +271,24 @@ function babh6_row_to_item($r) {
         'p'    => $r->producer_name,
         'pk'   => $r->producer_kind,
         'pn'   => isset($r->producer_norm) ? $r->producer_norm : '',
-        'tr'   => $inf ? $r->trader_inf_name : $r->trader_name,
-        'tk'   => $inf ? 'firm' : $r->trader_kind,
-        'tn'   => $inf ? $r->trader_inf_norm : (isset($r->trader_norm) ? $r->trader_norm : ''),
+        'tr'   => $r->trader_name,
+        'tk'   => $r->trader_kind,
+        'tn'   => isset($r->trader_norm) ? $r->trader_norm : '',
         'ti'   => $inf ? 1 : 0,
-        'tro'  => $inf ? (string)$r->trader_name : '',
+        'tin'  => $inf ? (string)$r->trader_inf_name : '',
+        'tinn' => $inf ? (string)$r->trader_inf_norm : '',
         'c'    => $r->composition,
         'pp'   => $r->purpose,
         'st'   => $r->storage,
+        'nn'   => isset($r->notif_no) ? (string)$r->notif_no : '',
         'nd'   => $r->notif_date,
         'ld'   => $r->launch_date,
+        'ed'   => isset($r->entry_date) ? $r->entry_date : null,
         'cat'  => $r->category,
         'catl' => babh6_category_label($r->category ? $r->category : 'other'),
         'f'    => $flags,
         'x'    => !empty($r->deleted_at) ? 1 : 0,
+        'xd'   => !empty($r->deleted_at) ? substr((string)$r->deleted_at, 0, 10) : '',
         'del'  => !empty($r->deletion),
         'dn'   => isset($r->deletion) ? (string)$r->deletion : '',
     );
@@ -226,51 +299,39 @@ function babh6_rest_products($req) {
     global $wpdb;
     $t = babh6_table('products');
 
-    babh6_build_where($req, $where, $args);
-    $wsql = implode(' AND ', $where);
-
-    $total = (int)$wpdb->get_var(babh6_maybe_prepare("SELECT COUNT(*) FROM $t WHERE $wsql", $args));
-
     $page = max(1, (int)$req->get_param('page'));
     $per  = (int)$req->get_param('per');
     if ($per < 1 || $per > 50) $per = 20;
     $offset = ($page - 1) * $per;
 
-    $sort  = (string)$req->get_param('sort');
-    $cols  = 'reg, rtype, ryear, oblast, name, purpose, composition, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, trader_inf_name, storage, notif_date, launch_date, deletion, category, flags, flag_count, deleted_at';
+    $cols = 'id, reg, rtype, ryear, oblast, name, purpose, composition, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, trader_inf_name, storage, notif_no, notif_date, launch_date, entry_date, deletion, category, flags, flag_count, deleted_at';
+    $sel = babh6_products_select($req, $cols, $per, $offset);
+    if (is_wp_error($sel)) return $sel;
 
-    /* При търсене без изрично подреждане: по съвпадение (име > фирма > състав), после по рег. № */
-    $rel_args = array(); $rel = '';
-    if (in_array($sort, array('', 'rel', 'new'), true)) $rel = babh6_relevance_sql((string)$req->get_param('q'), $rel_args);
-    if ($rel !== '') {
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT $cols, $rel AS rel FROM $t WHERE $wsql ORDER BY rel DESC, reg DESC LIMIT %d OFFSET %d",
-            array_merge($rel_args, $args, array($per, $offset))
-        ));
-    } else {
-        $order = babh6_order_sql($sort);
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT $cols FROM $t WHERE $wsql ORDER BY $order LIMIT %d OFFSET %d",
-            array_merge($args, array($per, $offset))
-        ));
-    }
+    $total = $wpdb->get_var(babh6_maybe_prepare("SELECT COUNT(*) FROM $t WHERE {$sel['where']}", $sel['args']));
+    if ($total === null || $wpdb->last_error) return new WP_Error('babh6_db', 'Грешка в базата данни при търсенето. Опитай отново.', array('status' => 500));
 
-    $items = array_map('babh6_row_to_item', $rows ? $rows : array());
+    $items = array_map('babh6_row_to_item', $sel['rows'] ? $sel['rows'] : array());
 
     return rest_ensure_response(array(
-        'total' => $total,
+        'total' => (int)$total,
         'page'  => $page,
         'per'   => $per,
         'items' => $items,
     ));
 }
 
-/* ============ GET /product/{reg} ============ */
+/* ============ GET /product/{reg} — точен запис, включително липсващ в последния файл (PR-10) ============ */
 function babh6_rest_product($req) {
     global $wpdb;
     $t   = babh6_table('products');
-    $reg = sanitize_text_field(urldecode((string)$req['reg']));
+    $reg = sanitize_text_field(rawurldecode((string)$req['reg']));
+    $reg = preg_replace('/\s+/u', '', $reg);
     $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE reg = %s LIMIT 1", $reg));
+    if (!$row) {
+        $pr = babh6_parse_reg($reg);
+        if ($pr && $pr['reg'] !== $reg) $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE reg = %s LIMIT 1", $pr['reg']));
+    }
     if (!$row) return new WP_Error('babh6_notfound', 'Няма намерен запис с този регистрационен номер.', array('status' => 404));
     return rest_ensure_response(babh6_row_to_item($row));
 }
@@ -278,7 +339,7 @@ function babh6_rest_product($req) {
 /* ============ GET /stats ============ */
 function babh6_rest_stats() {
     $cached = get_transient('babh6_stats');
-    if (is_array($cached)) return rest_ensure_response($cached);
+    if (is_array($cached) && isset($cached['sync_result'])) return rest_ensure_response($cached);
 
     global $wpdb;
     $t  = babh6_table('products');
@@ -291,29 +352,40 @@ function babh6_rest_stats() {
         'producers_bg' => (int)$wpdb->get_var("SELECT COUNT(*) FROM $pt WHERE kind = 'p' AND is_bg = 1"),
         'traders_bg'   => (int)$wpdb->get_var("SELECT COUNT(*) FROM $pt WHERE kind = 't' AND is_bg = 1"),
         'deleted'      => (int)$wpdb->get_var("SELECT COUNT(*) FROM $t WHERE deleted_at IS NOT NULL"),
+        'delnote'      => (int)$wpdb->get_var("SELECT COUNT(*) FROM $t WHERE deletion <> ''"),
         'producers'    => (int)$wpdb->get_var("SELECT COUNT(*) FROM $pt WHERE kind = 'p'"),
         'traders'      => (int)$wpdb->get_var("SELECT COUNT(*) FROM $pt WHERE kind = 't'"),
         'inferred'     => (int)$wpdb->get_var("SELECT COUNT(*) FROM $t WHERE deleted_at IS NULL AND trader_inf_norm <> ''"),
     );
 
-    $last = $wpdb->get_var("SELECT uploaded_at FROM $ut WHERE status = 'done' ORDER BY id DESC LIMIT 1");
-    $out['last_update'] = $last ? date_i18n('d.m.Y', strtotime($last)) : null;
+    /* Актуалност (OV-06): дата на последния пълен импорт, дата на източника, кога е проверявано и с какъв резултат */
+    $last = $wpdb->get_row("SELECT uploaded_at, notes FROM $ut WHERE status = 'done' ORDER BY id DESC LIMIT 1");
+    $out['last_update']    = $last ? date_i18n('d.m.Y', strtotime($last->uploaded_at)) : null;
+    $out['last_update_at'] = $last ? date_i18n('d.m.Y H:i', strtotime($last->uploaded_at)) : null;
+    $out['last_partial']   = ($last && !empty($last->notes)) ? 1 : 0;
+    $st = function_exists('babh6_sync_state') ? babh6_sync_state() : array();
+    $out['source_date']  = !empty($st['portal_updated']) ? date_i18n('d.m.Y', strtotime($st['portal_updated'])) : null;
+    $out['checked_at']   = !empty($st['last_check']) ? date_i18n('d.m.Y H:i', strtotime($st['last_check'])) : null;
+    $out['sync_result']  = isset($st['last_result']) ? (string)$st['last_result'] : '';
+    $out['sync_enabled'] = function_exists('babh6_sync_enabled') && babh6_sync_enabled() ? 1 : 0;
+    $out['check_overdue'] = 0;
+    if ($out['sync_enabled'] && !empty($st['last_check']) && time() - strtotime($st['last_check']) > 8 * DAY_IN_SECONDS) $out['check_overdue'] = 1;
 
-    /* Месечна серия — последните 12 месеца по notif_date */
-    $keys = array();
-    for ($i = 11; $i >= 0; $i--) $keys[] = gmdate('Y-m', strtotime("-$i months"));
-    $from = $keys[0] . '-01';
+    /* Месечна серия — точно 12 календарни месеца, същия интервал като филтъра „recent“ */
+    $rr = babh6_recent_range();
     $rows = $wpdb->get_results($wpdb->prepare(
         "SELECT DATE_FORMAT(notif_date, '%%Y-%%m') AS m, COUNT(*) AS c
-         FROM $t WHERE deleted_at IS NULL AND notif_date >= %s
-         GROUP BY m", $from
+         FROM $t WHERE deleted_at IS NULL AND notif_date >= %s AND notif_date < %s
+         GROUP BY m", $rr['from'], $rr['to']
     ));
     $map = array();
     foreach ($rows as $r) $map[$r->m] = (int)$r->c;
     $monthly = array();
-    foreach ($keys as $k) $monthly[] = array('m' => $k, 'c' => isset($map[$k]) ? $map[$k] : 0);
+    foreach ($rr['keys'] as $k) $monthly[] = array('m' => $k, 'c' => isset($map[$k]) ? $map[$k] : 0);
     $out['monthly']  = $monthly;
     $out['recent12'] = array_sum(array_map(function ($x) { return $x['c']; }, $monthly));
+    $out['recent_from'] = $rr['from'];
+    $out['recent_to']   = $rr['to'];
 
     /* Категории */
     $cats = array();
@@ -324,45 +396,74 @@ function babh6_rest_stats() {
     }
     $out['cats'] = $cats;
 
-    $out['years']   = array_map('intval', (array)$wpdb->get_col("SELECT DISTINCT ryear FROM $t WHERE deleted_at IS NULL AND ryear IS NOT NULL ORDER BY ryear DESC"));
-    $out['oblasti'] = (array)$wpdb->get_col("SELECT DISTINCT oblast FROM $t WHERE deleted_at IS NULL AND oblast <> '' ORDER BY oblast ASC");
+    /* Опции за филтрите покриват и архивните записи (PR-06) */
+    $out['years']   = array_map('intval', (array)$wpdb->get_col("SELECT DISTINCT ryear FROM $t WHERE ryear IS NOT NULL ORDER BY ryear DESC"));
+    $out['oblasti'] = (array)$wpdb->get_col("SELECT DISTINCT oblast FROM $t WHERE oblast <> '' ORDER BY oblast ASC");
+    $out['rules']   = defined('BABH6_RULES_VERSION') ? BABH6_RULES_VERSION : '';
 
     set_transient('babh6_stats', $out, HOUR_IN_SECONDS);
     return rest_ensure_response($out);
 }
 
-/* ============ GET /export — CSV на текущите филтри ============ */
+/* ============ CSV ============ */
+/**
+ * Безопасна клетка за spreadsheet (EX-02): стойностите от външния източник остават текст —
+ * формулен префикс (=, +, -, @, таб) се неутрализира, а CR/LF се нормализират.
+ */
+function babh6_csv_cell($v) {
+    $v = (string)$v;
+    $v = str_replace(array("\r\n", "\r"), "\n", $v);
+    if ($v !== '' && !is_numeric($v) && preg_match('/^[=+\-@\t]/', $v)) $v = "'" . $v;
+    return $v;
+}
+function babh6_csv_row($fh, $row) {
+    fputcsv($fh, array_map('babh6_csv_cell', $row), ';', '"', '');
+}
+
+/* ============ GET /export — CSV на текущите филтри, същия набор и подреждане като списъка ============ */
 function babh6_rest_export($req) {
     global $wpdb;
-    $t = babh6_table('products');
-
-    babh6_build_where($req, $where, $args);
-    $wsql  = implode(' AND ', $where);
-    $order = babh6_order_sql((string)$req->get_param('sort'));
-
-    $sql  = "SELECT reg, name, producer_name, producer_kind, trader_name, trader_kind, trader_inf_name, notif_date, category, composition, purpose FROM $t WHERE $wsql ORDER BY $order LIMIT 5000";
-    $rows = $wpdb->get_results(babh6_maybe_prepare($sql, $args));
+    $limit = (int)apply_filters('babh6_export_limit', 5000);
+    $sel = babh6_products_select($req, 'id, reg, name, producer_name, producer_kind, trader_name, trader_kind, trader_inf_name, notif_no, notif_date, entry_date, category, composition, purpose, deletion, deleted_at', $limit, 0);
+    if (is_wp_error($sel)) return $sel;
+    $rows  = $sel['rows'];
+    $total = (int)$wpdb->get_var(babh6_maybe_prepare("SELECT COUNT(*) FROM " . babh6_table('products') . " WHERE {$sel['where']}", $sel['args']));
 
     nocache_headers();
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="babh-register-export.csv"');
+    header('Content-Disposition: attachment; filename="babh-register-' . date_i18n('Y-m-d') . '.csv"');
+    header('X-Babh6-Total: ' . $total);
+    header('X-Babh6-Rows: ' . count((array)$rows));
     echo "\xEF\xBB\xBF";
     $fh = fopen('php://output', 'w');
-    fputcsv($fh, array('Регистрационен №', 'Наименование на продукта', 'Производител', 'Тип на полето „Производител“', 'Търговец', 'Тип на полето „Търговец“', 'Търговец, допълнен автоматично по марката (не е поле на БАБХ)', 'Дата на уведомление', 'Автоматична категория', 'Бележки за проверка (автоматични съвпадения по дума, не становище)'));
+    babh6_csv_row($fh, array('Регистрационен №', 'Наименование на продукта', 'Наличност в последния пълен файл', 'Бележка за заличаване в източника',
+        'Производител', 'Тип на полето „Производител“', 'Търговец (посочен в регистъра)', 'Тип на полето „Търговец“',
+        'Възможен търговец по наименованието (автоматично предположение, не е поле на БАБХ)',
+        'Номер на уведомление', 'Дата на уведомление', 'Дата на вписване', 'Автоматична категория',
+        'Бележки за проверка (автоматични съвпадения по дума, не становище)', 'Състав (текст от регистъра)', 'Предназначение (текст от регистъра)'));
     $kinds = array('firm' => 'фирма', 'country' => 'посочена държава', '' => '');
     foreach ((array)$rows as $r) {
         $flags = implode('; ', array_map(function ($f) { return $f['label'] . ' (в ' . babh6_field_label($f['field']) . ': ' . $f['term'] . ')'; },
             babh6_find_flags_fields($r->name, $r->composition, $r->purpose)));
-        fputcsv($fh, array($r->reg, $r->name, $r->producer_name, isset($kinds[$r->producer_kind]) ? $kinds[$r->producer_kind] : $r->producer_kind,
+        babh6_csv_row($fh, array($r->reg, $r->name,
+            $r->deleted_at ? 'липсва от ' . substr($r->deleted_at, 0, 10) : 'наличен',
+            (string)$r->deletion,
+            $r->producer_name, isset($kinds[$r->producer_kind]) ? $kinds[$r->producer_kind] : $r->producer_kind,
             $r->trader_name, isset($kinds[$r->trader_kind]) ? $kinds[$r->trader_kind] : $r->trader_kind,
             (string)$r->trader_inf_name,
-            (string)$r->notif_date, babh6_category_label($r->category ? $r->category : 'other'), $flags));
+            (string)$r->notif_no, (string)$r->notif_date, (string)$r->entry_date,
+            babh6_category_label($r->category ? $r->category : 'other'), $flags,
+            (string)$r->composition, (string)$r->purpose));
+    }
+    /* Обхватът е явен в самия файл, когато лимитът е достигнат (EX-01) */
+    if ($total > count((array)$rows)) {
+        babh6_csv_row($fh, array('# Изнесени са първите ' . count((array)$rows) . ' от общо ' . $total . ' резултата според избраното подреждане. Стесни търсенето за пълен списък.'));
     }
     fclose($fh);
     exit;
 }
 
-/* ============ POST /waitlist ============ */
+/* ============ POST /waitlist — интерес по функция (WL-01) ============ */
 function babh6_rest_waitlist($req) {
     global $wpdb;
 
@@ -372,26 +473,27 @@ function babh6_rest_waitlist($req) {
     }
 
     $email = sanitize_email((string)$req->get_param('email'));
-    if (!is_email($email)) {
+    if (!is_email($email) || strlen($email) > 191) {
         return new WP_Error('babh6_email', 'Въведи валиден имейл адрес, например name@example.com.', array('status' => 400));
     }
 
     /* лек rate limit по IP */
-    $ip  = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
-    $key = 'babh6_wl_' . md5($ip);
+    $key = 'babh6_wl_' . md5(babh6_client_ip());
     $n   = (int)get_transient($key);
     if ($n > 10) return new WP_Error('babh6_rate', 'Направени са твърде много опити. Опитай отново по-късно.', array('status' => 429));
     set_transient($key, $n + 1, HOUR_IN_SECONDS);
 
+    $allowed = array('pro', 'producers', 'traders', 'novel', 'inspector', 'watchlist');
     $source = sanitize_key((string)$req->get_param('source'));
+    if (!in_array($source, $allowed, true)) $source = 'pro';
     $wt = babh6_table('waitlist');
     $res = $wpdb->query($wpdb->prepare(
         "INSERT IGNORE INTO $wt (email, source, created_at) VALUES (%s, %s, %s)",
-        $email, $source ? $source : 'pro', current_time('mysql')
+        $email, $source, current_time('mysql')
     ));
     if ($res === false) {
         return new WP_Error('babh6_db', 'Имейлът не е записан поради технически проблем. Опитай отново.', array('status' => 500));
     }
-    /* 0 засегнати реда = имейлът вече е в списъка (UNIQUE email) */
-    return rest_ensure_response(array('ok' => 1, 'exists' => ((int)$wpdb->rows_affected === 0) ? 1 : 0));
+    /* 0 засегнати реда = същият имейл вече е записан за същата функция (UNIQUE email+source) */
+    return rest_ensure_response(array('ok' => 1, 'source' => $source, 'exists' => ((int)$wpdb->rows_affected === 0) ? 1 : 0));
 }

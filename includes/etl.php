@@ -11,6 +11,39 @@ if (!defined('ABSPATH')) exit;
  * става чак след последния файл. Така „част 2" не заличава „част 1".
  */
 
+/* ============ Атомарни заключвания (IM-05, SY-04) ============
+ * Transient „прочети, после запиши“ не е атомарно. Тук lock-ът е ред в wp_options
+ * (уникален option_name): INSERT IGNORE успява само за един процес; изтекъл lock
+ * се поема с условен UPDATE върху старата стойност, така че пак само един печели.
+ */
+function babh6_lock_acquire($name, $ttl) {
+    global $wpdb;
+    $opt = 'babh6_lock_' . $name; $now = time();
+    $r = $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", $opt, (string)($now + (int)$ttl)));
+    if ($r) return true;
+    $exp = (int)$wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $opt));
+    if ($exp > 0 && $exp < $now) {
+        $r = $wpdb->query($wpdb->prepare("UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", (string)($now + (int)$ttl), $opt, (string)$exp));
+        return (bool)$r;
+    }
+    return false;
+}
+function babh6_lock_refresh($name, $ttl) {
+    global $wpdb;
+    $wpdb->query($wpdb->prepare("UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s", (string)(time() + (int)$ttl), 'babh6_lock_' . $name));
+}
+function babh6_lock_release($name) {
+    global $wpdb;
+    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name = %s", 'babh6_lock_' . $name));
+    wp_cache_delete('babh6_lock_' . $name, 'options');
+}
+/** Активен ли е lock-ът (не изтекъл). */
+function babh6_lock_held($name) {
+    global $wpdb;
+    $exp = (int)$wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", 'babh6_lock_' . $name));
+    return $exp > time();
+}
+
 /* ============ Job lifecycle ============ */
 
 /** Създава нова import задача от един качен файл (обратна съвместимост). */
@@ -33,10 +66,17 @@ function babh6_job_create_files($files, $source = 'manual', $meta = array()) {
     /* Маркирай закъсали стари задачи */
     $uploads_t = babh6_table('uploads');
     $old = get_option('babh6_job');
-    if ($old && !empty($old['files'])) foreach ((array)$old['files'] as $f) @unlink($f);
-    $wpdb->query("UPDATE $uploads_t SET status = 'failed', notes = 'Обработката е прекратена, защото е започнато ново качване.' WHERE status = 'processing'");
+    if ($old) {
+        /* Стара задача, която още работи, не се прекъсва мълчаливо (IM-05) */
+        if (babh6_lock_held('step')) return new WP_Error('babh6_busy', 'В момента тече друга обработка. Изчакай да приключи или я спри от таблото.');
+        foreach (babh6_job_files($old) as $f) @unlink($f);
+        $wpdb->update($uploads_t, array('status' => 'cancelled', 'notes' => 'Обработката е прекратена, защото е започнато ново качване.'), array('id' => (int)$old['upload_id']));
+        do_action('babh6_import_cancelled', (int)$old['upload_id'], $old);
+    }
+    $wpdb->query("UPDATE $uploads_t SET status = 'failed', notes = 'Обработката не е приключила (прекъсната преди ново качване).' WHERE status = 'processing'");
     delete_option('babh6_job');
-    delete_transient('babh6_step_lock');
+    delete_option('babh6_job_cancel');
+    babh6_lock_release('step');
 
     $dir = wp_upload_dir();
     $base = trailingslashit($dir['basedir']) . 'babh6';
@@ -82,6 +122,7 @@ function babh6_job_create_files($files, $source = 'manual', $meta = array()) {
         'done_rows' => 0,          /* редове от вече приключилите файлове */
         'cursor'    => 0,          /* ред в текущия файл */
         'parsed'    => 0,
+        'skipped'   => 0,          /* редове без валиден рег. № / наименование (IM-07) */
         'added'     => 0,
         'updated'   => 0,
         'restored'  => 0,
@@ -94,14 +135,17 @@ function babh6_job_create_files($files, $source = 'manual', $meta = array()) {
 function babh6_job_cancel() {
     global $wpdb;
     $job = get_option('babh6_job');
+    /* Флаг за отказ: работник, който още изпълнява стъпка, го проверява преди да запише checkpoint */
+    update_option('babh6_job_cancel', time(), false);
     if ($job) {
         $wpdb->update(babh6_table('uploads'),
-            array('status' => 'failed', 'notes' => 'Обработката е спряна от администратор. Вече записаните промени остават.'),
+            array('status' => 'cancelled', 'notes' => 'Обработката е спряна от администратор. Вече записаните промени остават; публикуваната дата на обновяване не е променена.'),
             array('id' => (int)$job['upload_id']));
         foreach (babh6_job_files($job) as $f) @unlink($f);
+        do_action('babh6_import_cancelled', (int)$job['upload_id'], $job);
     }
     delete_option('babh6_job');
-    delete_transient('babh6_step_lock');
+    babh6_lock_release('step');
 }
 
 /** Списък с файловете на job-а (поддържа и стария формат с единичен 'file'). */
@@ -116,8 +160,15 @@ function babh6_job_fail($job, $message) {
     $wpdb->update(babh6_table('uploads'), array('status' => 'failed', 'notes' => $message), array('id' => (int)$job['upload_id']));
     foreach (babh6_job_files($job) as $f) @unlink($f);
     delete_option('babh6_job');
-    delete_transient('babh6_step_lock');
+    babh6_lock_release('step');
     do_action('babh6_import_failed', (int)$job['upload_id'], $message, $job);
+}
+
+/** Записва checkpoint само ако задачата не е отменена междувременно (IM-05). */
+function babh6_job_checkpoint($job) {
+    if (get_option('babh6_job_cancel')) return false;
+    update_option('babh6_job', $job, false);
+    return true;
 }
 
 /**
@@ -139,20 +190,19 @@ function babh6_run_step() {
         $job['fi'] = 0; $job['done_rows'] = 0; $job['totals'] = array();
         if (!empty($job['total'])) $job['totals'] = array((int)$job['total']);
     }
-    foreach (array('fi' => 0, 'done_rows' => 0, 'totals' => array(), 'source' => 'manual', 'meta' => array(), 'names' => array()) as $k => $v) {
+    foreach (array('fi' => 0, 'done_rows' => 0, 'totals' => array(), 'source' => 'manual', 'meta' => array(), 'names' => array(), 'skipped' => 0) as $k => $v) {
         if (!isset($job[$k])) $job[$k] = $v;
     }
 
-    /* Lock срещу паралелна обработка (AJAX + cron) */
-    if (get_transient('babh6_step_lock')) {
+    /* Атомарен lock срещу паралелна обработка (AJAX + cron + loopback) */
+    if (!babh6_lock_acquire('step', 3 * MINUTE_IN_SECONDS)) {
         return array('done' => false, 'phase' => 'busy',
             'progress' => (int)$job['done_rows'] + (int)$job['cursor'], 'total' => (int)$job['total'],
             'added' => (int)$job['added'], 'updated' => (int)$job['updated'], 'restored' => (int)$job['restored']);
     }
-    set_transient('babh6_step_lock', 1, 2 * MINUTE_IN_SECONDS);
 
     $res = babh6_run_step_locked($job);
-    delete_transient('babh6_step_lock');
+    babh6_lock_release('step');
     return $res;
 }
 
@@ -181,10 +231,21 @@ function babh6_run_step_locked($job) {
                 return $total;
             }
             $totals[] = (int)$total; $sum += (int)$total;
+            /* Структурата се проверява, не се предполага (IM-06): сред първите редове трябва да има
+               валиден регистрационен номер в колона A и наименование в колона J. */
+            $probe = BABH6_XLSX_Reader::read_rows_chunk($f, 0, 40);
+            if (is_wp_error($probe)) { babh6_job_fail($job, $probe->get_error_message() . ' (' . basename($f) . ')'); return $probe; }
+            $valid = 0;
+            foreach ((array)$probe as $row) { if (babh6_normalize_row($row) !== null) $valid++; }
+            if ($valid === 0) {
+                $e = new WP_Error('babh6_format', 'Файлът „' . basename($f) . '“ не изглежда като регистъра на БАБХ: в първите 40 реда няма ред с валиден регистрационен номер (колона A) и наименование (колона J). Обработката не е започната.');
+                babh6_job_fail($job, $e->get_error_message());
+                return $e;
+            }
         }
         $job['totals'] = $totals;
         $job['total']  = max(1, $sum);
-        update_option('babh6_job', $job, false);
+        if (!babh6_job_checkpoint($job)) return new WP_Error('babh6_cancelled', 'Обработката е спряна.');
         return array('done' => false, 'phase' => 'count', 'progress' => 0, 'total' => $job['total'],
                      'added' => 0, 'updated' => 0, 'restored' => 0);
     }
@@ -206,7 +267,11 @@ function babh6_run_step_locked($job) {
         $items = array();
         foreach ($rows as $row) {
             $p = babh6_normalize_row($row);
-            if ($p === null) continue;
+            if ($p === null) {
+                /* заглавен/празен ред не се брои; ред с текст в колона A без валиден № — да (IM-07) */
+                if (trim((string)(isset($row[0]) ? $row[0] : '')) !== '' && preg_match('/\d{5,}/u', (string)$row[0])) $job['skipped']++;
+                continue;
+            }
             if (!isset($items[$p['reg']])) $items[$p['reg']] = $p;
         }
 
@@ -214,8 +279,12 @@ function babh6_run_step_locked($job) {
             $regs = array_keys($items);
             $ph = implode(',', array_fill(0, count($regs), '%s'));
             $existing = $wpdb->get_results($wpdb->prepare(
-                "SELECT id, reg, comp_hash, deleted_at, last_upload, producer_name, trader_name FROM $products_t WHERE reg IN ($ph)", $regs
+                "SELECT id, reg, comp_hash, src_hash, deleted_at, last_upload FROM $products_t WHERE reg IN ($ph)", $regs
             ));
+            if ($existing === null || $wpdb->last_error) {
+                babh6_job_fail($job, 'Грешка в базата данни при четене на записите: ' . $wpdb->last_error);
+                return new WP_Error('babh6_db', 'Грешка в базата данни при четене на записите.');
+            }
             $map = array();
             foreach ($existing as $e) $map[$e->reg] = $e;
 
@@ -233,14 +302,15 @@ function babh6_run_step_locked($job) {
                 /* Същият рег. номер вече мина в този import (напр. дублиран в част 1 и част 2) — първият печели */
                 if ((int)$e->last_upload === $upload_id) continue;
                 $job['parsed']++;
-                $changed     = ($e->comp_hash !== $p['comp_hash'])
-                            || (string)$e->producer_name !== $p['producer_name'] || (string)$e->trader_name !== $p['trader_name'];
+                /* Всяко източниково поле участва в сравнението (IM-01): промяна във фирма, дата,
+                   предназначение, съхранение или бележка за заличаване също се записва. */
+                $changed     = ((string)$e->src_hash !== $p['src_hash']);
                 $was_deleted = !empty($e->deleted_at);
                 if ($changed || $was_deleted) {
-                    $wpdb->update($products_t, array(
+                    $ok = $wpdb->update($products_t, array(
                         'rtype' => $p['rtype'], 'ryear' => $p['ryear'], 'oblast' => $p['oblast'],
                         'name' => $p['name'], 'purpose' => $p['purpose'], 'composition' => $p['composition'],
-                        'comp_hash' => $p['comp_hash'],
+                        'comp_hash' => $p['comp_hash'], 'src_hash' => $p['src_hash'],
                         'producer_name' => $p['producer_name'], 'producer_norm' => $p['producer_norm'], 'producer_kind' => $p['producer_kind'],
                         'trader_name' => $p['trader_name'], 'trader_norm' => $p['trader_norm'], 'trader_kind' => $p['trader_kind'],
                         'storage' => $p['storage'], 'notif_no' => $p['notif_no'],
@@ -249,6 +319,10 @@ function babh6_run_step_locked($job) {
                         'flags' => $p['flags'], 'flag_count' => $p['flag_count'],
                         'last_upload' => $upload_id, 'deleted_at' => null, 'updated_at' => $now,
                     ), array('id' => $e->id));
+                    if ($ok === false) {
+                        babh6_job_fail($job, 'Грешка в базата данни при обновяване на запис ' . $reg . ' (' . basename($file) . ', ред ~' . ((int)$job['cursor'] + 1) . '): ' . $wpdb->last_error);
+                        return new WP_Error('babh6_db', 'Грешка в базата данни при обновяване на запис ' . $reg . '.');
+                    }
                     if ($was_deleted) $job['restored']++;
                     elseif ($changed) $job['updated']++;
                 } else {
@@ -257,16 +331,22 @@ function babh6_run_step_locked($job) {
             }
 
             foreach (array_chunk($to_insert, 200) as $b) {
-                babh6_insert_batch($b, $upload_id, $now);
+                if (!babh6_insert_batch($b, $upload_id, $now)) {
+                    babh6_job_fail($job, 'Грешка в базата данни при запис на нови записи (' . basename($file) . ', ред ~' . ((int)$job['cursor'] + 1) . '): ' . $wpdb->last_error);
+                    return new WP_Error('babh6_db', 'Грешка в базата данни при запис на нови записи.');
+                }
             }
             foreach (array_chunk($to_bump, 500) as $b) {
                 $ids = implode(',', $b);
-                $wpdb->query($wpdb->prepare("UPDATE $products_t SET last_upload = %d WHERE id IN ($ids)", $upload_id));
+                if ($wpdb->query($wpdb->prepare("UPDATE $products_t SET last_upload = %d WHERE id IN ($ids)", $upload_id)) === false) {
+                    babh6_job_fail($job, 'Грешка в базата данни при потвърждаване на записи: ' . $wpdb->last_error);
+                    return new WP_Error('babh6_db', 'Грешка в базата данни при потвърждаване на записи.');
+                }
             }
         }
 
         $job['cursor'] += count($rows);
-        update_option('babh6_job', $job, false);
+        if (!babh6_job_checkpoint($job)) return new WP_Error('babh6_cancelled', 'Обработката е спряна.');
     }
 
     $file_done = (!$rows || count($rows) < $chunk);
@@ -277,7 +357,7 @@ function babh6_run_step_locked($job) {
         $job['fi']        = $fi + 1;
         $job['file']      = $files[$fi + 1];
         $job['cursor']    = 0;
-        update_option('babh6_job', $job, false);
+        if (!babh6_job_checkpoint($job)) return new WP_Error('babh6_cancelled', 'Обработката е спряна.');
         return array('done' => false, 'phase' => 'rows', 'file' => $fi + 2, 'files' => $nfiles,
             'progress' => (int)$job['done_rows'], 'total' => (int)$job['total'],
             'added' => (int)$job['added'], 'updated' => (int)$job['updated'], 'restored' => (int)$job['restored']);
@@ -285,49 +365,70 @@ function babh6_run_step_locked($job) {
 
     /* Фаза 3: финализиране след последния файл */
     if ($file_done) {
-        $removed = 0; $notes = null; $removed_checked = false;
+        /* Нула валидни записа не е успешен импорт (IM-09) */
+        if ((int)$job['parsed'] === 0) {
+            $e = new WP_Error('babh6_empty', 'Във файловете няма нито един валиден запис (пропуснати редове: ' . (int)$job['skipped'] . '). Регистърът не е променен.');
+            babh6_job_fail($job, $e->get_error_message());
+            return $e;
+        }
+        $removed = 0; $notes = array(); $removed_checked = false;
         if ((int)$job['parsed'] > 100) {
             $removed_checked = true;
-            /* Предпазител: ако липсват над X% от активните продукти, файловете
-               най-вероятно са непълни (напр. само част 1) — не заличаваме. */
+            /* Предпазител: ако липсват X% или повече от активните продукти, файловете
+               най-вероятно са непълни (напр. само част 1) — не отбелязваме липси (IM-03). */
             $active = (int)$wpdb->get_var("SELECT COUNT(*) FROM $products_t WHERE deleted_at IS NULL");
             $would  = (int)$wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM $products_t WHERE deleted_at IS NULL AND (last_upload IS NULL OR last_upload <> %d)", $upload_id));
             $ratio  = (float)apply_filters('babh6_max_remove_ratio', 0.5);
-            if ($active > 0 && $would > $active * $ratio) {
-                $notes = sprintf('Проверката за липсващи записи е пропусната: %d от %d записа липсват в качените файлове (над %d%%). Вероятно файловете не са пълни.',
+            if ($active > 0 && $would >= $active * $ratio) {
+                $notes[] = sprintf('Проверката за липсващи записи е пропусната: %d от %d записа липсват в качените файлове (%d%% или повече). Вероятно файловете не са пълни; версията не е приета за пълна.',
                     $would, $active, (int)round($ratio * 100));
                 $removed_checked = false;
             } else {
-                $wpdb->query($wpdb->prepare(
+                $r = $wpdb->query($wpdb->prepare(
                     "UPDATE $products_t SET deleted_at = %s
                      WHERE deleted_at IS NULL AND (last_upload IS NULL OR last_upload <> %d)",
                     $now, $upload_id
                 ));
-                $removed = (int)$wpdb->rows_affected;
+                if ($r === false) {
+                    babh6_job_fail($job, 'Грешка в базата данни при отбелязване на липсващите записи: ' . $wpdb->last_error);
+                    return new WP_Error('babh6_db', 'Грешка в базата данни при отбелязване на липсващите записи.');
+                }
+                $removed = (int)$r;
             }
+        } else {
+            $notes[] = 'Проверка за липсващи записи не е извършена (под 100 обработени записа); версията не е приета за пълна.';
         }
+        if ((int)$job['skipped'] > 0) $notes[] = 'Пропуснати редове без валиден рег. № или наименование: ' . (int)$job['skipped'] . '.';
 
-        babh6_rebuild_parties();
+        $ok = babh6_rebuild_parties();
+        if ($ok === false) {
+            babh6_job_fail($job, 'Грешка при преизчисляване на фирмите: ' . $wpdb->last_error);
+            return new WP_Error('babh6_db', 'Грешка при преизчисляване на фирмите.');
+        }
         delete_transient('babh6_stats');
 
-        $wpdb->update($uploads_t, array(
+        $notes_s = $notes ? implode(' ', $notes) : null;
+        $r = $wpdb->update($uploads_t, array(
             'status'     => 'done',
             'row_count'  => (int)$job['parsed'],
             'added'      => (int)$job['added'],
             'updated_ct' => (int)$job['updated'],
             'removed'    => $removed,
             'restored'   => (int)$job['restored'],
-            'notes'      => $notes,
+            'notes'      => $notes_s,
         ), array('id' => $upload_id));
+        if ($r === false) {
+            babh6_job_fail($job, 'Грешка в базата данни при записване на историята: ' . $wpdb->last_error);
+            return new WP_Error('babh6_db', 'Грешка в базата данни при записване на историята.');
+        }
 
         foreach ($files as $f) @unlink($f);
         delete_option('babh6_job');
 
-        if (!$removed_checked && $notes === null) $notes = 'Проверка за липсващи записи не е извършена (под 100 обработени записа).';
-        $result = array('done' => true, 'phase' => 'done', 'notes' => $notes, 'removed_checked' => $removed_checked,
+        $result = array('done' => true, 'phase' => 'done', 'notes' => $notes_s, 'removed_checked' => $removed_checked,
             'progress' => (int)$job['total'], 'total' => (int)$job['total'],
-            'parsed' => (int)$job['parsed'], 'added' => (int)$job['added'],
+            'parsed' => (int)$job['parsed'], 'skipped' => (int)$job['skipped'], 'added' => (int)$job['added'],
             'updated' => (int)$job['updated'], 'removed' => $removed, 'restored' => (int)$job['restored']);
         do_action('babh6_import_done', $upload_id, $result, $job);
         return $result;
@@ -362,7 +463,14 @@ function babh6_normalize_row($row) {
     $storage      = trim((string)(isset($row[8]) ? $row[8] : ''));
     $deletion     = trim((string)(isset($row[13]) ? $row[13] : ''));
 
+    if (strlen($reg_info['reg']) > 20) return null; /* колоната reg е VARCHAR(20) (IM-07) */
     $flags = babh6_find_flags_fields($name, $composition, $purpose);
+    $notif_no = mb_substr(trim((string)(isset($row[2]) ? $row[2] : '')), 0, 95, 'UTF-8');
+    $notif_date  = babh6_parse_date_any(isset($row[3]) ? $row[3] : '');
+    $launch_date = babh6_parse_date_any(isset($row[12]) ? $row[12] : '');
+    $entry_date  = babh6_parse_date_any(isset($row[1]) ? $row[1] : '');
+    /* Hash на всички източникови полета (IM-01) — не само име и състав */
+    $src_hash = md5(implode("\x1f", array($name, $composition, $purpose, $producer_raw, $trader_raw, $storage, $deletion, $notif_no, (string)$notif_date, (string)$launch_date, (string)$entry_date)));
 
     return array(
         'reg'           => $reg_info['reg'],
@@ -373,6 +481,7 @@ function babh6_normalize_row($row) {
         'purpose'       => mb_substr($purpose, 0, 2000, 'UTF-8'),
         'composition'   => mb_substr($composition, 0, 5000, 'UTF-8'),
         'comp_hash'     => md5($composition . '|' . $name),
+        'src_hash'      => $src_hash,
         'producer_name' => mb_substr($producer_raw, 0, 490, 'UTF-8'),
         'producer_norm' => babh6_norm_firm($producer_raw),
         'producer_kind' => $producer_raw === '' ? '' : (babh6_is_country($producer_raw) ? 'country' : 'firm'),
@@ -380,10 +489,10 @@ function babh6_normalize_row($row) {
         'trader_norm'   => babh6_norm_firm($trader_raw),
         'trader_kind'   => $trader_raw === '' ? '' : (babh6_is_country($trader_raw) ? 'country' : 'firm'),
         'storage'       => mb_substr($storage, 0, 2000, 'UTF-8'),
-        'notif_no'      => mb_substr(trim((string)(isset($row[2]) ? $row[2] : '')), 0, 95, 'UTF-8'),
-        'notif_date'    => babh6_parse_date_any(isset($row[3]) ? $row[3] : ''),
-        'launch_date'   => babh6_parse_date_any(isset($row[12]) ? $row[12] : ''),
-        'entry_date'    => babh6_parse_date_any(isset($row[1]) ? $row[1] : ''),
+        'notif_no'      => $notif_no,
+        'notif_date'    => $notif_date,
+        'launch_date'   => $launch_date,
+        'entry_date'    => $entry_date,
         'deletion'      => mb_substr($deletion, 0, 2000, 'UTF-8'),
         'category'      => babh6_categorize($name, $composition),
         'flags'         => $flags ? wp_json_encode($flags, JSON_UNESCAPED_UNICODE) : null,
@@ -405,6 +514,7 @@ function babh6_insert_batch($batch, $upload_id, $now) {
             $wpdb->prepare('%s', $p['purpose']),
             $wpdb->prepare('%s', $p['composition']),
             $wpdb->prepare('%s', $p['comp_hash']),
+            $wpdb->prepare('%s', $p['src_hash']),
             $wpdb->prepare('%s', $p['producer_name']),
             $wpdb->prepare('%s', $p['producer_norm']),
             $wpdb->prepare('%s', $p['producer_kind']),
@@ -426,8 +536,9 @@ function babh6_insert_batch($batch, $upload_id, $now) {
             $wpdb->prepare('%s', $now),
         )) . ')';
     }
-    $cols = 'reg,rtype,ryear,oblast,name,purpose,composition,comp_hash,producer_name,producer_norm,producer_kind,trader_name,trader_norm,trader_kind,storage,notif_no,notif_date,launch_date,entry_date,deletion,category,flags,flag_count,first_upload,last_upload,created_at,updated_at';
-    $wpdb->query("INSERT INTO $t ($cols) VALUES " . implode(',', $rows_sql));
+    $cols = 'reg,rtype,ryear,oblast,name,purpose,composition,comp_hash,src_hash,producer_name,producer_norm,producer_kind,trader_name,trader_norm,trader_kind,storage,notif_no,notif_date,launch_date,entry_date,deletion,category,flags,flag_count,first_upload,last_upload,created_at,updated_at';
+    $r = $wpdb->query("INSERT INTO $t ($cols) VALUES " . implode(',', $rows_sql));
+    return $r !== false; /* резултатът се проверява от извикващия (IM-02) */
 }
 
 function babh6_rebuild_parties() {
@@ -440,7 +551,13 @@ function babh6_rebuild_parties() {
     babh6_merge_norm_aliases();
     if (function_exists('babh6_infer_traders')) babh6_infer_traders();
 
-    $wpdb->query("TRUNCATE TABLE $parties_t");
+    /* Новите обобщения се строят в отделна таблица и се разменят атомарно (IM-04):
+       посетителите виждат или старите, или новите фирми — никога празна/частична таблица. */
+    $new_t = $parties_t . '_new'; $old_t = $parties_t . '_old';
+    $wpdb->query("DROP TABLE IF EXISTS $new_t");
+    $wpdb->query("DROP TABLE IF EXISTS $old_t");
+    if ($wpdb->query("CREATE TABLE $new_t LIKE $parties_t") === false) return false;
+    $parties_t_live = $parties_t; $parties_t = $new_t;
 
     /* Ефективен търговец: посоченият в регистъра, а ако липсва — определеният по името */
     $eff_norm = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm)";
@@ -514,14 +631,17 @@ function babh6_rebuild_parties() {
                 $wpdb->prepare('%s', $now),
             )) . ')';
             if (count($batch) >= 300) {
-                $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,inferred_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
+                if ($wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,inferred_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch)) === false) { $wpdb->query("DROP TABLE IF EXISTS $new_t"); return false; }
                 $batch = array();
             }
         }
         if ($batch) {
-            $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,inferred_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
+            if ($wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,inferred_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch)) === false) { $wpdb->query("DROP TABLE IF EXISTS $new_t"); return false; }
         }
     }
+    if ($wpdb->query("RENAME TABLE $parties_t_live TO $old_t, $new_t TO $parties_t_live") === false) { $wpdb->query("DROP TABLE IF EXISTS $new_t"); return false; }
+    $wpdb->query("DROP TABLE IF EXISTS $old_t");
+    return true;
 }
 
 /**
@@ -565,9 +685,11 @@ function babh6_merge_norm_aliases() {
 }
 
 /**
- * Преизчисляване на ключовете (producer_norm/trader_norm/kind) за всички записи след
- * промяна в babh6_norm_firm(). Работи на порции през WP-Cron (и по една порция при
- * зареждане на админа), за да не блокира заявка; накрая преизчислява фирмите.
+ * Преизчисляване на производните данни за всички записи след промяна на версията на
+ * правилата (BABH6_RULES_VERSION): ключове на фирмите (producer_norm/trader_norm/kind),
+ * категория и автоматични бележки (AD-01 — карти, филтри и статистика ползват една версия).
+ * Работи на порции през WP-Cron (и по една порция при зареждане на админа); накрая
+ * преизчислява фирмите.
  */
 function babh6_renorm_start() {
     update_option('babh6_renorm', array('cursor' => 0, 'changed' => 0, 'started' => time()), false);
@@ -588,12 +710,13 @@ function babh6_renorm_step($budget = 20) {
     $t0 = time();
     while (time() - $t0 < $budget) {
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT id, producer_name, trader_name, producer_norm, trader_norm, producer_kind, trader_kind FROM $t WHERE id > %d ORDER BY id LIMIT 1000", (int)$st['cursor']));
+            "SELECT id, name, composition, purpose, category, flags, flag_count, producer_name, trader_name, producer_norm, trader_norm, producer_kind, trader_kind FROM $t WHERE id > %d ORDER BY id LIMIT 1000", (int)$st['cursor']));
         if (!$rows) {
             delete_option('babh6_renorm');
             delete_transient('babh6_renorm_lock');
             babh6_rebuild_parties();
             delete_transient('babh6_stats');
+            if (defined('BABH6_RULES_VERSION')) update_option('babh6_rules_version', BABH6_RULES_VERSION);
             return;
         }
         foreach ($rows as $r) {
@@ -601,8 +724,13 @@ function babh6_renorm_step($budget = 20) {
             $pk = $r->producer_name === '' ? '' : (babh6_is_country($r->producer_name) ? 'country' : 'firm');
             $tn = babh6_norm_firm($r->trader_name);
             $tk = $r->trader_name === '' ? '' : (babh6_is_country($r->trader_name) ? 'country' : 'firm');
-            if ($pn !== $r->producer_norm || $tn !== $r->trader_norm || $pk !== $r->producer_kind || $tk !== $r->trader_kind) {
-                $wpdb->update($t, array('producer_norm' => $pn, 'producer_kind' => $pk, 'trader_norm' => $tn, 'trader_kind' => $tk), array('id' => (int)$r->id));
+            $cat   = babh6_categorize($r->name, (string)$r->composition);
+            $fl    = babh6_find_flags_fields($r->name, (string)$r->composition, (string)$r->purpose);
+            $fl_j  = $fl ? wp_json_encode($fl, JSON_UNESCAPED_UNICODE) : null;
+            if ($pn !== $r->producer_norm || $tn !== $r->trader_norm || $pk !== $r->producer_kind || $tk !== $r->trader_kind
+                || $cat !== (string)$r->category || count($fl) !== (int)$r->flag_count || (string)$fl_j !== (string)$r->flags) {
+                $wpdb->update($t, array('producer_norm' => $pn, 'producer_kind' => $pk, 'trader_norm' => $tn, 'trader_kind' => $tk,
+                    'category' => $cat, 'flags' => $fl_j, 'flag_count' => count($fl)), array('id' => (int)$r->id));
                 $st['changed']++;
             }
             $st['cursor'] = (int)$r->id;

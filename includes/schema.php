@@ -22,6 +22,7 @@ function babh6_create_tables() {
         purpose TEXT NULL,
         composition TEXT NULL,
         comp_hash CHAR(32) NOT NULL DEFAULT '',
+        src_hash CHAR(32) NOT NULL DEFAULT '',
         producer_name VARCHAR(500) NOT NULL DEFAULT '',
         producer_norm VARCHAR(191) NOT NULL DEFAULT '',
         producer_kind VARCHAR(10) NOT NULL DEFAULT '',
@@ -100,8 +101,20 @@ function babh6_create_tables() {
         source VARCHAR(50) NOT NULL DEFAULT '',
         created_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
-        UNIQUE KEY email (email)
+        UNIQUE KEY email_source (email, source)
     ) $charset;");
+    /* v6.6: един имейл може да заяви интерес към повече от една функция (WL-01) —
+       старият уникален ключ само по email се маха (dbDelta не трие индекси). */
+    $old_idx = $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE table_schema = %s AND table_name = %s AND index_name = 'email' AND non_unique = 0",
+        DB_NAME, $waitlist
+    ));
+    if ($old_idx) {
+        $wpdb->hide_errors();
+        $wpdb->query("ALTER TABLE $waitlist DROP INDEX email");
+        $wpdb->show_errors();
+    }
 
     /* FULLTEXT — dbDelta не го управлява надеждно; добавяме ръчно с толериране на грешка */
     $has_ft = $wpdb->get_var($wpdb->prepare(
