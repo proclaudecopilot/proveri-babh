@@ -80,12 +80,27 @@ function api(path, params) {
     });
     if (parts.length) qs = '?' + parts.join('&');
   }
-  return fetch(CFG.rest + path + qs, { credentials: 'same-origin' }).then(function (r) {
+  return fetch(restUrl(path, qs), { credentials: 'same-origin' }).then(function (r) {
     if (r.status === 401) { location.reload(); throw new Error('locked'); }
+    if (r.status === 404 && CFG.rest2 && !CFG._alt) {
+      /* /wp-json/ пътят е блокиран или пренаписването не работи → резервен ?rest_route= */
+      CFG._alt = true;
+      try { sessionStorage.setItem('babh6_rest_alt', '1'); } catch (e) {}
+      return fetch(restUrl(path, qs), { credentials: 'same-origin' }).then(function (r2) {
+        if (!r2.ok) throw new Error('HTTP ' + r2.status + ' (и през ?rest_route=)');
+        return r2.json();
+      });
+    }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   });
 }
+function restUrl(path, qs) {
+  var base = (CFG._alt && CFG.rest2) ? CFG.rest2 : CFG.rest;
+  if (base.indexOf('?') !== -1) return base + path + (qs ? '&' + qs.slice(1) : '');
+  return base + path + qs;
+}
+try { if (sessionStorage.getItem('babh6_rest_alt') === '1' && CFG.rest2) CFG._alt = true; } catch (e) {}
 function currentParams() {
   return {
     q: state.q, flagged: state.flagged, bg: state.bg, recent: state.recent,
@@ -136,7 +151,7 @@ function renderGate() {
     var pw = inp.value;
     if (!pw) { inp.focus(); return; }
     go.disabled = true; go.textContent = 'Проверявам…'; err.textContent = '';
-    fetch(CFG.rest + '/auth', {
+    fetch(restUrl('/auth', ''), {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: pw })
@@ -363,7 +378,7 @@ function renderRegister(c) {
       if (v === null || v === undefined || v === '' || v === false) return;
       parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v === true ? 1 : v));
     });
-    window.location.href = CFG.rest + '/export' + (parts.length ? '?' + parts.join('&') : '');
+    window.location.href = restUrl('/export', parts.length ? '?' + parts.join('&') : '');
   });
 
   renderList(true);
@@ -536,7 +551,7 @@ function renderNovel(c) {
     if (q.length < 2) { inp.focus(); return; }
     go.disabled = true; go.innerHTML = 'Проверявам…';
     res.innerHTML = '<div class="b6-sk"><div class="b6-sk-line" style="width:35%"></div><div class="b6-sk-line" style="width:85%;margin-top:10px"></div><div class="b6-sk-line" style="width:60%;margin-top:8px"></div></div>';
-    fetch(CFG.rest + '/novel-check', {
+    fetch(restUrl('/novel-check', ''), {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ingredient: q })
@@ -577,7 +592,7 @@ function renderSoon(c, title, desc, source, isPro) {
     var em = ($('#b6-wl-email').value || '').trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { $('#b6-wl-email').style.borderColor = 'var(--red)'; $('#b6-wl-email').focus(); return; }
     go.disabled = true;
-    fetch(CFG.rest + '/waitlist', {
+    fetch(restUrl('/waitlist', ''), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',

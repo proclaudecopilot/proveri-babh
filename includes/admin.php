@@ -264,6 +264,25 @@ function babh6_admin_dashboard() {
     echo '<li>FULLTEXT търсене: ' . ($fulltext ? '<b style="color:#00a32a">активно</b>' : '<b style="color:#d63638">недостъпно</b> — LIKE fallback в Сесия 2') . '</li>';
     echo '<li>PHP: ' . esc_html(PHP_VERSION) . ' · Memory: ' . esc_html(ini_get('memory_limit')) . ' · Upload max: ' . esc_html($upload_max) . '</li>';
     echo '<li>ZipArchive: ' . (class_exists('ZipArchive') ? 'да' : '<b style="color:#d63638">липсва</b>') . ' · XMLReader: ' . (class_exists('XMLReader') ? 'да' : '<b style="color:#d63638">липсва</b>') . '</li>';
+    /* REST API самопроверка: така както го вика фронтендът (отвън, през HTTP) */
+    $rest_urls = array(
+        'wp-json'    => untrailingslashit(rest_url('babh6/v1')) . '/stats',
+        'rest_route' => add_query_arg('rest_route', '/babh6/v1/stats', home_url('/')),
+    );
+    foreach ($rest_urls as $k => $u) {
+        $r = wp_remote_get($u, array('timeout' => 10, 'sslverify' => apply_filters('https_local_ssl_verify', false)));
+        if (is_wp_error($r)) {
+            $txt = '<b style="color:#d63638">грешка</b> — ' . esc_html($r->get_error_message());
+        } else {
+            $code = (int)wp_remote_retrieve_response_code($r);
+            $body = (string)wp_remote_retrieve_body($r);
+            $json = json_decode($body, true);
+            if ($code === 200 && is_array($json) && isset($json['total'])) $txt = '<b style="color:#00a32a">OK</b> (' . number_format_i18n((int)$json['total']) . ' продукта)';
+            else $txt = '<b style="color:#d63638">HTTP ' . $code . '</b>' . (is_array($json) && isset($json['code']) ? ' — ' . esc_html($json['code']) . ': ' . esc_html(isset($json['message']) ? $json['message'] : '') : ' — ' . esc_html(mb_substr(wp_strip_all_tags($body), 0, 120, 'UTF-8')));
+        }
+        echo '<li>REST (' . esc_html($k) . '): <a href="' . esc_url($u) . '" target="_blank" rel="noopener"><code>' . esc_html(preg_replace('#^https?://[^/]+#', '', $u)) . '</code></a> → ' . $txt . '</li>';
+    }
+    echo '<li style="color:#787c82;font-size:12px">Фронтендът ползва <code>/wp-json/</code>; при 404 минава сам на <code>?rest_route=</code>. Ако и двата са 404 — REST API-то е изключено от друг плъгин/защита или permalink правилата са счупени (Settings → Permalinks → Save).</li>';
     echo '</ul></div>';
 
     /* ===== History ===== */
