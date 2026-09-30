@@ -322,37 +322,200 @@ function babh6_sync_signature($links) {
     return md5(implode("\n", $paths));
 }
 
-/** Сваля файл на диска (stream) с повторни опити. Проверява, че е XLSX (zip) а не HTML страница. */
-function babh6_sync_download($url, $dest, $strategy = array(), $referer = '', $cookies = array()) {
-    $headers = array();
-    if ($referer) $headers['Referer'] = $referer;
-    $err = null;
-    for ($try = 1; $try <= 3; $try++) {
-        $t0  = microtime(true);
-        $res = wp_remote_get($url, babh6_sync_http_args(array(
-            'timeout' => max(300, 2 * babh6_sync_timeout()), 'stream' => true, 'filename' => $dest,
-            'headers' => $headers, 'cookies' => $cookies,
-        ), $strategy));
-        $secs = round(microtime(true) - $t0, 1);
-        if (is_wp_error($res)) {
-            $err = new WP_Error('babh6_sync_dl', $res->get_error_message() . ' при сваляне на ' . basename(rawurldecode($url)) . ' (' . $secs . ' сек)');
-        } else {
-            $code = (int)wp_remote_retrieve_response_code($res);
-            $size = (int)@filesize($dest);
-            $fh = @fopen($dest, 'rb');
-            $magic = $fh ? fread($fh, 2) : '';
-            if ($fh) fclose($fh);
-            if ($code === 200 && $size > 0 && $magic === 'PK') {
-                babh6_sync_log('файл OK: ' . basename(rawurldecode($url)) . ' — ' . number_format_i18n($size) . ' байта за ' . $secs . ' сек');
-                return $dest;
-            }
-            $err = new WP_Error('babh6_sync_notxlsx', ($code !== 200 ? 'HTTP ' . $code : 'Отговорът не е .xlsx') . ' при сваляне на ' . basename(rawurldecode($url)) . ' (' . number_format_i18n($size) . ' байта, ' . $secs . ' сек)');
-        }
-        @unlink($dest);
-        babh6_sync_log('файл опит ' . $try . '/3 грешка: ' . babh6_sync_err_short($err));
-        if ($try < 3) sleep(5 * $try);
+/* ============ Сваляне на порции с продължаване (resumable) ============
+ * Порталът дава ~10-15 KB/s, а файловете са мегабайти → едно сваляне трае
+ * над 10 мин и надхвърля лимита на една PHP заявка. Затова всяка фонова
+ * заявка тегли ~1 мин, записва .part файла и продължава (HTTP Range) в
+ * следващата. Състоянието е в option 'babh6_sync_dl'.
+ */
+
+function babh6_sync_dl_state() {
+    $s = get_option('babh6_sync_dl');
+    return is_array($s) ? $s : null;
+}
+
+function babh6_sync_dl_cleanup($dl) {
+    if (!$dl) return;
+    foreach ((array)$dl['links'] as $i => $l) @unlink($dl['base'] . '/dl-' . $dl['started'] . '-' . ($i + 1) . '.part');
+    foreach ((array)$dl['done'] as $f) @unlink($f['src']);
+    delete_option('babh6_sync_dl');
+    delete_transient('babh6_dl_lock');
+}
+
+function babh6_sync_fmt_bytes($b) {
+    if ($b >= 1048576) return number_format_i18n($b / 1048576, 1) . ' MB';
+    if ($b >= 1024) return number_format_i18n($b / 1024, 0) . ' KB';
+    return (int)$b . ' B';
+}
+
+/**
+ * Тегли (или дотегля) един файл с native cURL до $budget секунди.
+ * @return array {status: 'done'|'partial'|'error', message, bytes}
+ */
+function babh6_sync_curl_download($url, $part, $budget, $label, $strategy = array(), $referer = '') {
+    $have = is_file($part) ? (int)filesize($part) : 0;
+    if (!function_exists('curl_init')) {
+        /* Без cURL: цял файл наведнъж през WP HTTP (без порции) */
+        $res = wp_remote_get($url, babh6_sync_http_args(array('timeout' => 3600, 'stream' => true, 'filename' => $part, 'headers' => $referer ? array('Referer' => $referer) : array()), $strategy));
+        if (is_wp_error($res)) { @unlink($part); return array('status' => 'error', 'message' => $res->get_error_message(), 'bytes' => 0); }
+        $code = (int)wp_remote_retrieve_response_code($res);
+        if ($code !== 200) { @unlink($part); return array('status' => 'error', 'message' => 'HTTP ' . $code, 'bytes' => 0); }
+        return array('status' => 'done', 'message' => 'OK', 'bytes' => (int)@filesize($part));
     }
-    return $err;
+
+    $fh = @fopen($part, $have ? 'ab' : 'wb');
+    if (!$fh) return array('status' => 'error', 'message' => 'Не мога да пиша в ' . $part, 'bytes' => $have);
+
+    $headers = array('Accept: */*', 'Accept-Language: bg,en;q=0.8');
+    if (!empty($strategy['nogzip'])) $headers[] = 'Accept-Encoding: identity';
+    if (!empty($strategy['close']))  $headers[] = 'Connection: close';
+    if ($referer) $headers[] = 'Referer: ' . $referer;
+
+    $t0 = microtime(true); $last_ui = 0; $base_have = $have; $aborted = false;
+    $progress = function ($ch, $dltotal, $dlnow) use ($budget, $t0, &$last_ui, $base_have, $label, &$aborted) {
+        $el = microtime(true) - $t0;
+        if ($el - $last_ui >= 3) {
+            $last_ui = $el;
+            $speed = $el > 0 ? $dlnow / $el : 0;
+            $tot = $base_have + $dlnow;
+            $full = $dltotal > 0 ? ' от ' . babh6_sync_fmt_bytes($base_have + $dltotal) : '';
+            babh6_sync_state_set(array('last_message' => 'Свалям ' . $label . ': ' . babh6_sync_fmt_bytes($tot) . $full . ' (' . babh6_sync_fmt_bytes($speed) . '/s)…'));
+        }
+        if ($budget > 0 && $el > $budget) { $aborted = true; return 1; }
+        return 0;
+    };
+
+    $ch = curl_init($url);
+    $opts = array(
+        CURLOPT_FILE           => $fh,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS      => 5,
+        CURLOPT_CONNECTTIMEOUT => 30,
+        CURLOPT_TIMEOUT        => 3600,
+        CURLOPT_LOW_SPEED_LIMIT => 1,     /* под 1 B/s … */
+        CURLOPT_LOW_SPEED_TIME  => 120,   /* … за 120 сек = блокирала връзка */
+        CURLOPT_USERAGENT      => isset($strategy['ua']) ? $strategy['ua'] : 'Mozilla/5.0',
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_NOPROGRESS     => false,
+        CURLOPT_PROGRESSFUNCTION => $progress,
+        CURLOPT_FAILONERROR    => false,
+    );
+    if (!empty($strategy['http11']) && defined('CURL_HTTP_VERSION_1_1')) $opts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_1_1;
+    if (!empty($strategy['close'])) { $opts[CURLOPT_FORBID_REUSE] = true; $opts[CURLOPT_FRESH_CONNECT] = true; }
+    $ca = ABSPATH . WPINC . '/certificates/ca-bundle.crt';
+    if (is_file($ca)) $opts[CURLOPT_CAINFO] = $ca;
+    if ($have > 0) $opts[CURLOPT_RESUME_FROM] = $have;
+    curl_setopt_array($ch, $opts);
+    $opts = apply_filters('babh6_sync_curl_opts', $opts, $url);
+
+    curl_exec($ch);
+    $errno = curl_errno($ch); $err = curl_error($ch);
+    $code  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $got   = (int)curl_getinfo($ch, CURLINFO_SIZE_DOWNLOAD);
+    curl_close($ch);
+    fclose($fh);
+    clearstatcache(true, $part);
+    $size = (int)@filesize($part);
+    $secs = round(microtime(true) - $t0, 1);
+
+    if ($errno === 42 || $aborted) { /* CURLE_ABORTED_BY_CALLBACK — изтече бюджетът на заявката */
+        return array('status' => 'partial', 'message' => 'порция ' . babh6_sync_fmt_bytes($got) . ' за ' . $secs . ' сек, общо ' . babh6_sync_fmt_bytes($size), 'bytes' => $size);
+    }
+    if ($errno === 33) { /* CURLE_RANGE_ERROR — сървърът не поддържа Range: започваме отначало */
+        @unlink($part);
+        return array('status' => 'error', 'message' => 'сървърът не поддържа продължаване (Range) — започвам отначало', 'bytes' => 0);
+    }
+    if ($errno) {
+        /* Мрежова грешка по средата — .part файлът остава и ще бъде продължен */
+        if ($size > $have) return array('status' => 'partial', 'message' => 'прекъсване (cURL ' . $errno . ': ' . $err . ') след ' . babh6_sync_fmt_bytes($got) . ' — ще продължа от ' . babh6_sync_fmt_bytes($size), 'bytes' => $size);
+        return array('status' => 'error', 'message' => 'cURL ' . $errno . ': ' . $err . ' (' . $secs . ' сек)', 'bytes' => $size);
+    }
+    if ($code !== 200 && $code !== 206) {
+        @unlink($part);
+        return array('status' => 'error', 'message' => 'HTTP ' . $code . ' (' . $secs . ' сек)', 'bytes' => 0);
+    }
+    return array('status' => 'done', 'message' => babh6_sync_fmt_bytes($size) . ' за ' . $secs . ' сек' . ($have ? ' (последна порция)' : ''), 'bytes' => $size);
+}
+
+/**
+ * Една стъпка от свалянето: тегли текущия файл до $budget сек (0 = без лимит).
+ * @return array {status: 'none'|'busy'|'progress'|'started'|'error', message}
+ */
+function babh6_sync_dl_step($budget = 60) {
+    $dl = babh6_sync_dl_state();
+    if (!$dl) return array('status' => 'none', 'message' => '');
+    if (get_transient('babh6_dl_lock')) return array('status' => 'busy', 'message' => 'Свалянето тече в друга заявка.');
+    set_transient('babh6_dl_lock', 1, 5 * MINUTE_IN_SECONDS);
+    $r = babh6_sync_dl_step_locked($dl, $budget);
+    delete_transient('babh6_dl_lock');
+    return $r;
+}
+
+function babh6_sync_dl_step_locked($dl, $budget) {
+    $now = current_time('mysql');
+    if (time() - (int)$dl['started'] > 3 * HOUR_IN_SECONDS) {
+        babh6_sync_dl_cleanup($dl);
+        return babh6_sync_fail($now, 'Свалянето отне над 3 часа и беше прекратено.', $dl['context']);
+    }
+    $n = count($dl['links']); $i = (int)$dl['idx']; $l = $dl['links'][$i];
+    $label = 'файл ' . ($i + 1) . '/' . $n;
+    $part  = $dl['base'] . '/dl-' . $dl['started'] . '-' . ($i + 1) . '.part';
+    $r = babh6_sync_curl_download($l['url'], $part, $budget, $label, babh6_sync_strategy_by_name($dl['strategy']), babh6_sync_url());
+
+    if ($r['status'] === 'partial') {
+        babh6_sync_log($label . ': ' . $r['message']);
+        $dl['tries'] = 0;
+        update_option('babh6_sync_dl', $dl, false);
+        return array('status' => 'progress', 'message' => $r['message']);
+    }
+    if ($r['status'] === 'error') {
+        $dl['tries'] = (int)$dl['tries'] + 1;
+        babh6_sync_log($label . ' опит ' . $dl['tries'] . '/4 грешка: ' . $r['message']);
+        if ($dl['tries'] >= 4) {
+            babh6_sync_dl_cleanup($dl);
+            return babh6_sync_fail($now, ucfirst($label) . ': ' . $r['message'] . ' (4 опита — виж дневника).', $dl['context']);
+        }
+        update_option('babh6_sync_dl', $dl, false);
+        sleep(min(10, 3 * $dl['tries']));
+        return array('status' => 'progress', 'message' => $r['message']);
+    }
+
+    /* done → проверка, че е XLSX (zip) а не HTML страница */
+    $fh = @fopen($part, 'rb'); $magic = $fh ? fread($fh, 2) : ''; if ($fh) fclose($fh);
+    if ($r['bytes'] <= 0 || $magic !== 'PK') {
+        @unlink($part);
+        $dl['tries'] = (int)$dl['tries'] + 1;
+        babh6_sync_log($label . ' опит ' . $dl['tries'] . '/4: отговорът не е .xlsx (' . babh6_sync_fmt_bytes($r['bytes']) . ')');
+        if ($dl['tries'] >= 4) { babh6_sync_dl_cleanup($dl); return babh6_sync_fail($now, ucfirst($label) . ': порталът връща нещо, което не е .xlsx (4 опита).', $dl['context']); }
+        update_option('babh6_sync_dl', $dl, false);
+        return array('status' => 'progress', 'message' => 'не е .xlsx');
+    }
+    $tmp = $dl['base'] . '/dl-' . $dl['started'] . '-' . ($i + 1) . '.tmp';
+    @rename($part, $tmp);
+    $name = basename(rawurldecode(str_replace('+', ' ', $l['path'])));
+    $dl['done'][] = array('src' => $tmp, 'name' => sanitize_file_name($name), 'title' => $l['title']);
+    $dl['idx'] = $i + 1; $dl['tries'] = 0;
+    babh6_sync_log($label . ' OK: ' . $name . ' — ' . $r['message']);
+
+    if ($dl['idx'] < $n) {
+        update_option('babh6_sync_dl', $dl, false);
+        babh6_sync_state_set(array('last_message' => 'Свалям файл ' . ($dl['idx'] + 1) . '/' . $n . '…'));
+        return array('status' => 'progress', 'message' => 'следващ файл');
+    }
+
+    /* Всички файлове са свалени → import job */
+    delete_option('babh6_sync_dl');
+    $job = babh6_job_create_files($dl['done'], 'auto', array('sig' => $dl['sig'], 'context' => $dl['context'], 'portal_updated' => $dl['updated']));
+    if (is_wp_error($job)) {
+        foreach ($dl['done'] as $f) @unlink($f['src']);
+        return babh6_sync_fail($now, $job->get_error_message(), $dl['context']);
+    }
+    $msg = 'Свалени ' . $n . ' файла от БАБХ — обработката на редовете тече.';
+    babh6_sync_log($msg);
+    babh6_sync_state_set(array('last_check' => $now, 'last_result' => 'started', 'last_message' => $msg, 'pending_sig' => $dl['sig']));
+    babh6_sync_kick();
+    return array('status' => 'started', 'message' => $msg);
 }
 
 /* ============ Основно изпълнение ============ */
@@ -363,11 +526,11 @@ function babh6_sync_download($url, $dest, $strategy = array(), $referer = '', $c
  * @param string $context 'cron' | 'manual'
  * @return array {status: 'started'|'nochange'|'busy'|'error', message}
  */
-function babh6_sync_run($force = false, $context = 'cron') {
+function babh6_sync_run($force = false, $context = 'cron', $inline = false) {
     @set_time_limit(1800);
     $now = current_time('mysql');
 
-    /* Има ли вече активен import? Cron не прекъсва пресен ръчен import. */
+    /* Има ли вече активен import / сваляне? Cron не прекъсва пресен ръчен процес. */
     $job = get_option('babh6_job');
     if ($job) {
         $age = time() - (int)(isset($job['created']) ? $job['created'] : 0);
@@ -377,18 +540,26 @@ function babh6_sync_run($force = false, $context = 'cron') {
             return array('status' => 'busy', 'message' => $msg);
         }
     }
+    $dl = babh6_sync_dl_state();
+    if ($dl) {
+        if ($context === 'cron' && time() - (int)$dl['started'] < 3 * HOUR_IN_SECONDS) {
+            babh6_sync_kick();
+            return array('status' => 'busy', 'message' => 'Свалянето от предишна проверка още тече.');
+        }
+        babh6_sync_dl_cleanup($dl);
+    }
 
     /* Lock: една проверка наведнъж (loopback + cron fallback могат да съвпаднат) */
     if (get_transient('babh6_sync_check_lock')) {
         return array('status' => 'busy', 'message' => 'Проверката вече тече.');
     }
     set_transient('babh6_sync_check_lock', 1, 15 * MINUTE_IN_SECONDS);
-    $r = babh6_sync_run_locked($force, $context, $now);
+    $r = babh6_sync_run_locked($force, $context, $now, $inline);
     delete_transient('babh6_sync_check_lock');
     return $r;
 }
 
-function babh6_sync_run_locked($force, $context, $now) {
+function babh6_sync_run_locked($force, $context, $now, $inline = false) {
     $url = babh6_sync_url();
     babh6_sync_state_set(array('last_result' => 'running', 'last_message' => 'Свалям страницата на БАБХ (до ' . babh6_sync_timeout() . ' сек)…', 'queued_force' => 0, 'last_log' => array()));
     babh6_sync_log('старт (' . $context . ($force ? ', принудително' : '') . ') → ' . $url);
@@ -426,30 +597,22 @@ function babh6_sync_run_locked($force, $context, $now) {
     $base = trailingslashit($dir['basedir']) . 'babh6';
     if (!wp_mkdir_p($base)) return babh6_sync_fail($now, 'Не мога да създам папка ' . $base, $context);
 
-    $files = array();
-    foreach ($links as $i => $l) {
-        babh6_sync_state_set(array('last_message' => 'Свалям файл ' . ($i + 1) . '/' . count($links) . ' от БАБХ…'));
-        $tmp = $base . '/dl-' . time() . '-' . ($i + 1) . '.tmp';
-        $r = babh6_sync_download($l['url'], $tmp, babh6_sync_strategy_by_name($page['strategy']), $url, $page['cookies']);
-        if (is_wp_error($r)) {
-            foreach ($files as $f) @unlink($f['src']);
-            return babh6_sync_fail($now, 'Файл ' . ($i + 1) . '/' . count($links) . ': ' . $r->get_error_message() . ' (3 опита — виж дневника).', $context);
-        }
-        $name = basename(rawurldecode(str_replace('+', ' ', $l['path'])));
-        $files[] = array('src' => $tmp, 'name' => sanitize_file_name($name), 'title' => $l['title']);
+    $dl = array(
+        'links' => $links, 'sig' => $sig, 'updated' => $updated, 'context' => $context,
+        'strategy' => $page['strategy'], 'base' => $base, 'started' => time(),
+        'idx' => 0, 'done' => array(), 'tries' => 0,
+    );
+    update_option('babh6_sync_dl', $dl, false);
+    $msg = 'Страницата е свалена (' . $page['note'] . '). Свалям файл 1/' . count($links) . '…';
+    babh6_sync_state_set(array('last_check' => $now, 'last_result' => 'running', 'last_message' => $msg,
+                               'portal_updated' => $updated, 'portal_files' => $files_h, 'pending_sig' => $sig, 'running_since' => time()));
+
+    if ($inline) {
+        /* „Пусни директно": свалянето в същата заявка, без порции */
+        do { $r = babh6_sync_dl_step(0); } while ($r['status'] === 'progress');
+        return $r;
     }
-
-    $job = babh6_job_create_files($files, 'auto', array('sig' => $sig, 'context' => $context, 'portal_updated' => $updated));
-    if (is_wp_error($job)) {
-        foreach ($files as $f) @unlink($f['src']);
-        return babh6_sync_fail($now, $job->get_error_message(), $context);
-    }
-
-    $msg = 'Свалени ' . count($files) . ' файла от БАБХ (' . $page['note'] . ') — обработката тече.';
-    babh6_sync_state_set(array('last_check' => $now, 'last_result' => 'started', 'last_message' => $msg,
-                               'portal_updated' => $updated, 'portal_files' => $files_h, 'pending_sig' => $sig));
-
-    /* Фонова обработка (ако админът е на dashboard-а, AJAX-ът също я движи; lock пази от дублиране) */
+    /* Фоново: порции по ~1 мин, всяка кикна следващата */
     babh6_sync_kick();
     return array('status' => 'started', 'message' => $msg);
 }
@@ -519,8 +682,17 @@ function babh6_sync_worker() {
         $r = babh6_sync_run(!empty($state['queued_force']), 'manual');
         if ($r['status'] !== 'started') return; /* started → sync_run вече е пуснал kick */
     }
-    if (!get_option('babh6_job')) return;
     $limit  = (int)ini_get('max_execution_time');
+    if (babh6_sync_dl_state()) {
+        $r = babh6_sync_dl_step(($limit > 0) ? min(60, max(20, $limit - 15)) : 60);
+        if ($r['status'] === 'progress') { babh6_sync_kick(); return; }
+        if ($r['status'] === 'busy') {
+            if (!wp_next_scheduled('babh6_sync_process')) wp_schedule_single_event(time() + 120, 'babh6_sync_process');
+            return;
+        }
+        if ($r['status'] !== 'started') return; /* грешка → записана; started → kick вече е пуснат */
+    }
+    if (!get_option('babh6_job')) return;
     $budget = ($limit > 0) ? min(50, max(15, $limit - 10)) : 50;
     $start  = microtime(true);
     $done   = false;
@@ -543,6 +715,7 @@ add_action('wp_ajax_babh6_sync_status', function () {
         'result'  => isset($s['last_result']) ? $s['last_result'] : '',
         'message' => isset($s['last_message']) ? $s['last_message'] : '',
         'job'     => get_option('babh6_job') ? 1 : 0,
+        'dl'      => babh6_sync_dl_state() ? 1 : 0,
     ));
 });
 
@@ -589,8 +762,13 @@ add_action('admin_post_babh6_sync_now', function () {
     $force = !empty($_POST['babh6_force']);
     if (!empty($_POST['babh6_direct'])) {
         /* Директно в тази заявка (ако фоновият режим не тръгва на хостинга) */
-        @set_time_limit(900);
-        $r = babh6_sync_run($force, 'manual');
+        @set_time_limit(3600);
+        $r = babh6_sync_run($force, 'manual', true);
+        if ($r['status'] === 'started') {
+            /* файловете са свалени; редовете се обработват на dashboard-а (progress bar) */
+            wp_safe_redirect(admin_url('admin.php?page=babh6'));
+            exit;
+        }
         wp_safe_redirect(add_query_arg(array('babh6_sync' => $r['status'], 'babh6_msg' => rawurlencode($r['message'])), admin_url('admin.php?page=babh6')));
         exit;
     }
@@ -670,6 +848,10 @@ function babh6_sync_admin_section() {
     if ($res === 'queued' || $res === 'running') {
         $stale = $res === 'queued' && !empty($state['queued_at']) && (time() - (int)$state['queued_at']) > 180;
         if ($stale) echo '<p style="color:#d63638"><b>Фоновата проверка не тръгва</b> (чака от ' . esc_html(human_time_diff((int)$state['queued_at'])) . '). Хостингът вероятно блокира loopback заявки и WP-Cron. Използвай „Пусни директно" по-долу или системен cron.</p>';
+        $dl = babh6_sync_dl_state();
+        if ($res === 'running' && !$dl && !get_option('babh6_job') && !empty($state['running_since']) && (time() - (int)$state['running_since']) > 20 * MINUTE_IN_SECONDS) {
+            echo '<p style="color:#d63638"><b>Проверката изглежда прекъсната</b> (хостингът е спрял фоновата заявка). Натисни „Провери и обнови сега" отново.</p>';
+        }
         ?>
         <script>
         (function(){
