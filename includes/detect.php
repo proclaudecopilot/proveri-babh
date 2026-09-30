@@ -5,7 +5,11 @@ if (!defined('ABSPATH')) exit;
 function babh6_countries() {
     static $c = null;
     if ($c === null) {
-        $c = array('полша','италия','германия','австрия','чехия','словакия','унгария','румъния','гърция','турция','испания','франция','холандия','нидерландия','белгия','швейцария','великобритания','сащ','китай','индия','канада','дания','швеция','норвегия','финландия','португалия','ирландия','литва','латвия','естония','хърватия','словения','сърбия','македония','северна македония','русия','украйна','беларус','япония','корея','южна корея','бразилия','аржентина','мексико','кипър','малта','исландия','люксембург','молдова','тайван','тайланд','виетнам','сингапур','албания','босна и херцеговина','грузия','армения','казахстан','узбекистан','австралия','нова зеландия','юар','египет','израел','оае','саудитска арабия','иран','пакистан','шри ланка','чили','перу','колумбия','венецуела','уругвай','българия');
+        $c = array('полша','италия','германия','австрия','чехия','словакия','унгария','румъния','гърция','турция','испания','франция','холандия','нидерландия','белгия','швейцария','великобритания','англия','шотландия','уелс','обединено кралство','сащ','съединени американски щати','китай','индия','канада','дания','швеция','норвегия','финландия','португалия','ирландия','литва','латвия','естония','хърватия','хърватска','словения','сърбия','македония','северна македония','русия','украйна','беларус','япония','корея','южна корея','бразилия','аржентина','мексико','кипър','малта','исландия','люксембург','молдова','тайван','тайланд','виетнам','сингапур','албания','босна и херцеговина','грузия','армения','казахстан','узбекистан','австралия','нова зеландия','юар','южна африка','египет','израел','оае','обединени арабски емирства','саудитска арабия','иран','пакистан','шри ланка','чили','перу','колумбия','венецуела','уругвай','българия','република българия','р българия','бг',
+            /* региони и съкращения — не са фирми */
+            'ес','еу','европейски съюз','европа','eu','european union','europe','uk','u.k','usa','u.s.a','us','bg','eс',
+            /* латиница */
+            'poland','italy','germany','austria','czech republic','czechia','slovakia','hungary','romania','greece','turkey','spain','france','netherlands','the netherlands','holland','belgium','switzerland','united kingdom','great britain','england','scotland','wales','united states','united states of america','china','india','canada','denmark','sweden','norway','finland','portugal','ireland','lithuania','latvia','estonia','croatia','slovenia','serbia','north macedonia','macedonia','russia','ukraine','belarus','japan','korea','south korea','brazil','argentina','mexico','cyprus','malta','iceland','luxembourg','moldova','taiwan','thailand','vietnam','singapore','albania','bosnia and herzegovina','georgia','armenia','kazakhstan','australia','new zealand','south africa','egypt','israel','uae','united arab emirates','saudi arabia','iran','pakistan','sri lanka','chile','peru','colombia','bulgaria');
         $c = array_flip($c);
     }
     return $c;
@@ -22,20 +26,99 @@ function babh6_is_country($s) {
     $s = trim((string)$s);
     if ($s === '' || mb_strlen($s, 'UTF-8') > 50) return false;
     $l = mb_strtolower($s, 'UTF-8');
+    $l = trim(preg_replace('/\s+/u', ' ', preg_replace('/[.;:\-–—()]+$/u', '', $l)));
     if (strpos($l, ',') !== false) return false;
     foreach (array('оод','еоод','еад',' ад','gmbh','ltd','inc','srl','s.a','s.r.l') as $m) {
         if (mb_strpos($l, $m) !== false) return false;
     }
+    $l = preg_replace('/^(р\.|реп\.|република|republic of|the)\s+/u', '', $l);
     return isset(babh6_countries()[$l]);
 }
 
+/**
+ * Ключ за групиране на фирма по името. Регистърът пише една и съща фирма по десетки
+ * начини („Флай Фиш“ ЕООД / Флай Фиш ЕООД гр. София / ФЛАЙ ФИШ ЕООД, ул. …), затова:
+ *   1. взимаме частта преди първата запетая, малки букви, без кавички и ®/™;
+ *   2. режем при първата правна форма (ЕООД, ООД, АД, ЕАД, ЕТ, GmbH, Ltd, Sp. z o.o., …) —
+ *      адресът след нея без запетая („ЕООД гр. София“) отпада;
+ *   3. без правна форма — режем при адресни белези (гр., с., ул., бул., ж.к., ul., str., via, …)
+ *      или при число, следвано от дума (NOW Foods 244 Knollwood Dr.);
+ *   4. водеща правна форма („ЕТ Иван Иванов“) се маха и продължаваме с останалото.
+ */
 function babh6_norm_firm($s) {
     $s = mb_strtolower(babh6_first_part($s), 'UTF-8');
     if ($s === '') return '';
-    $s = preg_replace('/[."\'\x{201E}\x{201C}\x{00AB}\x{00BB}]/u', '', $s);
-    $s = preg_replace('/\s*(еоод|ооод|оод|еад|ад|ет|gmbh|srl|inc|ltd|llc|s\.?r\.?l\.?|s\.?a\.?)\s*$/u', '', $s);
+    /* кавички и знаци → интервал (иначе „Адифарма“ЕАД се слепва), после събиране на интервалите */
+    $s = preg_replace('/["\'\x{201E}\x{201C}\x{201D}\x{2018}\x{2019}\x{00AB}\x{00BB}\x{00AE}\x{2122}]/u', ' ', $s);
     $s = trim(preg_replace('/\s+/u', ' ', $s));
+    $s = babh6_fix_homoglyphs($s);
+    static $legal = '(?:еоод|ооод|оод|еад|ад|ет|сд|кд|кда|адсиц|eood|ood|ead|ad|gmbh|s\.?r\.?l\.?|s\.?p\.?a\.?|s\.?a\.?s\.?|s\.?a\.?r\.?l\.?|inc\.?|ltd\.?|limited|llc|llp|plc|co\.?\s?ltd\.?|corp\.?|corporation|s\.?a\.?|a\.?g\.?|a\.?b\.?|a\.?s\.?|o\.?y\.?j?|b\.?v\.?|n\.?v\.?|kft\.?|zrt\.?|s\.?r\.?o\.?|d\.?o\.?o\.?|sp\.?\s?z\s?o\.?\s?o\.?|spółka akcyjna|spolka akcyjna|spółka z\s?o\.?\s?o\.?|spolka z\s?o\.?\s?o\.?|pty\.?|pvt\.?|s\.?l\.?|ug|aps|a\/s|ltda\.?|lda\.?)';
+    /* водеща правна форма („ЕТ Иван Иванов“) → махаме я */
+    for ($guard = 0; $guard < 2; $guard++) {
+        if (preg_match('/^' . $legal . '(?=\s|$)\s*/u', $s, $m) && trim($m[0]) !== '' && trim($m[0]) !== $s) { $s = trim(mb_substr($s, mb_strlen($m[0], 'UTF-8'), null, 'UTF-8')); continue; }
+        break;
+    }
+    if (preg_match('/^(.*?\S)\s*(?:^|\s|-)' . $legal . '(?=\s|$|[-,;\/])/u', $s, $m) && trim($m[1]) !== '') {
+        $s = $m[1];
+    } else {
+        $cut = preg_split('/\s(?:гр\.|гр\s|с\.\s?[а-я]|ул\.|бул\.|ж\.?к\.?\s|кв\.|пл\.|обл\.|общ\.|местност|ul\.|str\.|strasse|straße|via\s|rue\s|road\b|street\b|avenue\b|ave\.|dr\.|blvd|p\.?o\.?\s?box)/u', ' ' . $s, 2);
+        $s = trim($cut[0]);
+        if (preg_match('/^(.*?\S)\s+\d+[\/\-\d]*\s+\p{L}{2,}/u', $s, $m)) $s = $m[1];
+    }
+    $s = str_replace('.', '', $s);
+    /* trim() с многобайтови знаци реже байтове от кирилски букви → preg_replace */
+    $s = preg_replace('/^[\s\-–—\/&+]+|[\s\-–—\/&+]+$/u', '', preg_replace('/\s+/u', ' ', $s));
     return mb_substr($s, 0, 190, 'UTF-8');
+}
+
+/**
+ * Показвано име на фирма: първата част без кавички/адрес, с правната форма („Флай Фиш ЕООД“).
+ * Същите правила като babh6_norm_firm(), но запазва изписването.
+ */
+function babh6_display_firm($s) {
+    $s = babh6_first_part($s);
+    if ($s === '') return '';
+    $s = preg_replace('/["\'\x{201E}\x{201C}\x{201D}\x{2018}\x{2019}\x{00AB}\x{00BB}\x{00AE}\x{2122}]/u', ' ', $s);
+    $s = trim(preg_replace('/\s+/u', ' ', $s));
+    $l = mb_strtolower($s, 'UTF-8');
+    if (strlen($l) !== strlen($s)) return $s; /* различна дължина в байтове (рядко) → без рязане */
+    static $legal = '(?:еоод|ооод|оод|еад|ад|ет|сд|кд|кда|адсиц|eood|ood|ead|ad|gmbh|s\.?r\.?l\.?|s\.?p\.?a\.?|s\.?a\.?s\.?|s\.?a\.?r\.?l\.?|inc\.?|ltd\.?|limited|llc|llp|plc|co\.?\s?ltd\.?|corp\.?|corporation|s\.?a\.?|a\.?g\.?|a\.?b\.?|a\.?s\.?|o\.?y\.?j?|b\.?v\.?|n\.?v\.?|kft\.?|zrt\.?|s\.?r\.?o\.?|d\.?o\.?o\.?|sp\.?\s?z\s?o\.?\s?o\.?|spółka akcyjna|spolka akcyjna|spółka z\s?o\.?\s?o\.?|spolka z\s?o\.?\s?o\.?|pty\.?|pvt\.?|s\.?l\.?|ug|aps|a\/s|ltda\.?|lda\.?)';
+    if (preg_match('/^(?:' . $legal . '\s+)?(.*?\S)\s*(?:^|\s|-)(' . $legal . ')(?=\s|$|[-,;\/])/u', $l, $m, PREG_OFFSET_CAPTURE) && trim($m[1][0]) !== '') {
+        $end = $m[2][1] + strlen($m[2][0]);
+        return preg_replace('/^[\s\-–—\/]+|[\s\-–—\/]+$/u', '', substr($s, 0, $end));
+    }
+    $parts = preg_split('/\s(?:гр\.|гр\s|с\.\s?[а-я]|ул\.|бул\.|ж\.?к\.?\s|кв\.|пл\.|обл\.|общ\.|местност|ul\.|str\.|strasse|straße|via\s|rue\s|road\b|street\b|avenue\b|ave\.|dr\.|blvd|p\.?o\.?\s?box)/u', ' ' . $l, 2, PREG_SPLIT_OFFSET_CAPTURE);
+    $cutlen = strlen($parts[0][0]) - 1;
+    $out = trim(substr($s, 0, max(0, $cutlen)));
+    if (preg_match('/^(.*?\S)\s+\d+[\/\-\d]*\s+\p{L}{2,}/u', $out, $m)) $out = $m[1];
+    return preg_replace('/^[\s\-–—\/]+|[\s\-–—\/]+$/u', '', $out);
+}
+
+/** Латински букви в предимно кирилска дума („ЕAД“, „ФИТОФАРМA“) → кирилица. */
+function babh6_fix_homoglyphs($s) {
+    static $map = array('a'=>'а','e'=>'е','o'=>'о','p'=>'р','c'=>'с','x'=>'х','y'=>'у','k'=>'к','m'=>'м','t'=>'т','h'=>'н','b'=>'в','n'=>'п','u'=>'и');
+    $words = explode(' ', $s);
+    foreach ($words as &$w) {
+        if (!preg_match('/[a-z]/', $w) || !preg_match('/[а-я]/u', $w)) continue;
+        $cyr = preg_match_all('/[а-я]/u', $w); $lat = preg_match_all('/[a-z]/', $w);
+        if ($cyr > $lat) $w = strtr($w, $map);
+    }
+    unset($w);
+    return implode(' ', $words);
+}
+
+/** Дали стойност от полетата за производство прилича на фирма (а не само на адрес или държава). */
+function babh6_looks_like_firm($s) {
+    $f = babh6_first_part($s);
+    if ($f === '' || mb_strlen($f, 'UTF-8') < 3 || babh6_is_country($f)) return false;
+    $l = mb_strtolower($f, 'UTF-8');
+    if (preg_match('/^(гр\.|гр\s|с\.|село|ул\.|бул\.|ж\.?к|кв\.|пл\.|местност|обл\.|общ\.|п\.к\.|-+$)/u', $l)) return false;
+    return babh6_norm_firm($f) !== '';
+}
+
+/** Ключ за откриване на печатни грешки между групи (латиница, без интервали). */
+function babh6_norm_alias_key($norm) {
+    return preg_replace('/[^a-z0-9]/', '', babh6_translit_bg2lat($norm));
 }
 
 /**
@@ -135,11 +218,12 @@ function babh6_parse_date_any($v) {
     }
     if (preg_match('/(\d{1,2})[.,\/](\d{1,2})[.,\/](\d{4})/u', $v, $m)) {
         $day = intval($m[1]); $mon = intval($m[2]); $yr = intval($m[3]);
-        if ($mon >= 1 && $mon <= 12 && $day >= 1 && $day <= 31) {
+        /* „31.04.2013“ се среща в регистъра — невалидна дата би провалила целия INSERT при строг SQL режим */
+        if (checkdate($mon, $day, $yr) && $yr >= 1990 && $yr <= 2100) {
             return sprintf('%04d-%02d-%02d', $yr, $mon, $day);
         }
     }
-    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $v, $m)) return $m[0];
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $v, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1])) return $m[0];
     return null;
 }
 
