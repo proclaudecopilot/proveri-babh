@@ -264,12 +264,14 @@ function renderShell() {
         '<div class="b6-top">' +
           '<button type="button" class="b6-burger" id="b6-burger" aria-label="Отвори менюто" aria-expanded="false" aria-controls="b6-sb">' + I.menu + '</button>' +
           '<div class="b6-crumb" id="b6-crumb" aria-hidden="true">Регистър</div>' +
+          '<form class="b6-minq" id="b6-minq" role="search">' + I.search + '<input id="b6-minq-i" type="search" autocomplete="off"><button type="button" class="clr" id="b6-minq-x" aria-label="Изчисти търсенето">' + I.x + '</button></form>' +
           '<div class="b6-live none" id="b6-live" title="Актуалност на данните"><span class="b6-live-dot" aria-hidden="true"></span><span id="b6-live-t2">Зареждане…</span></div>' +
         '</div>' +
         '<div class="b6-content" id="b6-content"></div>' +
       '</div>' +
     '</div>' +
     '<div class="b6-scrim" id="b6-scrim"></div>' +
+    '<div class="b6-dw-wrap" id="b6-dw" aria-hidden="true"><div class="b6-dw-scrim" id="b6-dw-scrim"></div><div class="b6-dw" id="b6-dw-p" role="dialog" aria-modal="true"></div></div>' +
     '<nav class="b6-bnav" aria-label="Долна навигация">' +
       '<button type="button" data-tab="overview" class="on" aria-current="page">' + I.grid + '<span>Регистър</span></button>' +
       '<button type="button" data-tab="products">' + I.search + '<span>Продукти</span></button>' +
@@ -298,13 +300,24 @@ function renderShell() {
   });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (dw.length) { dwClose(false); return; }
     if ($('#b6-sb') && $('#b6-sb').classList.contains('open')) { closeSidebar(); return; }
     if (state.fpanel) { closeFilterPanel(); }
   });
   var lo = $('#b6-logout');
   if (lo) lo.addEventListener('click', function () { lo.disabled = true; api('/logout', null, { method: 'POST' }).then(function () { location.reload(); }, function () { lo.disabled = false; alert('Изходът не е потвърден от сървъра. Опитай отново.'); }); });
 
-  /* v6.7: горната търсачка е премахната — всеки раздел има една собствена търсачка */
+  /* v6.7: горната търсачка е премахната — всеки раздел има една собствена търсачка;
+     компактно копие се показва в лентата, когато голямата излезе от екрана (v6.7.1) */
+  bindMini();
+  $('#b6-dw-scrim').addEventListener('click', function () { dwClose(true); });
+  $('#b6-dw-p').addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab') return;
+    var f = $$('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex="0"]', $('#b6-dw-p')).filter(function (el) { return el.offsetParent !== null; });
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
 }
 var TAB_NAMES = { overview: 'Регистър', products: 'Продукти', producers: 'Производители', traders: 'Търговци', novel: 'Проверка на съставки', inspector: 'Промени в регистъра', watchlist: 'Известия' };
 function setCrumb() {
@@ -341,6 +354,7 @@ function closeSidebar() {
 
 function setTab(t) {
   clearTimers();
+  if (dw.length) dwClose(true);
   var same = state.tab === t;
   state.tab = t; state.page = 1; state.openReg = null; state.fpanel = false; state.draft = null;
   if (t !== 'products') { state.deepReg = null; state.deepErr = ''; }
@@ -434,6 +448,7 @@ function render() {
   var c = $('#b6-content');
   if (!c) return;
   setCrumb();
+  setTimeout(setupMini, 0);
   switch (state.tab) {
     case 'overview': renderOverview(c); break;
     case 'products': renderProducts(c); break;
@@ -798,7 +813,7 @@ function renderActive() {
 }
 
 function sortSelectHTML(val) {
-  var opts = [['rel', 'По съвпадение'], ['new', 'По рег. №: най-нови'], ['date', 'По дата на уведомление'], ['old', 'По рег. №: най-стари'], ['name', 'По име: А–Я']];
+  var opts = [['rel', 'По съвпадение'], ['new', 'Най-нови (по рег. №)'], ['date', 'По дата на уведомление'], ['old', 'Най-стари (по рег. №)'], ['name', 'По име: А–Я']];
   if (PRO) opts.push(['flagged', 'С най-много бележки']);
   return '<select class="b6-sel" id="b6-sort" aria-label="Подреждане">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (val === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
 }
@@ -837,14 +852,15 @@ function renderList(skeleton) {
     syncExportBtn();
     return;
   }
-  var html = deep + '<div class="b6-cards grid" style="--cols:' + state.cols + '">' + state.items.map(function (p) { return cardHTML(p, state.openReg === p.reg); }).join('') + '</div>';
+  var html = deep + '<div class="b6-cards grid" style="--cols:' + state.cols + '">' + state.items.map(function (p) { return cardHTML(p); }).join('') + '</div>';
   if (state.items.length < state.total) {
     var left = state.total - state.items.length;
     html += '<div class="b6-more-wrap"><button type="button" class="b6-more" id="b6-more">Покажи още ' + Math.min(state.per, left) + '</button><div class="b6-left">' + (left === 1 ? 'Остава 1 резултат' : 'Остават ' + nfmt(left) + ' резултата') + '</div></div>';
   }
   c.innerHTML = html;
   bindDeep(c);
-  bindCards(c, function (reg) { state.openReg = state.openReg === reg ? null : reg; renderList(false); return state.openReg === reg; });
+  bindCards(c, state.items);
+  var tp = dw[dw.length - 1]; if (tp && tp.type === 'product') markActiveCard(tp.item.reg);
   var more = $('#b6-more');
   if (more) more.addEventListener('click', function () { more.disabled = true; more.textContent = 'Зареждане…'; state.page++; loadProducts(true); });
   syncExportBtn();
@@ -857,33 +873,85 @@ function bindSort(c) {
   var s = $('#b6-sort', c);
   if (s) s.addEventListener('change', function (e) { state.f.sort = e.target.value; state.page = 1; state.deepReg = null; loadProducts(false); });
 }
-/* Общи обработчици за картите (главен списък и списъкът в профила на фирма) */
-function bindCards(c, toggle) {
-  $$('.b6-card', c).forEach(function (card) {
-    var head = $('.b6-ch', card);
-    head.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target === head) { e.preventDefault(); head.click(); } });
-    head.addEventListener('click', function (e) {
-      if (e.target.closest('.b6-plink')) return;
-      /* маркиране на текст в картата не я свива (PR-14) */
-      var sel = window.getSelection ? String(window.getSelection()) : '';
-      if (sel && sel.length) return;
-      var reg = card.getAttribute('data-reg');
-      var y = card.getBoundingClientRect().top;
-      if (toggle(reg)) {
-        var el = $('.b6-card[data-reg="' + CSS.escape(reg) + '"]');
-        if (el) { var h = $('.b6-ch', el); if (h) focusEl(h); setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 60); }
-      } else {
-        var el2 = $('.b6-card[data-reg="' + CSS.escape(reg) + '"]');
-        if (el2) { var h2 = $('.b6-ch', el2); if (h2) focusEl(h2); var dy = el2.getBoundingClientRect().top - y; if (dy) window.scrollBy(0, dy); }
-      }
-    });
-  });
+/* ===== v6.7.1: страничен панел (drawer) за продукт и фирма; на телефон — панел отдолу нагоре =====
+   Стек: всеки отворен продукт/фирма е слой; „Назад“ връща предишния, × затваря всички. */
+var dw = [];
+function dwLabel(e) { return e.type === 'product' ? 'Продукт' : (e.kind === 'p' ? 'Производител' : 'Търговец'); }
+function dwOpen(entry, opener) {
+  if (!dw.length) entry.opener = opener || document.activeElement;
+  dw.push(entry);
+  dwRender(true);
+}
+function dwClose(all) {
+  if (!dw.length) return;
+  if (all) dw = []; else dw.pop();
+  if (!dw.length) {
+    var wrap = $('#b6-dw');
+    if (wrap) { wrap.classList.remove('open'); wrap.setAttribute('aria-hidden', 'true'); setTimeout(function () { if (!dw.length) $('#b6-dw-p').innerHTML = ''; }, 260); }
+    state.party.open = null; state.party.detail = null; ++seq.party; ++seq.pprod;
+    if (!state.fpanel) document.body.classList.remove('b6-noscroll');
+    markActiveCard(null);
+    var op = dwOpener; dwOpener = null;
+    if (op && document.contains(op)) focusEl(op);
+    return;
+  }
+  dwRender(false);
+}
+var dwOpener = null;
+function markActiveCard(reg) {
+  $$('.b6-card.active').forEach(function (c) { c.classList.remove('active'); });
+  if (reg) $$('.b6-card[data-reg="' + CSS.escape(reg) + '"]').forEach(function (c) { c.classList.add('active'); });
+}
+function dwRender(isNew) {
+  var wrap = $('#b6-dw'), panel = $('#b6-dw-p');
+  if (!wrap || !dw.length) return;
+  var top = dw[dw.length - 1];
+  if (top.opener) { dwOpener = top.opener; top.opener = null; }
+  var wasOpen = wrap.classList.contains('open');
+  wrap.classList.add('open'); wrap.removeAttribute('aria-hidden');
+  document.body.classList.add('b6-noscroll');
+  panel.setAttribute('aria-label', dwLabel(top));
+  panel.innerHTML =
+    '<div class="b6-dw-h">' +
+      (dw.length > 1 ? '<button type="button" class="b6-dw-back" id="b6-dw-back">' + I.chev + 'Назад</button>' : '<span class="b6-dw-l">' + dwLabel(top) + '</span>') +
+      '<button type="button" class="b6-iconbtn b6-dw-x" id="b6-dw-x" aria-label="Затвори">' + I.x + '</button>' +
+    '</div>' +
+    '<div class="b6-dw-b" id="b6-dw-b"></div>';
+  $('#b6-dw-x').addEventListener('click', function () { dwClose(true); });
+  var bk = $('#b6-dw-back'); if (bk) bk.addEventListener('click', function () { dwClose(false); });
+  var body = $('#b6-dw-b');
+  if (top.type === 'product') {
+    markActiveCard(top.item.reg);
+    body.innerHTML = productHeadHTML(top.item) + bodyHTML(top.item);
+    bindDetail(body);
+  } else {
+    markActiveCard(null);
+    var ps = state.party;
+    ps.kind = top.kind; ps.open = top.norm; ps.detail = top.detail || null; ps.err = top.err || ''; ps.view = top.view || 'partners';
+    if (!top.prod) top.prod = { items: [], total: 0, page: 1, loading: false, openReg: null, err: '' };
+    ps.prod = top.prod;
+    renderPartyDetail(body);
+  }
+  panel.scrollTop = 0; body.scrollTop = 0;
+  if (isNew || !wasOpen) setTimeout(function () { focusEl('#b6-dw-x'); }, wasOpen ? 0 : 60);
+}
+function productHeadHTML(p) {
+  var cat = p.cat || 'other', col = CAT_COLORS[cat] || '#9AA0AB';
+  return '<div class="b6-dw-ph"><div class="b6-tile" style="background:' + col + '1C;color:' + col + '" aria-hidden="true">' + (CAT_ICONS[cat] || CAT_ICONS.other) + '</div>' +
+    '<div><div class="b6-ccat" style="color:color-mix(in srgb,' + col + ' 58%,#0E1116)">' + esc(cat === 'other' ? 'Без определена категория' : catLabel(cat, p.catl)) + '</div>' +
+    '<div class="b6-dw-reg"><span class="b6-reg">' + esc(p.reg) + '</span>' + (p.nd ? '<span class="b6-date">уведомен ' + fmtDate(p.nd) + '</span>' : '') + '</div></div></div>';
+}
+function openProduct(item, opener) {
+  if (!item) return;
+  var top = dw[dw.length - 1];
+  if (top && top.type === 'product' && top.item.reg === item.reg) return;
+  dwOpen({ type: 'product', item: item }, opener);
+}
+/* Обработчици в детайла на продукт: съставки → търсене, копиране на линк */
+function bindDetail(c) {
   $$('.b6-ing[data-ing]', c).forEach(function (el) {
     el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
-    el.addEventListener('click', function (e) {
-      e.stopPropagation();
-      gotoProducts({ q: el.getAttribute('data-ing') });
-    });
+    el.addEventListener('click', function (e) { e.stopPropagation(); gotoProducts({ q: el.getAttribute('data-ing') }); });
   });
   $$('[data-share]', c).forEach(function (b) {
     b.addEventListener('click', function (e) {
@@ -895,8 +963,58 @@ function bindCards(c, toggle) {
     });
   });
 }
+/* Картите отварят панела с детайли (не се разгъват в мрежата) */
+function bindCards(c, items) {
+  $$('.b6-card', c).forEach(function (card) {
+    var head = $('.b6-ch', card);
+    head.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target === head) { e.preventDefault(); head.click(); } });
+    head.addEventListener('click', function () {
+      var sel = window.getSelection ? String(window.getSelection()) : '';
+      if (sel && sel.length) return; /* маркиране на текст не отваря панела (PR-14) */
+      var reg = card.getAttribute('data-reg'), item = null;
+      (items || []).forEach(function (x) { if (x.reg === reg) item = x; });
+      openProduct(item, head);
+    });
+  });
+}
 
-function cardHTML(p, open) {
+/* ===== v6.7.1: компактна търсачка в горната лента, когато голямата излезе от екрана ===== */
+var miniObs = null;
+function setupMini() {
+  var top = $('.b6-top'), mi = $('#b6-minq-i');
+  if (!top || !mi) return;
+  if (miniObs) { miniObs.disconnect(); miniObs = null; }
+  top.classList.remove('mini');
+  var hero = $('#b6-content .b6-hero'), hq = hero ? $('.b6-hq input', hero) : null;
+  if (!hero || !hq || !('IntersectionObserver' in window)) return;
+  mi.placeholder = hq.placeholder; mi.value = hq.value;
+  mi.setAttribute('aria-label', hq.previousElementSibling ? hq.previousElementSibling.textContent : 'Търсене');
+  hq.addEventListener('input', function () { if (mi.value !== hq.value) mi.value = hq.value; });
+  miniObs = new IntersectionObserver(function (en) {
+    var hidden = !en[0].isIntersecting;
+    top.classList.toggle('mini', hidden);
+  }, { rootMargin: '-64px 0px 0px 0px', threshold: 0 });
+  miniObs.observe($('.b6-hq', hero));
+}
+function bindMini() {
+  var mi = $('#b6-minq-i'), f = $('#b6-minq');
+  if (!mi) return;
+  var target = function () { return $('#b6-content .b6-hq input'); };
+  mi.addEventListener('input', function () {
+    var h = target(); if (!h) return;
+    h.value = mi.value; h.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var h = target(); if (!h) return;
+    h.value = mi.value;
+    var hf = h.form; if (hf) { if (hf.requestSubmit) hf.requestSubmit(); else hf.dispatchEvent(new Event('submit', { cancelable: true })); }
+  });
+  var clr = $('#b6-minq-x');
+  if (clr) clr.addEventListener('click', function () { mi.value = ''; var h = target(); if (!h) return; var x = h.form && $('.clr', h.form); if (x) x.click(); mi.focus(); });
+}
+
+function cardHTML(p) {
   var cat = p.cat || 'other';
   var col = CAT_COLORS[cat] || '#9AA0AB';
   var catName = catLabel(cat, p.catl);
@@ -912,8 +1030,8 @@ function cardHTML(p, open) {
   var rtype = p.t === 'П' ? 'П · производител' : (p.t === 'Т' ? 'Т · търговец' : '');
   var gone = p.x ? '<span class="b6-tag danger" title="Записът липсва в последния пълен файл на регистъра (локално сравнение, не официално заличаване)">Липсва в последния файл</span>' : '';
   var dnote = p.del ? '<span class="b6-tag muted" title="В източника има бележка за заличаване">Бележка за заличаване</span>' : '';
-  return '<div class="b6-card' + (nf ? ' flagged' : '') + (open ? ' open' : '') + (p.x ? ' gone' : '') + '" data-reg="' + esc(p.reg) + '">' +
-    '<div class="b6-ch" role="button" tabindex="0" aria-expanded="' + (open ? 'true' : 'false') + '" aria-label="' + (open ? 'Скрий подробностите за ' : 'Покажи подробности за ') + esc(p.n) + '">' +
+  return '<div class="b6-card' + (nf ? ' flagged' : '') + (p.x ? ' gone' : '') + '" data-reg="' + esc(p.reg) + '">' +
+    '<div class="b6-ch" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Подробности за ' + esc(p.n) + '">' +
       '<div class="b6-ct">' +
         '<div class="b6-tile" style="background:' + col + '1C;color:' + col + '" aria-hidden="true">' + (CAT_ICONS[cat] || CAT_ICONS.other) + '</div>' +
         '<span class="b6-ccat" style="color:color-mix(in srgb,' + col + ' 58%,#0E1116)" title="Автоматична категория">' + esc(cat === 'other' ? 'Без категория' : catName) + '</span>' +
@@ -923,9 +1041,8 @@ function cardHTML(p, open) {
       (firm ? '<div class="b6-firm">' + firmIcon + '<span>' + esc(firm) + '</span></div>' : '') +
       '<div class="b6-cm"><span class="b6-reg">' + esc(p.reg) + '</span>' + (rtype ? '<span class="b6-rt">' + rtype + '</span>' : '') + gone + dnote + '</div>' +
       flags +
-      '<div class="b6-cf"><span class="b6-cmore">' + (open ? 'Скрий детайлите' : 'Детайли и състав') + '</span><span class="b6-chev" aria-hidden="true">' + I.chev + '</span></div>' +
+      '<div class="b6-cf"><span class="b6-cmore">Детайли и състав</span><svg class="b6-carr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></div>' +
     '</div>' +
-    (open ? bodyHTML(p) : '') +
   '</div>';
 }
 
@@ -1188,31 +1305,25 @@ function loadParties(kind, append) {
     $('#b6-pretry-' + kind).addEventListener('click', function () { loadParties(kind, false); });
   });
 }
+function curParty() { var t = dw[dw.length - 1]; return t && t.type === 'party' ? t : null; }
 function openParty(kind, norm) {
-  var ps = state.party;
+  if (!PRO || !norm) return;
+  var top = curParty();
+  if (top && top.kind === kind && top.norm === norm) return;
   clearTimers();
   var id = ++seq.party; ++seq.pprod;
-  ps.kind = kind; ps.open = norm; ps.detail = null; ps.err = ''; ps.view = 'partners';
-  ps.prod = { items: [], total: 0, page: 1, loading: false, openReg: null, err: '' };
-  var tab = kind === 'p' ? 'producers' : 'traders';
-  if (state.tab !== tab) { state.tab = tab; state.page = 1; state.openReg = null; state.fpanel = false; document.body.classList.remove('b6-noscroll'); closeSidebar();
-    $$('.b6-item').forEach(function (b) { var on = b.getAttribute('data-tab') === state.tab; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    $$('.b6-bnav button[data-tab]').forEach(function (b) { var on = b.getAttribute('data-tab') === state.tab; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); }); }
-  render();
+  var entry = { type: 'party', kind: kind, norm: norm, detail: null, err: '', view: 'partners' };
+  dwOpen(entry, document.activeElement);
   api('/party', { kind: kind, norm: norm }).then(function (d) {
-    /* Отговорът се прилага само ако това е още отвореният профил (CO-01) */
-    if (id !== seq.party || ps.open !== norm || ps.kind !== kind) return;
-    ps.detail = d; render();
+    /* Отговорът се прилага само ако профилът е още отворен (CO-01) */
+    entry.detail = d;
+    if (id === seq.party && dw[dw.length - 1] === entry) dwRender(false);
   }).catch(function (e) {
-    if (id !== seq.party || ps.open !== norm || ps.kind !== kind) return;
-    ps.err = e.status === 404 ? 'Фирмата не е намерена в наличните данни.' : e.message;
-    render();
+    entry.err = e.status === 404 ? 'Фирмата не е намерена в наличните данни.' : e.message;
+    if (id === seq.party && dw[dw.length - 1] === entry) dwRender(false);
   });
-  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 function renderParties(c, kind) {
-  var ps = state.party;
-  if (ps.open && ps.kind === kind) { renderPartyDetail(c); return; }
   var isP = kind === 'p', pl = state.plist[kind];
   c.innerHTML =
     '<section class="b6-hero">' +
@@ -1305,17 +1416,14 @@ function renderPartyList(kind, skeleton) {
 /* Профил: KPI + изгледи „Свързани фирми“ · „Начала на наименованията“ · „Продукти“ */
 function renderPartyDetail(c) {
   var ps = state.party, d = ps.detail, isP = ps.kind === 'p';
-  var back = '<button type="button" class="b6-back" id="b6-pback">' + I.chev + 'Всички ' + (isP ? 'производители' : 'търговци') + '</button>';
-  var goBack = function () { ps.open = null; ps.detail = null; ps.err = ''; ++seq.party; ++seq.pprod; render(); };
+  var back = '';
   if (ps.err) {
-    c.innerHTML = back + '<div class="b6-empty" role="alert" style="margin-top:14px">' + I.empty + '<div class="b6-empty-t">' + esc(ps.err) + '</div><div style="margin-top:12px"><button type="button" class="b6-retry" id="b6-pretry">Опитай отново</button></div></div>';
-    $('#b6-pback').addEventListener('click', goBack);
-    $('#b6-pretry').addEventListener('click', function () { openParty(ps.kind, ps.open); });
+    c.innerHTML = '<div class="b6-empty" role="alert">' + I.empty + '<div class="b6-empty-t">' + esc(ps.err) + '</div><div style="margin-top:12px"><button type="button" class="b6-retry" id="b6-pretry">Опитай отново</button></div></div>';
+    $('#b6-pretry').addEventListener('click', function () { var k = ps.kind, n = ps.open; dwClose(false); openParty(k, n); });
     return;
   }
   if (!d) {
-    c.innerHTML = back + '<div class="b6-sk" style="margin-top:14px" role="status" aria-label="Зареждане на профила"><div class="b6-sk-line" style="width:40%"></div><div class="b6-sk-line" style="width:70%;margin-top:10px"></div></div>';
-    $('#b6-pback').addEventListener('click', goBack);
+    c.innerHTML = '<div class="b6-sk" role="status" aria-label="Зареждане на профила"><div class="b6-sk-line" style="width:40%"></div><div class="b6-sk-line" style="width:70%;margin-top:10px"></div><div class="b6-sk-line" style="width:55%;margin-top:10px"></div></div>';
     return;
   }
   var partnersLbl = isP ? 'Свързани търговци' : 'Свързани производители';
@@ -1324,8 +1432,8 @@ function renderPartyDetail(c) {
   var self = {}; self[isP ? 'producer' : 'trader'] = d.norm; self[isP ? 'producerName' : 'traderName'] = d.name;
   var views = [['partners', partnersLbl + ' (' + nfmt(pt) + ')'], ['brands', 'Начала на наименованията (' + nfmt(bt) + ')'], ['products', 'Продукти (' + nfmt(d.products) + ')']];
   c.innerHTML = back +
-    '<div class="b6-head" style="margin-top:12px"><div>' +
-      '<h1 class="b6-title" style="font-size:24px">' + (isP ? I.factory : I.store) + ' ' + esc(d.name) + (d.bg ? ' <span class="b6-tag green" title="Определена като българска по наименованието и адреса в регистъра">' + I.flag + 'БГ</span>' : ' <span class="b6-tag muted" title="Няма положително основание за българска регистрация по наименованието и адреса">държавата не е определена</span>') + '</h1>' +
+    '<div class="b6-head b6-dw-head"><div>' +
+      '<h2 class="b6-title" style="font-size:22px">' + (isP ? I.factory : I.store) + ' ' + esc(d.name) + (d.bg ? ' <span class="b6-tag green" title="Определена като българска по наименованието и адреса в регистъра">' + I.flag + 'БГ</span>' : ' <span class="b6-tag muted" title="Няма положително основание за българска регистрация по наименованието и адреса">държавата не е определена</span>') + '</h2>' +
       '<div class="b6-sub">' + (d.full && d.full !== d.name ? 'Най-пълно изписване в регистъра: ' + esc(d.full) + ' · ' : '') + (isP ? 'производител' : 'търговец') + ' според регистъра' + (d.y1 || d.y2 ? ' · регистрации ' + yearsLabel(d.y1, d.y2) : '') + ' · групиране по името, без проверен фирмен идентификатор</div>' +
     '</div><div class="b6-actions">' +
       '<button type="button" class="b6-btn" id="b6-pall">' + I.search + '<span>Отвори в „Продукти“</span></button>' +
@@ -1340,10 +1448,9 @@ function renderPartyDetail(c) {
     '</div>' +
     '<div class="b6-seg" role="tablist" aria-label="Изгледи на профила">' + views.map(function (v) { return '<button type="button" role="tab" id="b6-tab-' + v[0] + '" aria-controls="b6-pview" class="b6-seg-b' + (ps.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '" aria-selected="' + (ps.view === v[0] ? 'true' : 'false') + '" tabindex="' + (ps.view === v[0] ? '0' : '-1') + '">' + v[1] + '</button>'; }).join('') + '</div>' +
     '<div id="b6-pview" role="tabpanel" aria-labelledby="b6-tab-' + ps.view + '"></div>';
-  $('#b6-pback').addEventListener('click', goBack);
   $('#b6-pall').addEventListener('click', function () { gotoProducts(self); });
   var setView = function (v) {
-    ps.view = v;
+    ps.view = v; var ce = curParty(); if (ce) ce.view = v;
     $$('.b6-seg-b', c).forEach(function (b) { var on = b.getAttribute('data-view') === v; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); b.setAttribute('tabindex', on ? '0' : '-1'); });
     var pv = $('#b6-pview'); if (pv) pv.setAttribute('aria-labelledby', 'b6-tab-' + v);
     renderPartyView();
@@ -1459,10 +1566,10 @@ function renderPartyProducts(skeleton) {
   if (!c) return;
   if (skeleton && !pr.items.length) { c.innerHTML = '<div class="b6-sk" role="status"><div class="b6-sk-line" style="width:40%"></div><div class="b6-sk-line" style="width:75%;margin-top:10px"></div></div>'; return; }
   var html = '<div class="b6-meta"><span><b>' + nfmt(pr.total) + '</b> ' + plural(pr.total, 'продукт', 'продукта') + (ps.kind === 'p' ? ' с този производител' : ' с този търговец (посочен или предположен)') + ' · по рег. №, най-новите първи</span><span><a href="#" class="b6-plink" id="b6-pview-all">Отвори с филтри в „Продукти“</a></span></div>' +
-    '<div class="b6-cards grid" style="--cols:2">' + pr.items.map(function (p) { return cardHTML(p, pr.openReg === p.reg); }).join('') + '</div>';
+    '<div class="b6-cards grid" style="--cols:2">' + pr.items.map(function (p) { return cardHTML(p); }).join('') + '</div>';
   if (pr.items.length < pr.total) html += '<div class="b6-more-wrap"><button type="button" class="b6-more" id="b6-ppmore">Покажи още ' + Math.min(20, pr.total - pr.items.length) + '</button><div class="b6-left">Остават ' + nfmt(pr.total - pr.items.length) + '</div></div>';
   c.innerHTML = html;
-  bindCards(c, function (reg) { pr.openReg = pr.openReg === reg ? null : reg; renderPartyProducts(false); return pr.openReg === reg; });
+  bindCards(c, pr.items);
   var more = $('#b6-ppmore'); if (more) more.addEventListener('click', function () { more.disabled = true; more.textContent = 'Зареждане…'; loadPartyProducts(true); });
   $('#b6-pview-all').addEventListener('click', function (e) { e.preventDefault(); var f = {}; f[ps.kind === 'p' ? 'producer' : 'trader'] = ps.open; f[ps.kind === 'p' ? 'producerName' : 'traderName'] = ps.detail ? ps.detail.name : ''; gotoProducts(f); });
 }
@@ -1559,8 +1666,9 @@ function openDeep(reg) {
   render();
   api('/product/' + encodeURIComponent(reg)).then(function (item) {
     if (id !== seq.products || state.deepReg !== reg) return;
-    state.items = [item]; state.total = 1; state.openReg = item.reg; state.loading = false;
+    state.items = [item]; state.total = 1; state.loading = false;
     renderList(false);
+    openProduct(item, null);
   }).catch(function (e) {
     if (id !== seq.products || state.deepReg !== reg) return;
     state.loading = false; state.items = []; state.total = 0;

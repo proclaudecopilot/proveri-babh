@@ -218,11 +218,14 @@ function babh6_relevance_sql($q, &$args) {
 /** Стабилно подреждане: всяка сортировка има уникален вторичен ключ (PR-09). */
 function babh6_order_sql($sort) {
     $map = array(
-        'new'     => 'reg DESC, id DESC',
-        'old'     => 'reg ASC, id ASC',
-        'name'    => 'name ASC, reg DESC, id DESC',
-        'flagged' => 'flag_count DESC, reg DESC, id DESC',
-        'date'    => '(notif_date IS NULL) ASC, notif_date DESC, reg DESC, id DESC',
+        /* v6.7.1: рег. № е Т/П + код на областта (2) + година (2) + пореден номер — сортирането по целия
+           низ подреждаше по област. „Най-нови/най-стари“ е по годината от рег. №, после по дата на
+           уведомление и поредния номер. */
+        'new'     => '(ryear IS NULL) ASC, ryear DESC, (notif_date IS NULL) ASC, notif_date DESC, SUBSTRING(reg, 6) DESC, id DESC',
+        'old'     => '(ryear IS NULL) ASC, ryear ASC, (notif_date IS NULL) ASC, notif_date ASC, SUBSTRING(reg, 6) ASC, id ASC',
+        'name'    => 'name ASC, ryear DESC, id DESC',
+        'flagged' => 'flag_count DESC, ryear DESC, notif_date DESC, id DESC',
+        'date'    => '(notif_date IS NULL) ASC, notif_date DESC, ryear DESC, id DESC',
     );
     if ($sort === 'flagged' && !babh6_flags_visible()) $sort = 'new';
     return isset($map[$sort]) ? $map[$sort] : $map['new'];
@@ -247,7 +250,7 @@ function babh6_products_select($req, $cols, $limit, $offset = 0) {
     $rel_args = array(); $rel = '';
     if ($sort === '' || $sort === 'rel') $rel = babh6_relevance_sql((string)$req->get_param('q'), $rel_args);
     if ($rel !== '') {
-        $sql  = "SELECT $cols, $rel AS rel FROM $t WHERE $wsql ORDER BY rel DESC, reg DESC, id DESC LIMIT %d OFFSET %d";
+        $sql  = "SELECT $cols, $rel AS rel FROM $t WHERE $wsql ORDER BY rel DESC, ryear DESC, notif_date DESC, id DESC LIMIT %d OFFSET %d";
         $rows = $wpdb->get_results($wpdb->prepare($sql, array_merge($rel_args, $args, array($limit, $offset))));
     } else {
         $order = babh6_order_sql($sort);
