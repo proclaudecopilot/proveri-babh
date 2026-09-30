@@ -232,6 +232,6 @@ function babh6_admin_dashboard() {
         echo '</tbody></table>';
     }
 
-    echo '<p style="color:#787c82;margin-top:20px"><b>Публичен фронтенд:</b> сложи shortcode <code>[babh_register]</code> на страница (препоръчително full-width template без sidebar). Плъгинът работи паралелно с v5.6 — отделни таблици <code>' . esc_html($wpdb->prefix) . 'babh6_*</code>.</p>';
+    echo '<p style="color:#787c82;margin-top:20px"><b>Публичен фронтенд:</b> началната страница на сайта показва регистъра автоматично (standalone, без тема). Shortcode <code>[babh_register]</code> остава наличен за други страници. Плъгинът работи паралелно с v5.6 — отделни таблици <code>' . esc_html($wpdb->prefix) . 'babh6_*</code>.</p>';
     echo '</div>';
 }
