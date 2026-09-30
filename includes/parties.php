@@ -139,8 +139,9 @@ function babh6_rest_party($req) {
     $total = (int)$party->product_count;
     $plist = array();
     foreach ((array)$partners as $p) {
+        $dn = babh6_display_firm($p->name);
         $plist[] = array(
-            'norm' => $p->norm, 'name' => trim((string)$p->name), 'count' => (int)$p->c, 'flagged' => (int)$p->f,
+            'norm' => $p->norm, 'name' => $dn !== '' ? $dn : trim((string)$p->name), 'count' => (int)$p->c, 'flagged' => (int)$p->f,
             'inferred' => (int)$p->inf,
             'first' => $p->d1, 'last' => $p->d2, 'y2' => $p->y2 ? (int)$p->y2 : null,
             'share' => $total ? round(100 * (int)$p->c / $total, 1) : 0,
@@ -188,7 +189,7 @@ function babh6_rest_party($req) {
         $counts[$key]['n']++;
         if (mb_strlen($tok, 'UTF-8') > mb_strlen($counts[$key]['label'], 'UTF-8')) $counts[$key]['label'] = $tok;
         if ((int)$r->ok && $r->cn !== '') {
-            if (!isset($counts[$key]['cp'][$r->cn])) $counts[$key]['cp'][$r->cn] = array('n' => 0, 'name' => trim((string)$r->cname));
+            if (!isset($counts[$key]['cp'][$r->cn])) { $dn = babh6_display_firm($r->cname); $counts[$key]['cp'][$r->cn] = array('n' => 0, 'name' => $dn !== '' ? $dn : trim((string)$r->cname)); }
             $counts[$key]['cp'][$r->cn]['n']++;
         }
     }

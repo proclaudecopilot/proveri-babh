@@ -214,7 +214,7 @@ function babh6_run_step_locked($job) {
             $regs = array_keys($items);
             $ph = implode(',', array_fill(0, count($regs), '%s'));
             $existing = $wpdb->get_results($wpdb->prepare(
-                "SELECT id, reg, comp_hash, deleted_at, last_upload FROM $products_t WHERE reg IN ($ph)", $regs
+                "SELECT id, reg, comp_hash, deleted_at, last_upload, producer_name, trader_name FROM $products_t WHERE reg IN ($ph)", $regs
             ));
             $map = array();
             foreach ($existing as $e) $map[$e->reg] = $e;
@@ -233,7 +233,8 @@ function babh6_run_step_locked($job) {
                 /* Същият рег. номер вече мина в този import (напр. дублиран в част 1 и част 2) — първият печели */
                 if ((int)$e->last_upload === $upload_id) continue;
                 $job['parsed']++;
-                $changed     = ($e->comp_hash !== $p['comp_hash']);
+                $changed     = ($e->comp_hash !== $p['comp_hash'])
+                            || (string)$e->producer_name !== $p['producer_name'] || (string)$e->trader_name !== $p['trader_name'];
                 $was_deleted = !empty($e->deleted_at);
                 if ($changed || $was_deleted) {
                     $wpdb->update($products_t, array(
@@ -347,6 +348,14 @@ function babh6_normalize_row($row) {
     if ($name === '') return null;
 
     $producer_raw = trim((string)(isset($row[4]) ? $row[4] : ''));
+    /* Празно поле „Производител“ → фирмата от „адрес на възложено производство“ (G), после „собствено производство“ (F) */
+    if ($producer_raw === '' || $producer_raw === '-') {
+        foreach (array(6, 5) as $ci) {
+            $v = trim((string)(isset($row[$ci]) ? $row[$ci] : ''));
+            if ($v !== '' && babh6_looks_like_firm($v)) { $producer_raw = $v; break; }
+        }
+        if ($producer_raw === '-') $producer_raw = '';
+    }
     $trader_raw   = trim((string)(isset($row[7]) ? $row[7] : ''));
     $composition  = preg_replace('/\s+/u', ' ', trim((string)(isset($row[11]) ? $row[11] : '')));
     $purpose      = preg_replace('/\s+/u', ' ', trim((string)(isset($row[10]) ? $row[10] : '')));
@@ -427,7 +436,8 @@ function babh6_rebuild_parties() {
     $parties_t  = babh6_table('parties');
     $now = current_time('mysql');
 
-    /* Първо: търговец по името на продукта (includes/infer.php), за да влезе в броенето */
+    /* Първо: сливане на групи с печатна грешка в името, после търговец по името на продукта */
+    babh6_merge_norm_aliases();
     if (function_exists('babh6_infer_traders')) babh6_infer_traders();
 
     $wpdb->query("TRUNCATE TABLE $parties_t");
@@ -454,6 +464,27 @@ function babh6_rebuild_parties() {
     );
     foreach ($kinds as $kind => $k) {
         $full = $longest($k['name']);
+        /* Показвано име: най-честото изчистено изписване сред записите, чието име дава точно този ключ
+           (слетите печатни грешки не участват), без кавички и адрес — „Флай Фиш ЕООД“ */
+        $best_name = array(); $fallback_name = array(); $votes = array();
+        foreach ((array)$wpdb->get_results(
+            "SELECT {$k['norm']} AS norm, SUBSTRING_INDEX({$k['name']}, ',', 1) AS nm, COUNT(*) AS c
+             FROM $products_t WHERE {$k['where']} AND deleted_at IS NULL
+             GROUP BY norm, nm ORDER BY c DESC") as $bn) {
+            $disp = babh6_display_firm($bn->nm);
+            if ($disp === '') continue;
+            if (!isset($fallback_name[$bn->norm])) $fallback_name[$bn->norm] = $disp;
+            if (babh6_norm_firm($bn->nm) !== $bn->norm) continue;
+            $key = mb_strtolower($disp, 'UTF-8');
+            if (!isset($votes[$bn->norm][$key])) $votes[$bn->norm][$key] = array('n' => 0, 'disp' => $disp);
+            $votes[$bn->norm][$key]['n'] += (int)$bn->c;
+        }
+        foreach ($votes as $norm => $vs) {
+            $top = null;
+            foreach ($vs as $v) { if ($top === null || $v['n'] > $top['n']) $top = $v; }
+            $best_name[$norm] = $top['disp'];
+        }
+        foreach ($fallback_name as $norm => $d) { if (!isset($best_name[$norm])) $best_name[$norm] = $d; }
         $agg = $wpdb->get_results(
             "SELECT {$k['norm']} AS norm,
                     SUBSTRING_INDEX(MAX({$k['name']}), ',', 1) AS name,
@@ -472,7 +503,7 @@ function babh6_rebuild_parties() {
             $batch[] = '(' . implode(',', array(
                 $wpdb->prepare('%s', $kind),
                 $wpdb->prepare('%s', $a->norm),
-                $wpdb->prepare('%s', trim((string)$a->name)),
+                $wpdb->prepare('%s', !empty($best_name[$a->norm]) ? $best_name[$a->norm] : trim((string)$a->name)),
                 babh6_is_bg_firm((string)$a->full_name) ? 1 : 0,
                 intval($a->cnt),
                 intval($a->flagged),
@@ -492,3 +523,96 @@ function babh6_rebuild_parties() {
         }
     }
 }
+
+/**
+ * Печатни грешки в имената на фирмите („Биохерба Ррайхенбах“ / „Адифарма“ / „Флай Феш“)
+ * правят отделни групи. Групи с почти еднакъв ключ (латиница без интервали, разстояние
+ * на Левенщайн ≤ 1 при ≥ 7 знака, ≤ 2 при ≥ 12) се сливат в по-голямата, като
+ * producer_norm / trader_norm на продуктите се пренасочва към нея.
+ */
+function babh6_merge_norm_aliases() {
+    global $wpdb;
+    $t = babh6_table('products');
+    foreach (array('producer_norm' => 'producer_kind', 'trader_norm' => 'trader_kind') as $col => $kcol) {
+        $rows = $wpdb->get_results("SELECT $col AS norm, COUNT(*) AS c FROM $t WHERE $col <> '' AND $kcol = 'firm' GROUP BY $col ORDER BY c DESC");
+        if (!$rows) continue;
+        $groups = array(); $buckets = array();
+        foreach ($rows as $r) {
+            $key = babh6_norm_alias_key($r->norm);
+            if (strlen($key) < 7) continue;
+            $groups[$r->norm] = array('key' => $key, 'c' => (int)$r->c);
+            $buckets[$key[0]][] = $r->norm;
+        }
+        $map = array();
+        foreach ($groups as $norm => $g) {
+            $best = null; $bestc = $g['c'];
+            $len = strlen($g['key']); $maxd = $len >= 12 ? 2 : 1;
+            foreach ((array)$buckets[$g['key'][0]] as $other) {
+                if ($other === $norm) continue;
+                $o = $groups[$other];
+                if ($o['c'] < $bestc || ($o['c'] === $g['c'] && strcmp($other, $norm) > 0)) continue;
+                if (abs(strlen($o['key']) - $len) > $maxd) continue;
+                if (levenshtein($g['key'], $o['key']) <= $maxd) { $best = $other; $bestc = $o['c']; }
+            }
+            if ($best !== null) $map[$norm] = $best;
+        }
+        foreach ($map as $from => $to) {
+            $guard = 0;
+            while (isset($map[$to]) && $guard++ < 5) $to = $map[$to];
+            $wpdb->query($wpdb->prepare("UPDATE $t SET $col = %s WHERE $col = %s", $to, $from));
+        }
+    }
+}
+
+/**
+ * Преизчисляване на ключовете (producer_norm/trader_norm/kind) за всички записи след
+ * промяна в babh6_norm_firm(). Работи на порции през WP-Cron (и по една порция при
+ * зареждане на админа), за да не блокира заявка; накрая преизчислява фирмите.
+ */
+function babh6_renorm_start() {
+    update_option('babh6_renorm', array('cursor' => 0, 'changed' => 0, 'started' => time()), false);
+    if (!wp_next_scheduled('babh6_renorm_step')) wp_schedule_single_event(time() + 2, 'babh6_renorm_step');
+}
+add_action('babh6_renorm_step', 'babh6_renorm_step');
+function babh6_renorm_step($budget = 20) {
+    global $wpdb;
+    $st = get_option('babh6_renorm');
+    if (!$st) return;
+    if (get_option('babh6_job') || get_transient('babh6_renorm_lock')) {
+        if (!wp_next_scheduled('babh6_renorm_step')) wp_schedule_single_event(time() + 120, 'babh6_renorm_step');
+        return;
+    }
+    set_transient('babh6_renorm_lock', 1, 2 * MINUTE_IN_SECONDS);
+    @set_time_limit(120);
+    $t  = babh6_table('products');
+    $t0 = time();
+    while (time() - $t0 < $budget) {
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, producer_name, trader_name, producer_norm, trader_norm, producer_kind, trader_kind FROM $t WHERE id > %d ORDER BY id LIMIT 1000", (int)$st['cursor']));
+        if (!$rows) {
+            delete_option('babh6_renorm');
+            delete_transient('babh6_renorm_lock');
+            babh6_rebuild_parties();
+            delete_transient('babh6_stats');
+            return;
+        }
+        foreach ($rows as $r) {
+            $pn = babh6_norm_firm($r->producer_name);
+            $pk = $r->producer_name === '' ? '' : (babh6_is_country($r->producer_name) ? 'country' : 'firm');
+            $tn = babh6_norm_firm($r->trader_name);
+            $tk = $r->trader_name === '' ? '' : (babh6_is_country($r->trader_name) ? 'country' : 'firm');
+            if ($pn !== $r->producer_norm || $tn !== $r->trader_norm || $pk !== $r->producer_kind || $tk !== $r->trader_kind) {
+                $wpdb->update($t, array('producer_norm' => $pn, 'producer_kind' => $pk, 'trader_norm' => $tn, 'trader_kind' => $tk), array('id' => (int)$r->id));
+                $st['changed']++;
+            }
+            $st['cursor'] = (int)$r->id;
+        }
+        update_option('babh6_renorm', $st, false);
+    }
+    delete_transient('babh6_renorm_lock');
+    if (!wp_next_scheduled('babh6_renorm_step')) wp_schedule_single_event(time() + 5, 'babh6_renorm_step');
+}
+/* Една порция и при отваряне на админа — WP-Cron зависи от посещения */
+add_action('admin_init', function () {
+    if (get_option('babh6_renorm') && current_user_can('manage_options') && !wp_doing_ajax()) babh6_renorm_step(8);
+});

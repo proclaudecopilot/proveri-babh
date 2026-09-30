@@ -123,6 +123,13 @@ function babh6_admin_dashboard() {
         echo '<div class="notice notice-error is-dismissible"><p>' . wp_kses_post($msg) . '</p></div>';
     }
 
+    $renorm = get_option('babh6_renorm');
+    if ($renorm) {
+        $done = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $products_t WHERE id <= %d", (int)$renorm['cursor']));
+        $all  = (int)$wpdb->get_var("SELECT COUNT(*) FROM $products_t");
+        echo '<div class="notice notice-info"><p><b>Преизчисляват се ключовете на фирмите</b> след обновяването: ' . number_format_i18n($done) . ' от ' . number_format_i18n($all) . ' записа. Продължава на заден план и при всяко зареждане на тази страница; накрая списъците „Производители“ и „Търговци“ се преизчисляват.</p></div>';
+    }
+
     /* ===== Активна задача → progress UI ===== */
     if ($job) {
         $nonce = wp_create_nonce('babh6_step');

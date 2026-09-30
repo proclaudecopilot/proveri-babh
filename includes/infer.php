@@ -40,7 +40,7 @@ function babh6_infer_traders() {
         if ($tok === '') continue;
         $key = babh6_translit_bg2lat($tok);
         $tn  = $r->trader_norm;
-        if (!isset($tnames[$tn]) || mb_strlen($r->tname, 'UTF-8') > mb_strlen($tnames[$tn], 'UTF-8')) $tnames[$tn] = trim((string)$r->tname);
+        if (!isset($tnames[$tn])) { $dn = babh6_display_firm($r->tname); $tnames[$tn] = $dn !== '' ? $dn : trim((string)$r->tname); }
         if (!isset($global[$key][$tn])) $global[$key][$tn] = 0;
         $global[$key][$tn]++;
         $lk = $r->producer_norm . '|' . $key;
@@ -71,7 +71,7 @@ function babh6_infer_traders() {
         if ($tok === '') continue;
         $key = babh6_translit_bg2lat($tok);
         if (!isset($firms[$key]) || (int)$r->c > $firms[$key]['c']) $firms[$key] = array('norm' => $r->norm, 'name' => trim((string)$r->name), 'c' => (int)$r->c);
-        if (!isset($tnames[$r->norm])) $tnames[$r->norm] = trim((string)$r->name);
+        if (!isset($tnames[$r->norm])) { $dn = babh6_display_firm($r->name); $tnames[$r->norm] = $dn !== '' ? $dn : trim((string)$r->name); }
     }
 
     /* Прилагане върху продуктите без реален търговец */
