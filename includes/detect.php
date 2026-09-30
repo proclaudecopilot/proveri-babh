@@ -105,7 +105,10 @@ function babh6_parse_reg($reg) {
     if ($type === 'T') $type = 'Т';
     $obl_code = intval(substr($digits, 0, 2));
     $yy = intval(substr($digits, 2, 2));
-    $year = ($yy < 50) ? 2000 + $yy : 1900 + $yy;
+    /* Годината е от рег. номера (2000+). Номера с грешни цифри (напр. „1968“) са без година —
+       най-често в БАБХ липсва дата и полето е объркано. */
+    $year = 2000 + $yy;
+    if ($year > (int)gmdate('Y') + 1) $year = null;
     $obl_names = babh6_obl_names();
     return array(
         'reg'    => $type . $digits . $suffix,
