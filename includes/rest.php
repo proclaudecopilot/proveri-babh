@@ -78,7 +78,8 @@ function babh6_build_where($req, &$where, &$args) {
     else                            $where = array('deleted_at IS NULL');
     $args  = array();
 
-    if ($req->get_param('flagged')) $where[] = 'flag_count > 0';
+    /* „За проверка“ е Pro функция (v6.7): без Pro достъп филтърът се игнорира */
+    if ($req->get_param('flagged') && babh6_flags_visible()) $where[] = 'flag_count > 0';
     /* Тип на рег. номер: rt=П|Т (старият параметър bg=1 е „П“) */
     $rt = (string)$req->get_param('rt');
     if ($rt === '' && $req->get_param('bg')) $rt = 'П';
@@ -223,7 +224,13 @@ function babh6_order_sql($sort) {
         'flagged' => 'flag_count DESC, reg DESC, id DESC',
         'date'    => '(notif_date IS NULL) ASC, notif_date DESC, reg DESC, id DESC',
     );
+    if ($sort === 'flagged' && !babh6_flags_visible()) $sort = 'new';
     return isset($map[$sort]) ? $map[$sort] : $map['new'];
+}
+
+/** Автоматичните бележки „За проверка“ се виждат само с Pro достъп (v6.7) — и в API-то, не само в интерфейса. */
+function babh6_flags_visible() {
+    return function_exists('babh6_pro_ok') && babh6_pro_ok();
 }
 
 /**
@@ -255,7 +262,7 @@ function babh6_products_select($req, $cols, $limit, $offset = 0) {
 function babh6_row_to_item($r) {
     /* Бележките се преизчисляват при показване: така старите записи също носят
        намерения термин, полето и откъса (не само label от времето на качването). */
-    $flags = (isset($r->composition) || isset($r->purpose))
+    $flags = (babh6_flags_visible() && (isset($r->composition) || isset($r->purpose)))
         ? babh6_find_flags_fields($r->name, isset($r->composition) ? $r->composition : '', isset($r->purpose) ? $r->purpose : '')
         : array();
     foreach ($flags as &$fl) { $fl['field_label'] = babh6_field_label($fl['field']); }
@@ -339,7 +346,7 @@ function babh6_rest_product($req) {
 /* ============ GET /stats ============ */
 function babh6_rest_stats() {
     $cached = get_transient('babh6_stats');
-    if (is_array($cached) && isset($cached['sync_result'])) return rest_ensure_response($cached);
+    if (is_array($cached) && isset($cached['sync_result'])) return rest_ensure_response(babh6_stats_public($cached));
 
     global $wpdb;
     $t  = babh6_table('products');
@@ -402,7 +409,12 @@ function babh6_rest_stats() {
     $out['rules']   = defined('BABH6_RULES_VERSION') ? BABH6_RULES_VERSION : '';
 
     set_transient('babh6_stats', $out, HOUR_IN_SECONDS);
-    return rest_ensure_response($out);
+    return rest_ensure_response(babh6_stats_public($out));
+}
+/* Кешът е общ; броят „За проверка“ се маха на изхода, ако посетителят няма Pro достъп */
+function babh6_stats_public($out) {
+    if (!babh6_flags_visible()) unset($out['flagged']);
+    return $out;
 }
 
 /* ============ CSV ============ */
@@ -436,16 +448,19 @@ function babh6_rest_export($req) {
     header('X-Babh6-Rows: ' . count((array)$rows));
     echo "\xEF\xBB\xBF";
     $fh = fopen('php://output', 'w');
-    babh6_csv_row($fh, array('Регистрационен №', 'Наименование на продукта', 'Наличност в последния пълен файл', 'Бележка за заличаване в източника',
+    $show_flags = babh6_flags_visible();
+    $head = array('Регистрационен №', 'Наименование на продукта', 'Наличност в последния пълен файл', 'Бележка за заличаване в източника',
         'Производител', 'Тип на полето „Производител“', 'Търговец (посочен в регистъра)', 'Тип на полето „Търговец“',
         'Възможен търговец по наименованието (автоматично предположение, не е поле на БАБХ)',
         'Номер на уведомление', 'Дата на уведомление', 'Дата на вписване', 'Автоматична категория',
-        'Бележки за проверка (автоматични съвпадения по дума, не становище)', 'Състав (текст от регистъра)', 'Предназначение (текст от регистъра)'));
+        'Бележки за проверка (автоматични съвпадения по дума, не становище)', 'Състав (текст от регистъра)', 'Предназначение (текст от регистъра)');
+    if (!$show_flags) array_splice($head, 13, 1);
+    babh6_csv_row($fh, $head);
     $kinds = array('firm' => 'фирма', 'country' => 'посочена държава', '' => '');
     foreach ((array)$rows as $r) {
-        $flags = implode('; ', array_map(function ($f) { return $f['label'] . ' (в ' . babh6_field_label($f['field']) . ': ' . $f['term'] . ')'; },
-            babh6_find_flags_fields($r->name, $r->composition, $r->purpose)));
-        babh6_csv_row($fh, array($r->reg, $r->name,
+        $flags = $show_flags ? implode('; ', array_map(function ($f) { return $f['label'] . ' (в ' . babh6_field_label($f['field']) . ': ' . $f['term'] . ')'; },
+            babh6_find_flags_fields($r->name, $r->composition, $r->purpose))) : null;
+        $row = array($r->reg, $r->name,
             $r->deleted_at ? 'липсва от ' . substr($r->deleted_at, 0, 10) : 'наличен',
             (string)$r->deletion,
             $r->producer_name, isset($kinds[$r->producer_kind]) ? $kinds[$r->producer_kind] : $r->producer_kind,
@@ -453,7 +468,9 @@ function babh6_rest_export($req) {
             (string)$r->trader_inf_name,
             (string)$r->notif_no, (string)$r->notif_date, (string)$r->entry_date,
             babh6_category_label($r->category ? $r->category : 'other'), $flags,
-            (string)$r->composition, (string)$r->purpose));
+            (string)$r->composition, (string)$r->purpose);
+        if (!$show_flags) array_splice($row, 13, 1); /* без Pro колоната с бележките липсва изцяло */
+        babh6_csv_row($fh, $row);
     }
     /* Обхватът е явен в самия файл, когато лимитът е достигнат (EX-01) */
     if ($total > count((array)$rows)) {
