@@ -102,6 +102,7 @@ function babh6_admin_dashboard() {
     $prods_pb = (int)$wpdb->get_var("SELECT COUNT(*) FROM $parties_t WHERE kind = 'p' AND is_bg = 1");
     $trads_t  = (int)$wpdb->get_var("SELECT COUNT(*) FROM $parties_t WHERE kind = 't'");
     $trads_tb = (int)$wpdb->get_var("SELECT COUNT(*) FROM $parties_t WHERE kind = 't' AND is_bg = 1");
+    $inferred = (int)$wpdb->get_var("SELECT COUNT(*) FROM $products_t WHERE deleted_at IS NULL AND trader_inf_norm <> ''");
     $history  = $wpdb->get_results("SELECT * FROM $uploads_t ORDER BY id DESC LIMIT 10");
     $fulltext = (int)get_option('babh6_fulltext', 0);
     $job      = get_option('babh6_job');
@@ -222,6 +223,7 @@ function babh6_admin_dashboard() {
         array('Липсващи в последващ файл', number_format_i18n($deleted)),
         array('Производители: определени като български / общо', number_format_i18n($prods_pb) . ' / ' . number_format_i18n($prods_p)),
         array('Търговци: определени като български / общо', number_format_i18n($trads_tb) . ' / ' . number_format_i18n($trads_t)),
+        array('Продукти с търговец, определен по името (регистърът не го посочва)', number_format_i18n($inferred)),
     );
     foreach ($cards as $c) {
         echo '<div style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:14px 16px">';

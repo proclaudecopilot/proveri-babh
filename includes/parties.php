@@ -4,7 +4,8 @@ if (!defined('ABSPATH')) exit;
 /**
  * Pro: профили на производители и търговци.
  *
- *   GET /parties?kind=p|t&q=&sort=&page=&per=&bg=1   — списък фирми с брой продукти, партньори, флагове
+ *   GET /parties?kind=p|t&q=&sort=&page=&per=&all=1  — списък фирми с брой продукти, партньори, флагове;
+ *                                                       по подразбиране само с българска регистрация (all=1 показва и чуждестранните)
  *   GET /party?kind=p|t&norm=…                       — профил: партньори (клиенти / доставчици) с брой продукти при всеки,
  *                                                       собствени продукти, категории, регистрации по години
  *
@@ -45,7 +46,9 @@ function babh6_rest_parties($req) {
 
     $where = array('kind = %s');
     $args  = array($kind);
-    if ($req->get_param('bg')) $where[] = 'is_bg = 1';
+    /* По подразбиране само фирми с българска регистрация и седалище; all=1 показва всички */
+    $all = (bool)$req->get_param('all') && !$req->get_param('bg');
+    if (!$all) $where[] = 'is_bg = 1';
     $q = trim((string)$req->get_param('q'));
     if ($q !== '' && mb_strlen($q, 'UTF-8') >= 2) {
         $ors = array();
@@ -74,7 +77,7 @@ function babh6_rest_parties($req) {
 
     $total = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $pt WHERE $wsql", $args));
     $rows  = $wpdb->get_results($wpdb->prepare(
-        "SELECT norm, name, is_bg, product_count, flagged_count, partner_count, first_year, last_year
+        "SELECT norm, name, is_bg, product_count, flagged_count, partner_count, inferred_count, first_year, last_year
          FROM $pt WHERE $wsql ORDER BY $order LIMIT %d OFFSET %d",
         array_merge($args, array($per, $offset))
     ));
@@ -83,13 +86,14 @@ function babh6_rest_parties($req) {
         $items[] = array(
             'norm' => $r->norm, 'name' => $r->name, 'bg' => (int)$r->is_bg,
             'products' => (int)$r->product_count, 'flagged' => (int)$r->flagged_count, 'partners' => (int)$r->partner_count,
+            'inferred' => (int)$r->inferred_count,
             'y1' => $r->first_year ? (int)$r->first_year : null, 'y2' => $r->last_year ? (int)$r->last_year : null,
         );
     }
     $sums = $wpdb->get_row($wpdb->prepare("SELECT COUNT(*) AS n, SUM(is_bg) AS bg FROM $pt WHERE kind = %s", $kind));
     return rest_ensure_response(array(
         'kind' => $kind, 'total' => $total, 'page' => $page, 'per' => $per, 'items' => $items,
-        'all' => (int)$sums->n, 'all_bg' => (int)$sums->bg,
+        'all' => (int)$sums->n, 'all_bg' => (int)$sums->bg, 'bg_only' => $all ? 0 : 1,
     ));
 }
 
@@ -104,18 +108,31 @@ function babh6_rest_party($req) {
     $party = $wpdb->get_row($wpdb->prepare("SELECT * FROM $pt WHERE kind = %s AND norm = %s", $kind, $norm));
     if (!$party) return new WP_Error('babh6_notfound', 'Фирмата не е намерена.', array('status' => 404));
 
-    /* own = колоната на фирмата; other = насрещната страна */
-    $own_norm   = $kind === 'p' ? 'producer_norm' : 'trader_norm';
-    $other_norm = $kind === 'p' ? 'trader_norm'   : 'producer_norm';
-    $other_name = $kind === 'p' ? 'trader_name'   : 'producer_name';
-    $other_kind = $kind === 'p' ? 'trader_kind'   : 'producer_kind';
+    /* own = колоната на фирмата; other = насрещната страна.
+       Търговецът е „ефективен“: посоченият в регистъра, а ако липсва — определеният по името (trader_inf_*). */
+    $eff_norm = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm)";
+    $eff_name = "IF(trader_inf_norm <> '', trader_inf_name, trader_name)";
+    if ($kind === 'p') {
+        $own_cond   = 'producer_norm = %s';
+        $other_norm = $eff_norm;
+        $other_name = $eff_name;
+        $other_ok   = "(trader_inf_norm <> '' OR (trader_kind = 'firm' AND trader_norm <> '' AND trader_norm <> producer_norm))";
+        $none_cond  = "trader_inf_norm = '' AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)";
+    } else {
+        $own_cond   = "$eff_norm = %s";
+        $other_norm = 'producer_norm';
+        $other_name = 'producer_name';
+        $other_ok   = "(producer_kind = 'firm' AND producer_norm <> '' AND producer_norm <> $eff_norm)";
+        $none_cond  = "(producer_kind <> 'firm' OR producer_norm = '' OR producer_norm = $eff_norm)";
+    }
 
     $partners = $wpdb->get_results($wpdb->prepare(
         "SELECT $other_norm AS norm, SUBSTRING_INDEX(MAX($other_name), ',', 1) AS name,
                 COUNT(*) AS c, SUM(CASE WHEN flag_count > 0 THEN 1 ELSE 0 END) AS f,
+                SUM(CASE WHEN trader_inf_norm <> '' THEN 1 ELSE 0 END) AS inf,
                 MIN(notif_date) AS d1, MAX(notif_date) AS d2, MAX(ryear) AS y2
          FROM $t
-         WHERE deleted_at IS NULL AND $own_norm = %s AND $other_kind = 'firm' AND $other_norm <> '' AND $other_norm <> $own_norm
+         WHERE deleted_at IS NULL AND $own_cond AND $other_ok AND $other_norm <> ''
          GROUP BY $other_norm ORDER BY c DESC, name ASC LIMIT 500",
         $norm
     ));
@@ -124,39 +141,42 @@ function babh6_rest_party($req) {
     foreach ((array)$partners as $p) {
         $plist[] = array(
             'norm' => $p->norm, 'name' => trim((string)$p->name), 'count' => (int)$p->c, 'flagged' => (int)$p->f,
+            'inferred' => (int)$p->inf,
             'first' => $p->d1, 'last' => $p->d2, 'y2' => $p->y2 ? (int)$p->y2 : null,
             'share' => $total ? round(100 * (int)$p->c / $total, 1) : 0,
         );
     }
 
-    /* Без насрещна фирма: собствена марка / без търговец / насрещната страна е държава */
+    /* Без насрещна фирма: собствена марка / без търговец / насрещната страна е държава (и нищо определено по името) */
     $own = (int)$wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM $t WHERE deleted_at IS NULL AND $own_norm = %s
-         AND ($other_kind <> 'firm' OR $other_norm = '' OR $other_norm = $own_norm)", $norm));
+        "SELECT COUNT(*) FROM $t WHERE deleted_at IS NULL AND $own_cond AND $none_cond", $norm));
+    $inferred = (int)$wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $t WHERE deleted_at IS NULL AND $own_cond AND trader_inf_norm <> ''", $norm));
 
     $labels = array('other' => 'Други');
     foreach (babh6_categories() as $c) $labels[$c[0]] = $c[1];
     $cats = array();
     foreach ((array)$wpdb->get_results($wpdb->prepare(
-        "SELECT category, COUNT(*) AS c FROM $t WHERE deleted_at IS NULL AND $own_norm = %s GROUP BY category ORDER BY c DESC LIMIT 8", $norm)) as $r) {
+        "SELECT category, COUNT(*) AS c FROM $t WHERE deleted_at IS NULL AND $own_cond GROUP BY category ORDER BY c DESC LIMIT 8", $norm)) as $r) {
         $code = $r->category ? $r->category : 'other';
         $cats[] = array('code' => $code, 'label' => isset($labels[$code]) ? $labels[$code] : $code, 'count' => (int)$r->c);
     }
     $years = array();
     foreach ((array)$wpdb->get_results($wpdb->prepare(
-        "SELECT ryear AS y, COUNT(*) AS c FROM $t WHERE deleted_at IS NULL AND $own_norm = %s AND ryear IS NOT NULL GROUP BY ryear ORDER BY ryear ASC", $norm)) as $r) {
+        "SELECT ryear AS y, COUNT(*) AS c FROM $t WHERE deleted_at IS NULL AND $own_cond AND ryear IS NOT NULL GROUP BY ryear ORDER BY ryear ASC", $norm)) as $r) {
         $years[] = array('y' => (int)$r->y, 'c' => (int)$r->c);
     }
-    $deleted = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE deleted_at IS NOT NULL AND $own_norm = %s", $norm));
+    $deleted = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE deleted_at IS NOT NULL AND $own_cond", $norm));
+    $name_col  = $kind === 'p' ? 'producer_name' : $eff_name;
     $full_name = (string)$wpdb->get_var($wpdb->prepare(
-        "SELECT " . ($kind === 'p' ? 'producer_name' : 'trader_name') . " FROM $t WHERE $own_norm = %s ORDER BY LENGTH(" . ($kind === 'p' ? 'producer_name' : 'trader_name') . ") DESC LIMIT 1", $norm));
+        "SELECT $name_col FROM $t WHERE $own_cond ORDER BY CHAR_LENGTH($name_col) DESC LIMIT 1", $norm));
 
     /* Марки по първата дума в наименованието (автоматично). Регистърът често не
        посочва търговец, а марката е само в името („АНСА …" при производител Нутренд). */
     $brands = array(); $brand_token = '';
     if ($kind === 'p') {
         $names = $wpdb->get_col($wpdb->prepare(
-            "SELECT name FROM $t WHERE deleted_at IS NULL AND producer_norm = %s
+            "SELECT name FROM $t WHERE deleted_at IS NULL AND producer_norm = %s AND trader_inf_norm = ''
              AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)", $norm));
         $counts = array();
         foreach ((array)$names as $nm) {
@@ -180,10 +200,10 @@ function babh6_rest_party($req) {
         if ($brand_token !== '') {
             $conds = array(); $args = array();
             foreach (babh6_brand_like_variants($brand_token) as $v) { $conds[] = 'name LIKE %s'; $args[] = $v; }
-            $args[] = $norm;
+            $args[] = $norm; $args[] = $norm;
             $rows = $wpdb->get_results($wpdb->prepare(
                 "SELECT producer_norm AS norm, SUBSTRING_INDEX(MAX(producer_name), ',', 1) AS name, COUNT(*) AS c
-                 FROM $t WHERE deleted_at IS NULL AND (" . implode(' OR ', $conds) . ") AND trader_norm <> %s
+                 FROM $t WHERE deleted_at IS NULL AND (" . implode(' OR ', $conds) . ") AND trader_norm <> %s AND trader_inf_norm <> %s
                  AND producer_kind = 'firm' AND producer_norm <> ''
                  GROUP BY producer_norm ORDER BY c DESC LIMIT 30", $args));
             foreach ((array)$rows as $r) {
@@ -197,7 +217,7 @@ function babh6_rest_party($req) {
         'kind' => $kind, 'norm' => $party->norm, 'name' => $party->name, 'full' => $full_name, 'bg' => (int)$party->is_bg,
         'products' => $total, 'flagged' => (int)$party->flagged_count, 'deleted' => $deleted,
         'y1' => $party->first_year ? (int)$party->first_year : null, 'y2' => $party->last_year ? (int)$party->last_year : null,
-        'own' => $own, 'partners' => $plist, 'cats' => $cats, 'years' => $years,
+        'own' => $own, 'inferred' => $inferred, 'partners' => $plist, 'cats' => $cats, 'years' => $years,
         'brands' => $brands, 'brand_token' => $brand_token,
     ));
 }
