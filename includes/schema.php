@@ -76,6 +76,7 @@ function babh6_create_tables() {
         filename VARCHAR(255) NOT NULL DEFAULT '',
         uploaded_at DATETIME NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'processing',
+        source VARCHAR(10) NOT NULL DEFAULT 'manual',
         row_count INT UNSIGNED NOT NULL DEFAULT 0,
         added INT UNSIGNED NOT NULL DEFAULT 0,
         updated_ct INT UNSIGNED NOT NULL DEFAULT 0,

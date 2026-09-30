@@ -2,46 +2,85 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Chunked ETL: обработва регистъра на порции през AJAX, за да не удря
- * ограниченията на shared hosting (30-60s max request). Състоянието живее
+ * Chunked ETL: обработва регистъра на порции през AJAX или WP-Cron, за да не
+ * удря ограниченията на shared hosting (30-60s max request). Състоянието живее
  * в option 'babh6_job' → при прекъсване продължава от същото място.
+ *
+ * Един job може да съдържа няколко .xlsx файла (БАБХ публикува регистъра на
+ * части) — те се четат последователно, а заличаването на липсващите продукти
+ * става чак след последния файл. Така „част 2" не заличава „част 1".
  */
 
 /* ============ Job lifecycle ============ */
 
-/** Създава нова import задача от качен файл. Връща job масив или WP_Error. */
-function babh6_job_create($tmp_path, $filename) {
+/** Създава нова import задача от един качен файл (обратна съвместимост). */
+function babh6_job_create($tmp_path, $filename, $source = 'manual') {
+    return babh6_job_create_files(array(array('src' => $tmp_path, 'name' => $filename)), $source);
+}
+
+/**
+ * Създава import задача от един или повече файла.
+ * @param array  $files  [['src' => път (качен tmp или локален), 'name' => оригинално име], ...]
+ * @param string $source 'manual' | 'auto'
+ * @param array  $meta   произволни данни (напр. подписът на линковете при auto sync)
+ * @return array|WP_Error
+ */
+function babh6_job_create_files($files, $source = 'manual', $meta = array()) {
     global $wpdb;
+    $files = array_values(array_filter((array)$files, function ($f) { return !empty($f['src']); }));
+    if (!$files) return new WP_Error('babh6_nofiles', 'Няма файлове за обработка.');
 
     /* Маркирай закъсали стари задачи */
     $uploads_t = babh6_table('uploads');
+    $old = get_option('babh6_job');
+    if ($old && !empty($old['files'])) foreach ((array)$old['files'] as $f) @unlink($f);
     $wpdb->query("UPDATE $uploads_t SET status = 'failed', notes = 'Прекъснат — заменен от нов import' WHERE status = 'processing'");
     delete_option('babh6_job');
+    delete_transient('babh6_step_lock');
 
     $dir = wp_upload_dir();
     $base = trailingslashit($dir['basedir']) . 'babh6';
     if (!wp_mkdir_p($base)) {
         return new WP_Error('babh6_dir', 'Не мога да създам папка ' . $base);
     }
-    $dest = $base . '/import-' . time() . '.xlsx';
-    if (!@move_uploaded_file($tmp_path, $dest)) {
-        if (!@copy($tmp_path, $dest)) {
+
+    $paths = array(); $names = array(); $stamp = time();
+    foreach ($files as $i => $f) {
+        $dest = $base . '/import-' . $stamp . '-' . ($i + 1) . '.xlsx';
+        $moved = false;
+        if (function_exists('is_uploaded_file') && @is_uploaded_file($f['src'])) $moved = @move_uploaded_file($f['src'], $dest);
+        if (!$moved) $moved = @rename($f['src'], $dest);
+        if (!$moved && @copy($f['src'], $dest)) { @unlink($f['src']); $moved = true; }
+        if (!$moved) {
+            foreach ($paths as $p) @unlink($p);
             return new WP_Error('babh6_move', 'Не мога да запиша файла в ' . $base);
         }
+        $paths[] = $dest;
+        $names[] = isset($f['name']) && $f['name'] !== '' ? $f['name'] : basename($dest);
     }
+    $filename = implode(' + ', $names);
 
     $wpdb->insert($uploads_t, array(
-        'filename'    => $filename,
+        'filename'    => mb_substr($filename, 0, 250, 'UTF-8'),
         'uploaded_at' => current_time('mysql'),
         'status'      => 'processing',
+        'source'      => $source === 'auto' ? 'auto' : 'manual',
     ));
 
     $job = array(
         'upload_id' => (int)$wpdb->insert_id,
-        'file'      => $dest,
+        'files'     => $paths,
+        'names'     => $names,
+        'fi'        => 0,          /* индекс на текущия файл */
+        'file'      => $paths[0],  /* текущ файл (обратна съвместимост) */
         'filename'  => $filename,
-        'total'     => 0,
-        'cursor'    => 0,
+        'source'    => $source === 'auto' ? 'auto' : 'manual',
+        'meta'      => (array)$meta,
+        'created'   => time(),
+        'totals'    => array(),    /* редове по файл */
+        'total'     => 0,          /* сумарно */
+        'done_rows' => 0,          /* редове от вече приключилите файлове */
+        'cursor'    => 0,          /* ред в текущия файл */
         'parsed'    => 0,
         'added'     => 0,
         'updated'   => 0,
@@ -59,13 +98,31 @@ function babh6_job_cancel() {
         $wpdb->update(babh6_table('uploads'),
             array('status' => 'failed', 'notes' => 'Отменен от потребителя'),
             array('id' => (int)$job['upload_id']));
-        if (!empty($job['file'])) @unlink($job['file']);
+        foreach (babh6_job_files($job) as $f) @unlink($f);
     }
     delete_option('babh6_job');
+    delete_transient('babh6_step_lock');
+}
+
+/** Списък с файловете на job-а (поддържа и стария формат с единичен 'file'). */
+function babh6_job_files($job) {
+    if (!empty($job['files'])) return (array)$job['files'];
+    return !empty($job['file']) ? array($job['file']) : array();
+}
+
+/** Прекратява job-а с грешка: маркира upload-а, чисти файловете, пуска hook. */
+function babh6_job_fail($job, $message) {
+    global $wpdb;
+    $wpdb->update(babh6_table('uploads'), array('status' => 'failed', 'notes' => $message), array('id' => (int)$job['upload_id']));
+    foreach (babh6_job_files($job) as $f) @unlink($f);
+    delete_option('babh6_job');
+    delete_transient('babh6_step_lock');
+    do_action('babh6_import_failed', (int)$job['upload_id'], $message, $job);
 }
 
 /**
- * Изпълнява една стъпка от import-а (~1500 реда). Вика се многократно през AJAX.
+ * Изпълнява една стъпка от import-а (~1500 реда). Вика се многократно през AJAX
+ * или от WP-Cron (auto sync). Lock (transient) пази двата да не работят едновременно.
  * @return array|WP_Error {done, phase, progress, total, added, updated, restored, removed?}
  */
 function babh6_run_step() {
@@ -76,36 +133,69 @@ function babh6_run_step() {
     $job = get_option('babh6_job');
     if (!$job) return new WP_Error('babh6_nojob', 'Няма активна import задача.');
 
+    /* Стар формат (job от версия преди 6.1) */
+    if (empty($job['files']) && !empty($job['file'])) {
+        $job['files'] = array($job['file']); $job['names'] = array($job['filename']);
+        $job['fi'] = 0; $job['done_rows'] = 0; $job['totals'] = array();
+        if (!empty($job['total'])) $job['totals'] = array((int)$job['total']);
+    }
+    foreach (array('fi' => 0, 'done_rows' => 0, 'totals' => array(), 'source' => 'manual', 'meta' => array(), 'names' => array()) as $k => $v) {
+        if (!isset($job[$k])) $job[$k] = $v;
+    }
+
+    /* Lock срещу паралелна обработка (AJAX + cron) */
+    if (get_transient('babh6_step_lock')) {
+        return array('done' => false, 'phase' => 'busy',
+            'progress' => (int)$job['done_rows'] + (int)$job['cursor'], 'total' => (int)$job['total'],
+            'added' => (int)$job['added'], 'updated' => (int)$job['updated'], 'restored' => (int)$job['restored']);
+    }
+    set_transient('babh6_step_lock', 1, 2 * MINUTE_IN_SECONDS);
+
+    $res = babh6_run_step_locked($job);
+    delete_transient('babh6_step_lock');
+    return $res;
+}
+
+function babh6_run_step_locked($job) {
+    global $wpdb;
     $products_t = babh6_table('products');
     $uploads_t  = babh6_table('uploads');
     $upload_id  = (int)$job['upload_id'];
+    $files      = (array)$job['files'];
+    $nfiles     = count($files);
 
-    if (empty($job['file']) || !file_exists($job['file'])) {
-        $wpdb->update($uploads_t, array('status' => 'failed', 'notes' => 'Файлът липсва'), array('id' => $upload_id));
-        delete_option('babh6_job');
-        return new WP_Error('babh6_nofile', 'Import файлът липсва — качи отново.');
+    foreach ($files as $f) {
+        if (empty($f) || !file_exists($f)) {
+            babh6_job_fail($job, 'Файлът липсва');
+            return new WP_Error('babh6_nofile', 'Import файлът липсва — качи отново.');
+        }
     }
 
-    /* Фаза 1: преброяване (една отделна бърза стъпка за progress bar) */
+    /* Фаза 1: преброяване на всички файлове (една отделна бърза стъпка за progress bar) */
     if (empty($job['total'])) {
-        $total = BABH6_XLSX_Reader::count_data_rows($job['file']);
-        if (is_wp_error($total)) {
-            $wpdb->update($uploads_t, array('status' => 'failed', 'notes' => $total->get_error_message()), array('id' => $upload_id));
-            delete_option('babh6_job');
-            return $total;
+        $totals = array(); $sum = 0;
+        foreach ($files as $f) {
+            $total = BABH6_XLSX_Reader::count_data_rows($f);
+            if (is_wp_error($total)) {
+                babh6_job_fail($job, $total->get_error_message() . ' (' . basename($f) . ')');
+                return $total;
+            }
+            $totals[] = (int)$total; $sum += (int)$total;
         }
-        $job['total'] = max(1, (int)$total);
+        $job['totals'] = $totals;
+        $job['total']  = max(1, $sum);
         update_option('babh6_job', $job, false);
         return array('done' => false, 'phase' => 'count', 'progress' => 0, 'total' => $job['total'],
                      'added' => 0, 'updated' => 0, 'restored' => 0);
     }
 
-    /* Фаза 2: порция редове */
+    /* Фаза 2: порция редове от текущия файл */
+    $fi    = (int)$job['fi'];
+    $file  = $files[$fi];
     $chunk = (int)apply_filters('babh6_chunk_size', 1500);
-    $rows = BABH6_XLSX_Reader::read_rows_chunk($job['file'], (int)$job['cursor'], $chunk);
+    $rows = BABH6_XLSX_Reader::read_rows_chunk($file, (int)$job['cursor'], $chunk);
     if (is_wp_error($rows)) {
-        $wpdb->update($uploads_t, array('status' => 'failed', 'notes' => $rows->get_error_message()), array('id' => $upload_id));
-        delete_option('babh6_job');
+        babh6_job_fail($job, $rows->get_error_message() . ' (' . basename($file) . ')');
         return $rows;
     }
 
@@ -124,7 +214,7 @@ function babh6_run_step() {
             $regs = array_keys($items);
             $ph = implode(',', array_fill(0, count($regs), '%s'));
             $existing = $wpdb->get_results($wpdb->prepare(
-                "SELECT id, reg, comp_hash, deleted_at FROM $products_t WHERE reg IN ($ph)", $regs
+                "SELECT id, reg, comp_hash, deleted_at, last_upload FROM $products_t WHERE reg IN ($ph)", $regs
             ));
             $map = array();
             foreach ($existing as $e) $map[$e->reg] = $e;
@@ -133,13 +223,16 @@ function babh6_run_step() {
             $to_bump   = array();
 
             foreach ($items as $reg => $p) {
-                $job['parsed']++;
                 if (!isset($map[$reg])) {
                     $to_insert[] = $p;
+                    $job['parsed']++;
                     $job['added']++;
                     continue;
                 }
                 $e = $map[$reg];
+                /* Същият рег. номер вече мина в този import (напр. дублиран в част 1 и част 2) — първият печели */
+                if ((int)$e->last_upload === $upload_id) continue;
+                $job['parsed']++;
                 $changed     = ($e->comp_hash !== $p['comp_hash']);
                 $was_deleted = !empty($e->deleted_at);
                 if ($changed || $was_deleted) {
@@ -175,8 +268,22 @@ function babh6_run_step() {
         update_option('babh6_job', $job, false);
     }
 
-    /* Фаза 3: финализиране, когато редовете свършат */
-    if (!$rows || count($rows) < $chunk) {
+    $file_done = (!$rows || count($rows) < $chunk);
+
+    /* Следващ файл (част 2, 3, …) */
+    if ($file_done && $fi + 1 < $nfiles) {
+        $job['done_rows'] = (int)$job['done_rows'] + (int)$job['cursor'];
+        $job['fi']        = $fi + 1;
+        $job['file']      = $files[$fi + 1];
+        $job['cursor']    = 0;
+        update_option('babh6_job', $job, false);
+        return array('done' => false, 'phase' => 'rows', 'file' => $fi + 2, 'files' => $nfiles,
+            'progress' => (int)$job['done_rows'], 'total' => (int)$job['total'],
+            'added' => (int)$job['added'], 'updated' => (int)$job['updated'], 'restored' => (int)$job['restored']);
+    }
+
+    /* Фаза 3: финализиране след последния файл */
+    if ($file_done) {
         $removed = 0;
         if ((int)$job['parsed'] > 100) {
             $wpdb->query($wpdb->prepare(
@@ -199,17 +306,19 @@ function babh6_run_step() {
             'restored'   => (int)$job['restored'],
         ), array('id' => $upload_id));
 
-        @unlink($job['file']);
+        foreach ($files as $f) @unlink($f);
         delete_option('babh6_job');
 
-        return array('done' => true, 'phase' => 'done',
-            'progress' => (int)$job['cursor'], 'total' => (int)$job['total'],
+        $result = array('done' => true, 'phase' => 'done',
+            'progress' => (int)$job['total'], 'total' => (int)$job['total'],
             'parsed' => (int)$job['parsed'], 'added' => (int)$job['added'],
             'updated' => (int)$job['updated'], 'removed' => $removed, 'restored' => (int)$job['restored']);
+        do_action('babh6_import_done', $upload_id, $result, $job);
+        return $result;
     }
 
-    return array('done' => false, 'phase' => 'rows',
-        'progress' => (int)$job['cursor'], 'total' => (int)$job['total'],
+    return array('done' => false, 'phase' => 'rows', 'file' => $fi + 1, 'files' => $nfiles,
+        'progress' => (int)$job['done_rows'] + (int)$job['cursor'], 'total' => (int)$job['total'],
         'added' => (int)$job['added'], 'updated' => (int)$job['updated'], 'restored' => (int)$job['restored']);
 }
 

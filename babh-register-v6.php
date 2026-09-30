@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: БАБХ Регистър v6
- * Description: Регистър на хранителните добавки — публично търсене (shortcode [babh_register]), REST API, ETL за Excel файлове от БАБХ, diff между качвания, регулаторни флагове. Работи паралелно с v5.6 (отделни таблици).
- * Version: 6.0.4
+ * Description: Регистър на хранителните добавки — публично търсене (shortcode [babh_register]), REST API, ETL за Excel файлове от БАБХ, автоматично обновяване от портала на БАБХ по график, diff между качвания, регулаторни флагове. Работи паралелно с v5.6 (отделни таблици).
+ * Version: 6.1.0
  * GitHub Plugin URI: proclaudecopilot/proveri-babh
  * Author: BABH Register
  * Requires PHP: 7.4
@@ -11,7 +11,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BABH6_VERSION', '6.0.4');
+define('BABH6_VERSION', '6.1.0');
 define('BABH6_PATH', plugin_dir_path(__FILE__));
 define('BABH6_URL', plugin_dir_url(__FILE__));
 
@@ -19,6 +19,7 @@ require_once BABH6_PATH . 'includes/schema.php';
 require_once BABH6_PATH . 'includes/detect.php';
 require_once BABH6_PATH . 'includes/xlsx-reader.php';
 require_once BABH6_PATH . 'includes/etl.php';
+require_once BABH6_PATH . 'includes/sync.php';
 require_once BABH6_PATH . 'includes/ai.php';
 require_once BABH6_PATH . 'includes/rest.php';
 require_once BABH6_PATH . 'includes/frontend.php';
@@ -29,10 +30,17 @@ register_activation_hook(__FILE__, 'babh6_activate');
 function babh6_activate() {
     babh6_create_tables();
     update_option('babh6_version', BABH6_VERSION);
+    babh6_sync_schedule_next();
 }
 
-/* Upgrade-safe: пресъздава таблиците при промяна на версията */
-add_action('admin_init', function () {
+register_deactivation_hook(__FILE__, 'babh6_deactivate');
+function babh6_deactivate() {
+    wp_clear_scheduled_hook('babh6_sync_check');
+    wp_clear_scheduled_hook('babh6_sync_process');
+}
+
+/* Upgrade-safe: пресъздава таблиците при промяна на версията (на init — важи и за WP-Cron, не само за админа) */
+add_action('init', function () {
     if (get_option('babh6_version') !== BABH6_VERSION) {
         babh6_create_tables();
         update_option('babh6_version', BABH6_VERSION);
