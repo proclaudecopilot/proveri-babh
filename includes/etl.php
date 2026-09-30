@@ -284,14 +284,25 @@ function babh6_run_step_locked($job) {
 
     /* Фаза 3: финализиране след последния файл */
     if ($file_done) {
-        $removed = 0;
+        $removed = 0; $notes = null;
         if ((int)$job['parsed'] > 100) {
-            $wpdb->query($wpdb->prepare(
-                "UPDATE $products_t SET deleted_at = %s
-                 WHERE deleted_at IS NULL AND (last_upload IS NULL OR last_upload <> %d)",
-                $now, $upload_id
-            ));
-            $removed = (int)$wpdb->rows_affected;
+            /* Предпазител: ако липсват над X% от активните продукти, файловете
+               най-вероятно са непълни (напр. само част 1) — не заличаваме. */
+            $active = (int)$wpdb->get_var("SELECT COUNT(*) FROM $products_t WHERE deleted_at IS NULL");
+            $would  = (int)$wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $products_t WHERE deleted_at IS NULL AND (last_upload IS NULL OR last_upload <> %d)", $upload_id));
+            $ratio  = (float)apply_filters('babh6_max_remove_ratio', 0.5);
+            if ($active > 0 && $would > $active * $ratio) {
+                $notes = sprintf('Заличаването е пропуснато: %d от %d активни продукта липсват във файловете (над %d%%) — вероятно непълен набор файлове.',
+                    $would, $active, (int)round($ratio * 100));
+            } else {
+                $wpdb->query($wpdb->prepare(
+                    "UPDATE $products_t SET deleted_at = %s
+                     WHERE deleted_at IS NULL AND (last_upload IS NULL OR last_upload <> %d)",
+                    $now, $upload_id
+                ));
+                $removed = (int)$wpdb->rows_affected;
+            }
         }
 
         babh6_rebuild_parties();
@@ -304,12 +315,13 @@ function babh6_run_step_locked($job) {
             'updated_ct' => (int)$job['updated'],
             'removed'    => $removed,
             'restored'   => (int)$job['restored'],
+            'notes'      => $notes,
         ), array('id' => $upload_id));
 
         foreach ($files as $f) @unlink($f);
         delete_option('babh6_job');
 
-        $result = array('done' => true, 'phase' => 'done',
+        $result = array('done' => true, 'phase' => 'done', 'notes' => $notes,
             'progress' => (int)$job['total'], 'total' => (int)$job['total'],
             'parsed' => (int)$job['parsed'], 'added' => (int)$job['added'],
             'updated' => (int)$job['updated'], 'removed' => $removed, 'restored' => (int)$job['restored']);

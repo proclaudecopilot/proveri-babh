@@ -169,7 +169,7 @@ function babh6_admin_dashboard() {
                             bar.style.width = '100%';
                             status.innerHTML = '<b style="color:#00a32a">Готово.</b> Продукти: ' + d.parsed +
                                 ' · Нови: ' + d.added + ' · Обновени: ' + d.updated +
-                                ' · Заличени: ' + d.removed + ' · Възстановени: ' + d.restored;
+                                ' · Заличени: ' + d.removed + ' · Възстановени: ' + d.restored + (d.notes ? '<br><span style="color:#dba617">' + d.notes + '</span>' : '');
                             setTimeout(function(){ location.reload(); }, 1800);
                             return;
                         }
