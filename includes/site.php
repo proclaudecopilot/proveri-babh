@@ -24,8 +24,8 @@ function babh6_render_standalone() {
     $rest2 = esc_url_raw(add_query_arg('rest_route', '/babh6/v1', home_url('/')));
 
     $site  = get_bloginfo('name');
-    $title = $site ? $site . ' — регистър на хранителните добавки на БАБХ' : 'Проверка на добавки — регистър на БАБХ';
-    $desc  = 'Търси в официалния регистър на БАБХ на хранителните добавки: продукти, състав, производители, търговци и регулаторни флагове за спорни съставки.';
+    $title = $site ? $site . ' — справка за хранителни добавки по данни на БАБХ' : 'Регистър на добавките — справка по данни на БАБХ';
+    $desc  = 'Потърси хранителна добавка по име, фирма, съставка или регистрационен номер. Разгледай наличните данни от регистъра на БАБХ.';
     $home  = esc_url(home_url('/'));
 
     status_header(200);
@@ -51,8 +51,8 @@ function babh6_render_standalone() {
 </head>
 <body class="babh6-body">
 <div class="b6-page">
-  <div id="babh6-app" class="babh6"><div class="b6-boot">Зарежда регистър…</div></div>
-  <footer class="b6-site-f">© <?php echo esc_html(date_i18n('Y')); ?> <?php echo esc_html($site ? $site : 'Проверка на добавки'); ?> · Данни: Българска агенция по безопасност на храните (БАБХ) · Платформата е с информативен характер</footer>
+  <div id="babh6-app" class="babh6"><div class="b6-boot">Регистърът се зарежда…</div><noscript><div class="b6-boot">За търсене в регистъра е необходим JavaScript. Включи го в браузъра и презареди страницата.</div></noscript></div>
+  <footer class="b6-site-f">© <?php echo esc_html(date_i18n('Y')); ?> <?php echo esc_html($site ? $site : 'Регистър на добавките'); ?>. Данни от Българската агенция по безопасност на храните (БАБХ). Сайт за справки по данни от регистъра на БАБХ.</footer>
 </div>
 <script>window.BABH6_CFG = { rest: <?php echo wp_json_encode($rest); ?>, rest2: <?php echo wp_json_encode($rest2); ?>, locked: <?php echo babh6_gate_ok() ? '0' : '1'; ?>, hasAI: <?php echo babh6_api_key() !== '' ? '1' : '0'; ?>, pro: <?php echo babh6_pro_ok() ? '1' : '0'; ?>, nonce: <?php echo wp_json_encode(is_user_logged_in() ? wp_create_nonce('wp_rest') : ''); ?> };</script>
 <script src="<?php echo $js; ?>"></script>

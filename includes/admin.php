@@ -3,8 +3,8 @@ if (!defined('ABSPATH')) exit;
 
 add_action('admin_menu', function () {
     add_menu_page(
-        'БАБХ Регистър v6',
-        'БАБХ v6',
+        'Регистър на добавките — версия 6',
+        'Регистър на добавките',
         'manage_options',
         'babh6',
         'babh6_admin_dashboard',
@@ -16,27 +16,29 @@ add_action('admin_menu', function () {
 /* ============ Upload handler: само записва файла и създава job ============ */
 add_action('admin_post_babh6_upload', 'babh6_handle_upload_post');
 function babh6_handle_upload_post() {
-    if (!current_user_can('manage_options')) wp_die('Недостатъчни права.');
+    if (!current_user_can('manage_options')) wp_die('Нямаш права за това действие.');
     check_admin_referer('babh6_upload');
 
     $redirect = admin_url('admin.php?page=babh6');
 
     /* Един или няколко файла (част 1 + част 2 → едно качване) */
-    $files = array();
+    $files = array(); $errs = array();
     if (!empty($_FILES['babh6_file']['tmp_name'])) {
         $tmp = $_FILES['babh6_file']['tmp_name'];
         $nm  = $_FILES['babh6_file']['name'];
-        if (is_array($tmp)) {
-            foreach ($tmp as $i => $t) {
-                if ($t === '' || !is_uploaded_file($t)) continue;
-                $files[] = array('src' => $t, 'name' => sanitize_file_name((string)$nm[$i]));
-            }
-        } elseif (is_uploaded_file($tmp)) {
-            $files[] = array('src' => $tmp, 'name' => sanitize_file_name((string)$nm));
+        $er  = isset($_FILES['babh6_file']['error']) ? $_FILES['babh6_file']['error'] : 0;
+        if (!is_array($tmp)) { $tmp = array($tmp); $nm = array($nm); $er = array($er); }
+        foreach ($tmp as $i => $t) {
+            $code = isset($er[$i]) ? (int)$er[$i] : 0;
+            if ($code === UPLOAD_ERR_NO_FILE) continue;
+            if ($code === UPLOAD_ERR_INI_SIZE || $code === UPLOAD_ERR_FORM_SIZE) { $errs[] = 'size'; continue; }
+            if ($code !== UPLOAD_ERR_OK || $t === '' || !is_uploaded_file($t)) { $errs[] = 'partial'; continue; }
+            $files[] = array('src' => $t, 'name' => sanitize_file_name((string)$nm[$i]));
         }
     }
     if (!$files) {
-        wp_safe_redirect(add_query_arg('babh6_err', 'nofile', $redirect));
+        $code = in_array('size', $errs, true) ? 'size' : (in_array('partial', $errs, true) ? 'partial' : 'nofile');
+        wp_safe_redirect(add_query_arg('babh6_err', $code, $redirect));
         exit;
     }
     foreach ($files as $f) {
@@ -61,7 +63,7 @@ function babh6_handle_upload_post() {
 
 /* ============ AJAX стъпка ============ */
 add_action('wp_ajax_babh6_step', function () {
-    if (!current_user_can('manage_options')) wp_send_json_error(array('message' => 'Недостатъчни права.'));
+    if (!current_user_can('manage_options')) wp_send_json_error(array('message' => 'Нямаш права за това действие.'));
     check_ajax_referer('babh6_step', 'nonce');
     $res = babh6_run_step();
     if (is_wp_error($res)) wp_send_json_error(array('message' => $res->get_error_message()));
@@ -69,7 +71,7 @@ add_action('wp_ajax_babh6_step', function () {
 });
 
 add_action('wp_ajax_babh6_cancel', function () {
-    if (!current_user_can('manage_options')) wp_send_json_error(array('message' => 'Недостатъчни права.'));
+    if (!current_user_can('manage_options')) wp_send_json_error(array('message' => 'Нямаш права за това действие.'));
     check_ajax_referer('babh6_step', 'nonce');
     babh6_job_cancel();
     wp_send_json_success(array('ok' => 1));
@@ -78,7 +80,7 @@ add_action('wp_ajax_babh6_cancel', function () {
 
 /* ============ Settings save ============ */
 add_action('admin_post_babh6_settings', function () {
-    if (!current_user_can('manage_options')) wp_die('Недостатъчни права.');
+    if (!current_user_can('manage_options')) wp_die('Нямаш права за това действие.');
     check_admin_referer('babh6_settings');
     update_option('babh6_anthropic_key', sanitize_text_field(wp_unslash($_POST['babh6_key'] ?? '')), false);
     update_option('babh6_password', sanitize_text_field(wp_unslash($_POST['babh6_pw'] ?? '')), false);
@@ -104,16 +106,19 @@ function babh6_admin_dashboard() {
     $fulltext = (int)get_option('babh6_fulltext', 0);
     $job      = get_option('babh6_job');
 
-    echo '<div class="wrap"><h1>БАБХ Регистър v6 <span style="font-size:12px;color:#787c82;font-weight:400">v6 · DB + ETL + Frontend</span></h1>';
+    $max_upload = function_exists('wp_max_upload_size') ? size_format(wp_max_upload_size()) : ini_get('upload_max_filesize');
+    echo '<div class="wrap"><h1>Регистър на добавките <span style="font-size:12px;color:#787c82;font-weight:400">Версия ' . esc_html(BABH6_VERSION) . '</span></h1>';
 
     if (isset($_GET['babh6_err'])) {
         $err = sanitize_text_field(wp_unslash($_GET['babh6_err']));
         $messages = array(
-            'nofile' => 'Не е избран файл.',
-            'type'   => 'Файлът трябва да е .xlsx (не .xls или .csv).',
-            'etl'    => 'Грешка: ' . (isset($_GET['babh6_msg']) ? esc_html(rawurldecode(sanitize_text_field(wp_unslash($_GET['babh6_msg'])))) : 'неизвестна'),
+            'nofile'  => 'Файлът не е получен. Избери .xlsx файл и опитай отново.',
+            'size'    => 'Файлът е по-голям от допустимия размер ' . esc_html($max_upload) . '.',
+            'partial' => 'Качването е прекъснато. Опитай отново.',
+            'type'    => 'Избери Excel файл във формат .xlsx.',
+            'etl'     => 'Качването не започна. ' . (isset($_GET['babh6_msg']) ? esc_html(rawurldecode(sanitize_text_field(wp_unslash($_GET['babh6_msg'])))) : 'Не получихме подробности за грешката.'),
         );
-        $msg = isset($messages[$err]) ? $messages[$err] : 'Неизвестна грешка.';
+        $msg = isset($messages[$err]) ? $messages[$err] : 'Качването не започна. Опитай отново.';
         echo '<div class="notice notice-error is-dismissible"><p>' . wp_kses_post($msg) . '</p></div>';
     }
 
@@ -121,14 +126,14 @@ function babh6_admin_dashboard() {
     if ($job) {
         $nonce = wp_create_nonce('babh6_step');
         echo '<div id="babh6-progress" style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:18px 20px;max-width:640px;margin:18px 0">';
-        echo '<h2 style="margin-top:0">Обработва се: ' . esc_html($job['filename']) . '</h2>';
+        echo '<h2 style="margin-top:0">Обработва се файлът „' . esc_html($job['filename']) . '“</h2>';
         if (!empty($job['source']) && $job['source'] === 'auto') {
             echo '<p style="color:#787c82;margin:0 0 6px">Автоматично обновяване от БАБХ. Обработката продължава и на заден план (WP-Cron), дори да затвориш страницата.</p>';
         }
         echo '<div style="background:#f0f0f1;border-radius:100px;height:14px;overflow:hidden;margin:10px 0">';
         echo '<div id="babh6-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#2271b1,#72aee6);border-radius:100px;transition:width .4s"></div></div>';
-        echo '<p id="babh6-status" style="color:#787c82;margin:6px 0 12px">Стартирам…</p>';
-        echo '<button type="button" class="button" id="babh6-cancel">Отмени import-а</button>';
+        echo '<p id="babh6-status" style="color:#787c82;margin:6px 0 12px" aria-live="polite">Подготовка за обработка…</p>';
+        echo '<button type="button" class="button" id="babh6-cancel">Спри обработката</button>';
         echo '</div>';
         ?>
         <script>
@@ -140,12 +145,15 @@ function babh6_admin_dashboard() {
             var stopped = false;
 
             document.getElementById('babh6-cancel').addEventListener('click', function(){
-                if (!confirm('Сигурен ли си? Частично обработените данни остават в базата (следващ import ги изравнява).')) return;
+                if (!confirm('Да спрем ли обработката? Вече записаните промени ще останат. За пълно обновяване ще трябва да качиш целия регистър отново.')) return;
                 stopped = true;
                 var fd = new FormData();
                 fd.append('action', 'babh6_cancel');
                 fd.append('nonce', nonce);
-                fetch(ajaxurl, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function(){ location.reload(); });
+                fetch(ajaxurl, {method: 'POST', body: fd, credentials: 'same-origin'})
+                    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                    .then(function(j){ if (!j.success) throw new Error('nok'); location.reload(); })
+                    .catch(function(){ stopped = false; status.innerHTML = '<b style="color:#d63638">Не успяхме да потвърдим спирането.</b> Презареди страницата, за да провериш състоянието.'; });
             });
 
             function step(){
@@ -155,46 +163,46 @@ function babh6_admin_dashboard() {
                 fd.append('nonce', nonce);
                 fetch(ajaxurl, {method: 'POST', body: fd, credentials: 'same-origin'})
                     .then(function(r){
-                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        if (!r.ok) throw new Error('Сървърът върна грешка. Код: HTTP ' + r.status + '.');
                         return r.json();
                     })
                     .then(function(j){
                         retries = 0;
                         if (!j.success) {
-                            status.innerHTML = '<b style="color:#d63638">Грешка:</b> ' + (j.data && j.data.message ? j.data.message : 'неизвестна');
+                            status.innerHTML = '<b style="color:#d63638">Обработката спря.</b> ' + (j.data && j.data.message ? j.data.message : 'Не получихме подробности за грешката.');
                             return;
                         }
                         var d = j.data;
                         if (d.done) {
                             bar.style.width = '100%';
-                            status.innerHTML = '<b style="color:#00a32a">Готово.</b> Продукти: ' + d.parsed +
-                                ' · Нови: ' + d.added + ' · Обновени: ' + d.updated +
-                                ' · Заличени: ' + d.removed + ' · Възстановени: ' + d.restored + (d.notes ? '<br><span style="color:#dba617">' + d.notes + '</span>' : '');
+                            status.innerHTML = '<b style="color:#00a32a">Обработката приключи.</b> Обработени записи: ' + d.parsed +
+                                ' · Нови записи: ' + d.added + ' · С променено име или състав: ' + d.updated +
+                                ' · Липсват в качения файл: ' + d.removed + ' · Отново намерени във файла: ' + d.restored + (d.notes ? '<br><span style="color:#dba617">' + d.notes + '</span>' : '');
                             setTimeout(function(){ location.reload(); }, 1800);
                             return;
                         }
                         if (d.phase === 'busy') {
-                            status.textContent = 'Обработва се на заден план… (' + d.progress + ' / ' + d.total + ' реда)';
+                            status.textContent = 'Обработката продължава на заден план. Обработени редове: ' + d.progress + ' от ' + d.total + '.';
                             setTimeout(step, 2500);
                             return;
                         }
                         if (d.phase === 'count') {
-                            status.textContent = 'Преброени ' + d.total + ' реда. Обработвам…';
+                            status.textContent = 'Файлът съдържа ' + d.total + ' реда. Обработката започва…';
                         } else {
                             var pct = d.total ? Math.round(100 * d.progress / d.total) : 0;
                             bar.style.width = pct + '%';
-                            var fpart = (d.files && d.files > 1) ? ' · файл ' + d.file + '/' + d.files : '';
-                            status.textContent = d.progress + ' / ' + d.total + ' реда (' + pct + '%)' + fpart + ' · Нови: ' + d.added + ' · Обновени: ' + d.updated;
+                            var fpart = (d.files && d.files > 1) ? ' Файл ' + d.file + ' от ' + d.files + '.' : '';
+                            status.textContent = 'Обработени редове: ' + d.progress + ' от ' + d.total + ' (' + pct + '%).' + fpart + ' Нови записи: ' + d.added + '. С променено име или състав: ' + d.updated + '.';
                         }
                         step();
                     })
                     .catch(function(e){
                         retries++;
                         if (retries > 5) {
-                            status.innerHTML = '<b style="color:#d63638">Връзката прекъсна 5 пъти.</b> Презареди страницата — обработката продължава от същото място.';
+                            status.innerHTML = '<b style="color:#d63638">Обработката не можа да продължи след повторните опити.</b> Презареди страницата, за да продължиш от последната запазена стъпка.';
                             return;
                         }
-                        status.textContent = 'Прекъсване (' + e.message + ') — опит ' + retries + '/5 след 4 сек… Прогресът е запазен.';
+                        status.textContent = 'Неуспешна заявка. Повторен опит ' + retries + ' от 5 след 4 секунди. Обработката ще продължи от последната запазена стъпка. (' + e.message + ')';
                         setTimeout(step, 4000);
                     });
             }
@@ -209,11 +217,11 @@ function babh6_admin_dashboard() {
     /* ===== Stats ===== */
     echo '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:18px 0">';
     $cards = array(
-        array('Продукти (активни)', number_format_i18n($total)),
-        array('С регулаторни флагове', number_format_i18n($flagged)),
-        array('Заличени', number_format_i18n($deleted)),
-        array('Производители (БГ / общо)', number_format_i18n($prods_pb) . ' / ' . number_format_i18n($prods_p)),
-        array('Търговци (БГ / общо)', number_format_i18n($trads_tb) . ' / ' . number_format_i18n($trads_t)),
+        array('Записи в наличните данни', number_format_i18n($total)),
+        array('Записи с бележки за проверка', number_format_i18n($flagged)),
+        array('Липсващи в последващ файл', number_format_i18n($deleted)),
+        array('Производители: определени като български / общо', number_format_i18n($prods_pb) . ' / ' . number_format_i18n($prods_p)),
+        array('Търговци: определени като български / общо', number_format_i18n($trads_tb) . ' / ' . number_format_i18n($trads_t)),
     );
     foreach ($cards as $c) {
         echo '<div style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:14px 16px">';
@@ -225,13 +233,13 @@ function babh6_admin_dashboard() {
 
     /* ===== Upload form ===== */
     echo '<div style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:18px 20px;max-width:640px;margin-bottom:20px">';
-    echo '<h2 style="margin-top:0">Качи регистър от БАБХ (.xlsx)</h2>';
-    echo '<p style="color:#787c82">Избери <b>всички части</b> на регистъра наведнъж (част 1 + част 2) — обработват се като едно качване, иначе втората част ще заличи продуктите от първата. Обработката е на порции (~1500 реда на стъпка) с progress bar — устойчива на слаби хостинги. При прекъсване продължава от същото място. ~28 000 реда отнемат 2-5 минути.</p>';
+    echo '<h2 style="margin-top:0">Качи файл от регистъра на БАБХ</h2>';
+    echo '<p style="color:#787c82">Избери <b>всички части</b> на регистъра наведнъж (част 1 и част 2). Те се обработват като едно качване; качени поотделно, втората част ще отбележи записите от първата като липсващи. Остави страницата отворена до края на обработката. Ако тя прекъсне, презареди страницата, за да продължиш от последната запазена стъпка. Времето зависи от размера на файла и сървъра.</p>';
     echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" enctype="multipart/form-data">';
     wp_nonce_field('babh6_upload');
     echo '<input type="hidden" name="action" value="babh6_upload">';
-    echo '<p><input type="file" name="babh6_file[]" accept=".xlsx" multiple required></p>';
-    submit_button('Качи и обработи', 'primary', 'submit', false);
+    echo '<p><label for="babh6_file"><b>Файл от регистъра (.xlsx)</b> — максимален размер: ' . esc_html($max_upload) . '</label><br><input type="file" id="babh6_file" name="babh6_file[]" accept=".xlsx" multiple required></p>';
+    submit_button('Качи файла и започни обработка', 'primary', 'submit', false);
     echo '</form></div>';
 
     /* ===== Auto sync ===== */
@@ -258,12 +266,13 @@ function babh6_admin_dashboard() {
     echo '</p></form></div>';
 
     /* ===== Health ===== */
-    $upload_max = ini_get('upload_max_filesize');
     echo '<div style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:14px 20px;max-width:640px;margin-bottom:20px">';
-    echo '<h2 style="margin-top:0">Здраве на системата</h2><ul style="margin:0">';
-    echo '<li>FULLTEXT търсене: ' . ($fulltext ? '<b style="color:#00a32a">активно</b>' : '<b style="color:#d63638">недостъпно</b> — LIKE fallback в Сесия 2') . '</li>';
-    echo '<li>PHP: ' . esc_html(PHP_VERSION) . ' · Memory: ' . esc_html(ini_get('memory_limit')) . ' · Upload max: ' . esc_html($upload_max) . '</li>';
-    echo '<li>ZipArchive: ' . (class_exists('ZipArchive') ? 'да' : '<b style="color:#d63638">липсва</b>') . ' · XMLReader: ' . (class_exists('XMLReader') ? 'да' : '<b style="color:#d63638">липсва</b>') . '</li>';
+    echo '<h2 style="margin-top:0">Състояние на системата</h2><ul style="margin:0">';
+    echo '<li>Търсене с пълнотекстов индекс: ' . ($fulltext ? '<b style="color:#00a32a">Активно</b>' : '<b style="color:#d63638">Не е налично</b> — използва се стандартно текстово търсене.') . '</li>';
+    $mem = ini_get('memory_limit');
+    echo '<li>PHP: ' . esc_html(PHP_VERSION) . ' · Лимит на PHP паметта: ' . esc_html($mem === '-1' ? 'без ограничение' : $mem) . ' · Лимит за качван файл: ' . esc_html($max_upload) . '</li>';
+    $dep = function ($ok) { return $ok ? 'Налично' : '<b style="color:#d63638">Липсва</b>'; };
+    echo '<li>Поддръжка за ZIP архиви (ZipArchive): ' . $dep(class_exists('ZipArchive')) . ' · XMLReader: ' . $dep(class_exists('XMLReader')) . ' · SimpleXML: ' . $dep(function_exists('simplexml_load_string')) . '</li>';
     /* REST API самопроверка: така както го вика фронтендът (отвън, през HTTP) */
     $rest_urls = array(
         'wp-json'    => untrailingslashit(rest_url('babh6/v1')) . '/stats',
@@ -286,21 +295,23 @@ function babh6_admin_dashboard() {
     echo '</ul></div>';
 
     /* ===== History ===== */
-    echo '<h2>История на качванията</h2>';
+    echo '<h2>Последни 10 качвания</h2>';
     if (!$history) {
-        echo '<p style="color:#787c82">Още няма качвания.</p>';
+        echo '<p style="color:#787c82">Все още няма качени файлове. Използвай формата „Качи файл от регистъра на БАБХ“ по-горе.</p>';
     } else {
-        echo '<table class="widefat striped" style="max-width:900px"><thead><tr>';
-        echo '<th>#</th><th>Файл</th><th>Дата</th><th>Източник</th><th>Статус</th><th>Редове</th><th>Нови</th><th>Обновени</th><th>Заличени</th><th>Възстановени</th>';
+        $status_names = array('processing' => 'В обработка', 'done' => 'Завършено', 'failed' => 'Не е завършено');
+        echo '<table class="widefat striped" style="max-width:1000px"><thead><tr>';
+        echo '<th title="Номер на качването">№</th><th>Файл</th><th>Дата на качване</th><th>Източник</th><th>Състояние</th><th title="Нормализирани записи, обработени от файла">Обработени записи</th><th title="Нови за локалната база">Нови записи</th><th title="Различно име или състав спрямо предишното качване">Променено име/състав</th><th title="Липсват в качения файл; не е официално заличаване">Липсват във файла</th><th title="Отново намерени във файла след предишна липса">Отново във файла</th>';
         echo '</tr></thead><tbody>';
         foreach ($history as $h) {
+            $st = isset($status_names[$h->status]) ? $status_names[$h->status] : $h->status;
             printf(
                 '<tr><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
                 (int)$h->id,
                 esc_html($h->filename),
-                esc_html($h->uploaded_at),
-                (isset($h->source) && $h->source === 'auto') ? 'авто (БАБХ)' : 'ръчно',
-                esc_html($h->status) . (!empty($h->notes) ? ' <span title="' . esc_attr($h->notes) . '" style="color:#d63638;cursor:help">ⓘ</span>' : ''),
+                esc_html(date_i18n('d.m.Y H:i', strtotime($h->uploaded_at))),
+                (isset($h->source) && $h->source === 'auto') ? 'Автоматично от БАБХ' : 'Ръчно качване',
+                esc_html($st) . (!empty($h->notes) ? '<div style="font-size:11px;color:#787c82;max-width:260px">Причина: ' . esc_html($h->notes) . ($h->status === 'failed' ? ' Възможно е част от данните вече да са записани.' : '') . '</div>' : ''),
                 number_format_i18n((int)$h->row_count),
                 number_format_i18n((int)$h->added),
                 number_format_i18n((int)$h->updated_ct),
@@ -311,6 +322,6 @@ function babh6_admin_dashboard() {
         echo '</tbody></table>';
     }
 
-    echo '<p style="color:#787c82;margin-top:20px"><b>Публичен фронтенд:</b> началната страница на сайта показва регистъра автоматично (standalone, без тема). Shortcode <code>[babh_register]</code> остава наличен за други страници. Плъгинът работи паралелно с v5.6 — отделни таблици <code>' . esc_html($wpdb->prefix) . 'babh6_*</code>.</p>';
+    echo '<p style="color:#787c82;margin-top:20px"><b>Показване на регистъра в сайта:</b> по подразбиране регистърът се показва на началната страница със собствено оформление. За друга страница добави краткия код <code>[babh_register]</code>. Данните на тази версия се пазят отделно в таблиците <code>' . esc_html($wpdb->prefix) . 'babh6_*</code>.</p>';
     echo '</div>';
 }

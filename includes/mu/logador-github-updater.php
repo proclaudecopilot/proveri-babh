@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name: LOGADOR GitHub Updater
- * Description: Един token за сайта; всеки плъгин с ред „GitHub Plugin URI: owner/repo“ в header-а си се обновява от GitHub Releases през стандартния WP ъпдейт (Update now / auto-updates). Инсталира се сам от плъгините на LOGADOR (mu-plugins).
- * Version: 1.0.1
+ * Description: Обновяване на съвместимите плъгини от GitHub през стандартния механизъм на WordPress. При нужда от частен достъп се използва общ ключ за сайта. Компонентът се инсталира автоматично от плъгините на LOGADOR.
+ * Version: 1.0.2
  * Author: LOGADOR
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 if ( defined( 'LOGADOR_GH_UPDATER_VERSION' ) ) return; // вече е зареден (от друго копие)
-define( 'LOGADOR_GH_UPDATER_VERSION', '1.0.1' );
+define( 'LOGADOR_GH_UPDATER_VERSION', '1.0.2' );
 
 final class LOGADOR_GitHub_Updater {
 	const OPT_TOKEN = 'logador_github_token';
@@ -51,7 +51,7 @@ final class LOGADOR_GitHub_Updater {
 		if ( self::token() ) $args['headers']['Authorization'] = 'Bearer ' . self::token();
 		$res  = wp_remote_get( 'https://api.github.com/repos/' . $repo . '/releases/latest', $args );
 		$row  = array( 'at' => time(), 'data' => null, 'error' => '' );
-		if ( is_wp_error( $res ) ) { $row['error'] = 'Сайтът не стигна до GitHub: ' . $res->get_error_message(); }
+		if ( is_wp_error( $res ) ) { $row['error'] = 'Неуспешна връзка с GitHub. ' . $res->get_error_message(); }
 		else {
 			$code = (int) wp_remote_retrieve_response_code( $res );
 			$body = json_decode( (string) wp_remote_retrieve_body( $res ), true );
@@ -61,9 +61,9 @@ final class LOGADOR_GitHub_Updater {
 				$row['data'] = array( 'version' => ltrim( (string) $body['tag_name'], 'vV' ), 'tag' => (string) $body['tag_name'], 'package' => $pkg ?: (string) ( $body['zipball_url'] ?? '' ), 'asset_api' => $api,
 					'notes' => (string) ( $body['body'] ?? '' ), 'published' => (string) ( $body['published_at'] ?? '' ), 'html_url' => (string) ( $body['html_url'] ?? '' ) );
 			} elseif ( 404 === $code ) {
-				$row['error'] = self::token() ? 'HTTP 404 — token-ът няма достъп до ' . $repo . ' (частно репо: Fine-grained token с „Only select repositories“ → това репо, Contents: Read; за организация — одобрен от owner-а) или още няма Release.' : 'HTTP 404 — репото е частно (трябва token) или няма Release.';
-			} elseif ( 401 === $code ) { $row['error'] = 'HTTP 401 — невалиден/изтекъл token.'; }
-			else { $row['error'] = 'GitHub HTTP ' . $code . ( isset( $body['message'] ) ? ': ' . $body['message'] : '' ); }
+				$row['error'] = self::token() ? 'GitHub не върна достъпна публикувана версия за ' . $repo . ' (HTTP 404). Провери адреса на хранилището, наличието на версия и достъпа на ключа.' : 'GitHub не върна достъпна публикувана версия (HTTP 404). Провери адреса на хранилището и дали има публикувана версия. За частно хранилище е необходим достъп.';
+			} elseif ( 401 === $code ) { $row['error'] = 'GitHub отказа удостоверяването (HTTP 401). Провери ключа за достъп.'; }
+			else { $row['error'] = 'GitHub върна грешка HTTP ' . $code . '.' . ( isset( $body['message'] ) ? ' ' . $body['message'] : '' ); }
 		}
 		$all[ $repo ] = $row; set_site_transient( self::CACHE, $all, self::TTL );
 		return $row;
@@ -95,7 +95,7 @@ final class LOGADOR_GitHub_Updater {
 			if ( $p['slug'] !== $args->slug ) continue;
 			$d = self::release( $p['repo'] )['data'] ?? null; if ( ! $d ) return $res;
 			return (object) array( 'name' => $p['name'], 'slug' => $p['slug'], 'version' => $d['version'], 'author' => 'LOGADOR', 'homepage' => 'https://github.com/' . $p['repo'], 'download_link' => $d['package'], 'last_updated' => $d['published'],
-				'sections' => array( 'changelog' => nl2br( esc_html( $d['notes'] ?: 'Виж release-а в GitHub.' ) ) ) );
+				'sections' => array( 'changelog' => nl2br( esc_html( $d['notes'] ?: 'Виж описанието на версията в GitHub.' ) ) ) );
 		}
 		return $res;
 	}
@@ -120,41 +120,41 @@ final class LOGADOR_GitHub_Updater {
 		return $args;
 	}
 	public function row_meta( $links, $file ) {
-		$tr = self::tracked(); if ( isset( $tr[ $file ] ) ) $links[] = '<a href="https://github.com/' . esc_attr( $tr[ $file ]['repo'] ) . '/releases" target="_blank" rel="noopener">GitHub</a>';
+		$tr = self::tracked(); if ( isset( $tr[ $file ] ) ) $links[] = '<a href="https://github.com/' . esc_attr( $tr[ $file ]['repo'] ) . '/releases" target="_blank" rel="noopener">Версии в GitHub</a>';
 		return $links;
 	}
 
 	/* ---------- Settings → GitHub ъпдейти ---------- */
-	public function menu() { add_options_page( 'GitHub ъпдейти', 'GitHub ъпдейти', 'manage_options', 'logador-github', array( $this, 'page' ) ); }
+	public function menu() { add_options_page( 'Обновявания от GitHub', 'Обновявания от GitHub', 'manage_options', 'logador-github', array( $this, 'page' ) ); }
 	public function save() {
-		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Няма достъп.' ); check_admin_referer( 'logador_gh_save' );
+		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Нямаш права за това действие.' ); check_admin_referer( 'logador_gh_save' );
 		update_option( self::OPT_TOKEN, sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) ), false );
 		delete_site_transient( self::CACHE ); delete_site_transient( 'update_plugins' );
 		wp_safe_redirect( admin_url( 'options-general.php?page=logador-github&saved=1' ) ); exit;
 	}
 	public function check() {
-		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Няма достъп.' ); check_admin_referer( 'logador_gh_check' );
+		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Нямаш права за това действие.' ); check_admin_referer( 'logador_gh_check' );
 		delete_site_transient( self::CACHE ); foreach ( self::tracked() as $p ) self::release( $p['repo'], true );
 		delete_site_transient( 'update_plugins' ); wp_update_plugins();
 		wp_safe_redirect( admin_url( 'options-general.php?page=logador-github&checked=1' ) ); exit;
 	}
 	public function page() {
 		$tr = self::tracked();
-		echo '<div class="wrap"><h1>GitHub ъпдейти (LOGADOR)</h1>';
-		if ( ! empty( $_GET['saved'] ) ) echo '<div class="notice notice-success is-dismissible"><p>Записано.</p></div>';
-		if ( ! empty( $_GET['checked'] ) ) echo '<div class="notice notice-success is-dismissible"><p>Проверено — виж таблицата; новите версии са и в Plugins → Update now.</p></div>';
-		echo '<p>Един token за всички плъгини. Всеки плъгин с ред <code>GitHub Plugin URI: owner/repo</code> в header-а си се появява тук и се обновява от последния GitHub Release. Публично репо не иска token.</p>';
+		echo '<div class="wrap"><h1>Обновявания от GitHub (LOGADOR)</h1>';
+		if ( ! empty( $_GET['saved'] ) ) echo '<div class="notice notice-success is-dismissible"><p>Настройките са запазени.</p></div>';
+		if ( ! empty( $_GET['checked'] ) ) echo '<div class="notice notice-success is-dismissible"><p>Проверката приключи. Резултатът за всеки плъгин е в таблицата.</p></div>';
+		echo '<p>Тук се проверяват плъгините, които имат зададено GitHub хранилище (ред <code>GitHub Plugin URI: owner/repo</code> в описанието на плъгина). За частен достъп добави ключа на сайта. Новите версии се инсталират от страницата <a href="' . esc_url( admin_url( 'plugins.php' ) ) . '">Плъгини</a>.</p>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">'; wp_nonce_field( 'logador_gh_save' ); echo '<input type="hidden" name="action" value="logador_gh_save">';
-		echo '<table class="form-table"><tr><th>GitHub token</th><td><input type="password" name="token" class="regular-text" value="' . esc_attr( self::token() ) . '" autocomplete="new-password"><p class="description">Fine-grained PAT: Repository access → всички репота на LOGADOR (или „All repositories“), Permissions → Contents: Read-only. Един за целия сайт.</p></td></tr></table>';
-		submit_button( 'Запази' ); echo '</form>';
-		echo '<h2>Следени плъгини</h2><table class="widefat striped"><thead><tr><th>Плъгин</th><th>Репо</th><th>Тук</th><th>В GitHub</th><th>Състояние</th></tr></thead><tbody>';
-		if ( ! $tr ) echo '<tr><td colspan="5">Няма плъгин с „GitHub Plugin URI“ в header-а.</td></tr>';
+		echo '<table class="form-table"><tr><th>Ключ за достъп до GitHub (token)</th><td><input type="password" name="token" class="regular-text" value="' . esc_attr( self::token() ) . '" autocomplete="new-password"><p class="description">Използвай ключ за достъп до хранилищата на плъгините, които ще обновяваш (в GitHub: fine-grained token с право Contents: Read за съответните хранилища). Един ключ за целия сайт. Публично хранилище не изисква ключ.</p></td></tr></table>';
+		submit_button( 'Запази настройките' ); echo '</form>';
+		echo '<h2>Плъгини с обновяване от GitHub</h2><table class="widefat striped"><thead><tr><th>Плъгин</th><th>Хранилище</th><th>Инсталирана версия</th><th>Версия в GitHub</th><th>Състояние</th></tr></thead><tbody>';
+		if ( ! $tr ) echo '<tr><td colspan="5">Няма плъгини със зададено GitHub хранилище.</td></tr>';
 		foreach ( $tr as $p ) {
 			$r = self::release( $p['repo'] ); $d = $r['data'] ?? null;
-			$st = $d ? ( version_compare( $d['version'], $p['version'], '>' ) ? '<b style="color:#b8481c">нова версия → Plugins → Update now</b>' : '<span style="color:#1f7a4d">актуален</span>' ) : '<b style="color:#d64545">' . esc_html( $r['error'] ?: 'няма данни' ) . '</b>';
-			echo '<tr><td><b>' . esc_html( $p['name'] ) . '</b></td><td><a href="https://github.com/' . esc_attr( $p['repo'] ) . '/releases" target="_blank">' . esc_html( $p['repo'] ) . '</a></td><td>' . esc_html( $p['version'] ) . '</td><td>' . esc_html( $d['version'] ?? '—' ) . '</td><td>' . $st . '</td></tr>';
+			$st = $d ? ( version_compare( $d['version'], $p['version'], '>' ) ? '<b style="color:#b8481c">Има нова версия. <a href="' . esc_url( admin_url( 'plugins.php' ) ) . '">Отвори „Плъгини“</a>, за да я инсталираш.</b>' : '<span style="color:#1f7a4d">Не е намерена по-нова версия.</span>' ) : '<b style="color:#d64545">' . esc_html( $r['error'] ?: 'Не е получена информация за версията.' ) . '</b>';
+			echo '<tr><td><b>' . esc_html( $p['name'] ) . '</b></td><td><a href="https://github.com/' . esc_attr( $p['repo'] ) . '/releases" target="_blank">' . esc_html( $p['repo'] ) . '</a></td><td>' . esc_html( $p['version'] ) . '</td><td>' . esc_html( $d['version'] ?? 'Няма данни' ) . '</td><td>' . $st . '</td></tr>';
 		}
-		echo '</tbody></table><p><a class="button button-primary" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=logador_gh_check' ), 'logador_gh_check' ) ) . '">Провери сега</a> &nbsp; <span class="description">Иначе се проверява на 6 ч. Auto-updates се включват от Plugins → „Enable auto-updates“ за всеки плъгин.</span></p></div>';
+		echo '</tbody></table><p><a class="button button-primary" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=logador_gh_check' ), 'logador_gh_check' ) ) . '">Провери за обновявания</a> &nbsp; <span class="description">Резултатите от GitHub се пазят до 6 часа. За нова проверка използвай бутона. Автоматичното обновяване се включва за всеки плъгин от страницата „Плъгини“.</span></p></div>';
 	}
 }
 LOGADOR_GitHub_Updater::instance();

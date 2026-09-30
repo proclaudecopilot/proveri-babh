@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: БАБХ Регистър v6
- * Description: Регистър на хранителните добавки — публично търсене (shortcode [babh_register]), REST API, ETL за Excel файлове от БАБХ, автоматично обновяване от портала на БАБХ по график, diff между качвания, регулаторни флагове. Работи паралелно с v5.6 (отделни таблици).
- * Version: 6.2.0
+ * Plugin Name: Регистър на добавките — версия 6
+ * Description: Търсене в данни от регистъра на хранителните добавки на БАБХ. Качване на Excel файловете на регистъра или автоматично изтегляне от портала на БАБХ по график, преглед на продукти, профили на производители и търговци, изтегляне на резултатите в CSV. За вграждане в страница: [babh_register].
+ * Version: 6.3.0
  * GitHub Plugin URI: proclaudecopilot/proveri-babh
  * Author: BABH Register
  * Requires PHP: 7.4
@@ -11,7 +11,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BABH6_VERSION', '6.2.0');
+define('BABH6_VERSION', '6.3.0');
 define('BABH6_PATH', plugin_dir_path(__FILE__));
 define('BABH6_URL', plugin_dir_url(__FILE__));
 
@@ -63,11 +63,11 @@ add_action( 'admin_init', function () {
 	if ( ! is_dir( $dir ) ) @wp_mkdir_p( $dir );
 	if ( ! is_dir( $dir ) || ! is_writable( $dir ) || ! @copy( $src, $dst ) ) {
 		add_action( 'admin_notices', function () use ( $src, $dir ) {
-			echo '<div class="notice notice-warning"><p><b>БАБХ Регистър v6:</b> не мога да запиша <code>logador-github-updater.php</code> в <code>' . esc_html( $dir ) . '</code> (права). Копирай го ръчно от <code>' . esc_html( $src ) . '</code>.</p></div>';
+			echo '<div class="notice notice-warning"><p><b>Регистър на добавките:</b> автоматичното обновяване не е настроено: файлът <code>logador-github-updater.php</code> не може да бъде записан в <code>' . esc_html( $dir ) . '</code>. Провери правата за запис или копирай файла ръчно от <code>' . esc_html( $src ) . '</code>.</p></div>';
 		} );
 		return;
 	}
 	add_action( 'admin_notices', function () use ( $want ) {
-		echo '<div class="notice notice-success is-dismissible"><p><b>LOGADOR GitHub Updater ' . esc_html( $want ) . '</b> е инсталиран. Token-ът се слага веднъж в <a href="' . esc_url( admin_url( 'options-general.php?page=logador-github' ) ) . '">Settings → GitHub ъпдейти</a>.</p></div>';
+		echo '<div class="notice notice-success is-dismissible"><p><b>LOGADOR GitHub Updater ' . esc_html( $want ) . '</b> е инсталиран. При нужда от достъп до частно хранилище ключът за достъп до GitHub се задава в <a href="' . esc_url( admin_url( 'options-general.php?page=logador-github' ) ) . '">Настройки → Обновявания от GitHub</a>.</p></div>';
 	} );
 } );
