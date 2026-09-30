@@ -240,3 +240,36 @@ body.babh6-body { margin: 0; background: #ECECE8; font-family: 'Geist', system-u
 .b6-page .b6-layout { min-height: calc(100vh - 130px); }
 .b6-site-f { text-align: center; font-size: 11.5px; color: #9AA0AB; padding: 16px 10px 0; line-height: 1.6; }
 @media (max-width: 680px) { .b6-page { padding: 8px 8px 36px; } }
+
+/* ===== Password gate ===== */
+.b6-gate { min-height: 70vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0E1116, #1B232E); border-radius: 18px; padding: 30px 16px; font-family: 'Geist', system-ui, sans-serif; }
+.b6-gate-card { width: 340px; max-width: 100%; text-align: center; }
+.b6-gate-t { font-size: 20px; font-weight: 600; color: #fff; letter-spacing: -.4px; }
+.b6-gate-s { font-size: 13px; color: #9CA3AF; margin: 6px 0 18px; }
+.b6-gate input { width: 100%; padding: 12px 14px; font-size: 14px; background: #1A1F26; border: 1px solid #262C36; border-radius: 9px; color: #fff; text-align: center; margin-bottom: 10px; }
+.b6-gate input:focus { border-color: #E66A3D; }
+.b6-gate button { width: 100%; padding: 12px; font-size: 13.5px; font-weight: 600; background: #E66A3D; color: #fff; border: none; border-radius: 9px; cursor: pointer; }
+.b6-gate button:hover { background: #C5572E; }
+.b6-gate button:disabled { opacity: .6; cursor: default; }
+.b6-gate-err { min-height: 20px; font-size: 12.5px; color: #FCA5A5; margin-top: 10px; }
+
+/* ===== Novel Food ===== */
+.b6-nv { max-width: 680px; }
+.b6-nv-bar { display: flex; gap: 8px; margin-bottom: 14px; }
+.b6-nv-go { padding: 9px 18px; font-size: 13px; font-weight: 600; background: var(--sb); color: #fff; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.b6-nv-go:hover { background: #1F2937; }
+.b6-nv-go:disabled { opacity: .6; cursor: default; }
+.b6-nv-go svg { width: 14px; height: 14px; }
+.b6-nv-card { border: 1px solid; border-radius: 12px; padding: 16px 18px; animation: b6in .25s ease; }
+.b6-nv-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.b6-nv-badge { color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .4px; padding: 4px 11px; border-radius: 100px; }
+.b6-nv-ing { font-size: 15px; font-weight: 600; letter-spacing: -.2px; }
+.b6-nv-cache { font-size: 10.5px; color: var(--t4); font-style: italic; }
+.b6-nv-sum { font-size: 13.5px; line-height: 1.6; font-weight: 500; }
+.b6-nv-meta { font-size: 11.5px; color: var(--t3); margin-top: 8px; }
+.b6-nv-note { font-size: 11px; color: var(--t4); margin-top: 18px; line-height: 1.6; }
+.b6-nv-hrow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 13px; background: var(--bg-card); border: 1px solid var(--bd); border-radius: 8px; margin-bottom: 4px; cursor: pointer; text-align: left; font-size: 13px; transition: all .12s; }
+.b6-nv-hrow:hover { border-color: var(--bd-hover); }
+.b6-nv-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.b6-nv-hn { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b6-nv-hl { font-size: 10.5px; font-weight: 700; letter-spacing: .3px; }

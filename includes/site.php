@@ -53,7 +53,7 @@ function babh6_render_standalone() {
   <div id="babh6-app" class="babh6"><div class="b6-boot">Зарежда регистър…</div></div>
   <footer class="b6-site-f">© <?php echo esc_html(date_i18n('Y')); ?> <?php echo esc_html($site ? $site : 'Проверка на добавки'); ?> · Данни: Българска агенция по безопасност на храните (БАБХ) · Платформата е с информативен характер</footer>
 </div>
-<script>window.BABH6_CFG = { rest: <?php echo wp_json_encode($rest); ?> };</script>
+<script>window.BABH6_CFG = { rest: <?php echo wp_json_encode($rest); ?>, locked: <?php echo babh6_gate_ok() ? '0' : '1'; ?>, hasAI: <?php echo babh6_api_key() !== '' ? '1' : '0'; ?> };</script>
 <script src="<?php echo $js; ?>"></script>
 </body>
 </html><?php

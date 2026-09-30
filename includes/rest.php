@@ -8,19 +8,19 @@ if (!defined('ABSPATH')) exit;
 
 add_action('rest_api_init', function () {
     register_rest_route('babh6/v1', '/products', array(
-        'methods' => 'GET', 'callback' => 'babh6_rest_products', 'permission_callback' => '__return_true',
+        'methods' => 'GET', 'callback' => 'babh6_rest_products', 'permission_callback' => 'babh6_rest_permission',
     ));
     register_rest_route('babh6/v1', '/product/(?P<reg>[^/]+)', array(
-        'methods' => 'GET', 'callback' => 'babh6_rest_product', 'permission_callback' => '__return_true',
+        'methods' => 'GET', 'callback' => 'babh6_rest_product', 'permission_callback' => 'babh6_rest_permission',
     ));
     register_rest_route('babh6/v1', '/stats', array(
-        'methods' => 'GET', 'callback' => 'babh6_rest_stats', 'permission_callback' => '__return_true',
+        'methods' => 'GET', 'callback' => 'babh6_rest_stats', 'permission_callback' => 'babh6_rest_permission',
     ));
     register_rest_route('babh6/v1', '/export', array(
-        'methods' => 'GET', 'callback' => 'babh6_rest_export', 'permission_callback' => '__return_true',
+        'methods' => 'GET', 'callback' => 'babh6_rest_export', 'permission_callback' => 'babh6_rest_permission',
     ));
     register_rest_route('babh6/v1', '/waitlist', array(
-        'methods' => 'POST', 'callback' => 'babh6_rest_waitlist', 'permission_callback' => '__return_true',
+        'methods' => 'POST', 'callback' => 'babh6_rest_waitlist', 'permission_callback' => 'babh6_rest_permission',
     ));
 });
 

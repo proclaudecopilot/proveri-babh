@@ -21,7 +21,9 @@ function babh6_shortcode() {
     wp_enqueue_style('babh6');
     wp_enqueue_script('babh6');
     wp_localize_script('babh6', 'BABH6_CFG', array(
-        'rest' => esc_url_raw(untrailingslashit(rest_url('babh6/v1'))),
+        'rest'   => esc_url_raw(untrailingslashit(rest_url('babh6/v1'))),
+        'locked' => babh6_gate_ok() ? 0 : 1,
+        'hasAI'  => babh6_api_key() !== '' ? 1 : 0,
     ));
     return '<div id="babh6-app" class="babh6"><div class="b6-boot">Зарежда регистър…</div></div>';
 }

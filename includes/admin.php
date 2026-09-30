@@ -59,6 +59,17 @@ add_action('wp_ajax_babh6_cancel', function () {
     wp_send_json_success(array('ok' => 1));
 });
 
+
+/* ============ Settings save ============ */
+add_action('admin_post_babh6_settings', function () {
+    if (!current_user_can('manage_options')) wp_die('Недостатъчни права.');
+    check_admin_referer('babh6_settings');
+    update_option('babh6_anthropic_key', sanitize_text_field(wp_unslash($_POST['babh6_key'] ?? '')), false);
+    update_option('babh6_password', sanitize_text_field(wp_unslash($_POST['babh6_pw'] ?? '')), false);
+    wp_safe_redirect(add_query_arg('babh6_saved', 1, admin_url('admin.php?page=babh6')));
+    exit;
+});
+
 /* ============ Dashboard ============ */
 function babh6_admin_dashboard() {
     global $wpdb;
@@ -197,6 +208,26 @@ function babh6_admin_dashboard() {
     echo '<p><input type="file" name="babh6_file" accept=".xlsx" required></p>';
     submit_button('Качи и обработи', 'primary', 'submit', false);
     echo '</form></div>';
+
+    /* ===== Settings ===== */
+    if (isset($_GET['babh6_saved'])) {
+        echo '<div class="notice notice-success is-dismissible"><p>Настройките са запазени.</p></div>';
+    }
+    $api_key = babh6_api_key();
+    $pw      = babh6_password();
+    echo '<div style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:18px 20px;max-width:640px;margin-bottom:20px">';
+    echo '<h2 style="margin-top:0">Настройки</h2>';
+    echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+    wp_nonce_field('babh6_settings');
+    echo '<input type="hidden" name="action" value="babh6_settings">';
+    echo '<p style="margin-bottom:4px"><b>Anthropic API ключ</b> — включва Novel Food AI проверката на фронтенда.</p>';
+    echo '<input type="password" name="babh6_key" value="' . esc_attr($api_key) . '" placeholder="sk-ant-api03-…" style="width:100%;max-width:460px;font-family:monospace" autocomplete="new-password">';
+    echo $api_key ? '<p style="color:#00a32a;font-size:12px;margin-top:4px">✓ Конфигуриран (' . esc_html(substr($api_key, 0, 12)) . '…)</p>' : '<p style="color:#787c82;font-size:12px;margin-top:4px">Без ключ Novel Food табът показва „Скоро“ + waitlist.</p>';
+    echo '<p style="margin:14px 0 4px"><b>Парола за достъп до сайта</b> — празно = публичен. С парола целият фронтенд и API са заключени (cookie 30 дни).</p>';
+    echo '<input type="text" name="babh6_pw" value="' . esc_attr($pw) . '" placeholder="Без парола (публичен)" style="width:100%;max-width:300px">';
+    echo '<p style="margin-top:14px">';
+    submit_button('Запази настройките', 'primary', 'submit', false);
+    echo '</p></form></div>';
 
     /* ===== Health ===== */
     $upload_max = ini_get('upload_max_filesize');

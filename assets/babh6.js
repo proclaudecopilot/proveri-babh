@@ -81,6 +81,7 @@ function api(path, params) {
     if (parts.length) qs = '?' + parts.join('&');
   }
   return fetch(CFG.rest + path + qs, { credentials: 'same-origin' }).then(function (r) {
+    if (r.status === 401) { location.reload(); throw new Error('locked'); }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   });
@@ -117,6 +118,38 @@ function classifyIng(n) {
     }
   }
   return '';
+}
+
+/* ===== Password gate ===== */
+function renderGate() {
+  root.innerHTML =
+    '<div class="b6-gate"><div class="b6-gate-card">' +
+      '<div class="b6-mark" style="margin:0 auto 14px"></div>' +
+      '<div class="b6-gate-t">БАБХ Регистър</div>' +
+      '<div class="b6-gate-s">Достъпът е ограничен. Въведи парола.</div>' +
+      '<input type="password" id="b6-gate-pw" placeholder="Парола…" autocomplete="current-password">' +
+      '<button id="b6-gate-go">Влез</button>' +
+      '<div class="b6-gate-err" id="b6-gate-err"></div>' +
+    '</div></div>';
+  var inp = $('#b6-gate-pw'), go = $('#b6-gate-go'), err = $('#b6-gate-err');
+  function submit() {
+    var pw = inp.value;
+    if (!pw) { inp.focus(); return; }
+    go.disabled = true; go.textContent = 'Проверявам…'; err.textContent = '';
+    fetch(CFG.rest + '/auth', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        if (x.ok) { location.reload(); return; }
+        go.disabled = false; go.textContent = 'Влез';
+        err.textContent = (x.d && x.d.message) ? x.d.message : 'Грешна парола.';
+      }).catch(function () { go.disabled = false; go.textContent = 'Влез'; err.textContent = 'Грешка при връзка.'; });
+  }
+  go.addEventListener('click', submit);
+  inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  setTimeout(function () { inp.focus(); }, 100);
 }
 
 /* ===== Shell ===== */
@@ -223,7 +256,7 @@ function render() {
     case 'flagged': renderRegister(c); break;
     case 'producers': renderSoon(c, 'Производители', 'Пълни профили на фирмите — каталог, клиенти, история, справки за печат и CSV. Идва в следващото обновление на платформата.', 'producers', false); break;
     case 'traders': renderSoon(c, 'Търговци', 'Профили на търговците и вносителите — доставчици, внос по държави, каталози. Идва в следващото обновление на платформата.', 'traders', false); break;
-    case 'novel': renderSoon(c, 'Novel Food търсачка', 'Проверка на съставки срещу EU Novel Food Catalogue и EFSA становища, bulk проверка от етикет, PDF доклад с цитати.', 'novel', true); break;
+    case 'novel': if (CFG.hasAI == 1) { renderNovel(c); } else { renderSoon(c, 'Novel Food търсачка', 'Проверка на съставки срещу EU Novel Food Catalogue и EFSA становища, bulk проверка от етикет, PDF доклад с цитати.', 'novel', true); } break;
     case 'inspector': renderSoon(c, 'Инспектор', 'Diff между качванията на регистъра: нови регистрации, тихи заличавания, промени в състав, аномалии.', 'inspector', true); break;
     case 'watchlist': renderSoon(c, 'Абонаменти за промени', 'Email известие, когато следена фирма или съставка се появи в нова регистрация. Никой друг не го прави за БАБХ регистъра.', 'watchlist', true); break;
   }
@@ -454,6 +487,80 @@ function bodyHTML(p) {
   '</div></div>';
 }
 
+var NV_STATUS = {
+  banned:  { cls: 'danger', bg: 'var(--red-bg)',   bd: 'var(--red-line)',   fg: 'var(--red)' },
+  ok:      { cls: 'ok',     bg: 'var(--green-bg)', bd: '#BFE3CC',           fg: 'var(--green)' },
+  caution: { cls: 'warn',   bg: 'var(--amber-bg)', bd: 'var(--amber-line)', fg: 'var(--amber)' },
+  pending: { cls: 'info',   bg: 'var(--blue-bg)',  bd: '#C3D8F5',           fg: 'var(--blue)' }
+};
+var nvHistory = [];
+function renderNovel(c) {
+  c.innerHTML =
+    '<div class="b6-head"><div>' +
+      '<div class="b6-title">Novel Food търсачка</div>' +
+      '<div class="b6-sub">Проверка на съставка срещу EU Novel Food Catalogue и Union List — с AI и уеб търсене в реално време. Резултатите се кешират 7 дни.</div>' +
+    '</div></div>' +
+    '<div class="b6-nv">' +
+      '<div class="b6-nv-bar">' +
+        '<div class="b6-fq" style="flex:1">' + I.search + '<input id="b6-nv-q" type="text" placeholder="Напр. туркестерон, NMN, berberine, ashwagandha…" autocomplete="off"></div>' +
+        '<button class="b6-nv-go" id="b6-nv-go">' + I.flask + ' Провери</button>' +
+      '</div>' +
+      '<div id="b6-nv-res"></div>' +
+      '<div id="b6-nv-hist"></div>' +
+      '<div class="b6-nv-note">Инструментът е информативен и не замества правна консултация. Източник: EU Novel Food Catalogue, Union List (Reg. 2017/2470).</div>' +
+    '</div>';
+  var inp = $('#b6-nv-q'), go = $('#b6-nv-go'), res = $('#b6-nv-res');
+  function renderHist() {
+    var h = $('#b6-nv-hist');
+    if (!nvHistory.length) { h.innerHTML = ''; return; }
+    h.innerHTML = '<div class="b6-sec-l" style="margin:18px 0 8px">Последни проверки</div>' +
+      nvHistory.map(function (r, i) {
+        var st = NV_STATUS[r.status] || NV_STATUS.caution;
+        return '<button class="b6-nv-hrow" data-h="' + i + '"><span class="b6-nv-dot" style="background:' + st.fg + '"></span><span class="b6-nv-hn">' + esc(r.ingredient) + '</span><span class="b6-nv-hl" style="color:' + st.fg + '">' + esc(r.label_bg) + '</span></button>';
+      }).join('');
+    $$('.b6-nv-hrow').forEach(function (b) {
+      b.addEventListener('click', function () { showResult(nvHistory[parseInt(b.getAttribute('data-h'), 10)]); });
+    });
+  }
+  function showResult(r) {
+    var st = NV_STATUS[r.status] || NV_STATUS.caution;
+    res.innerHTML =
+      '<div class="b6-nv-card" style="background:' + st.bg + ';border-color:' + st.bd + '">' +
+        '<div class="b6-nv-top"><span class="b6-nv-badge" style="background:' + st.fg + '">' + esc(r.label_bg) + '</span><span class="b6-nv-ing">' + esc(r.ingredient) + '</span>' + (r.cached ? '<span class="b6-nv-cache">от кеш</span>' : '') + '</div>' +
+        '<div class="b6-nv-sum" style="color:' + st.fg + '">' + esc(r.summary_bg) + '</div>' +
+        '<div class="b6-nv-meta">' + (r.source ? 'Източник: ' + esc(r.source) + ' · ' : '') + 'Сигурност: ' + esc(r.confidence || '—') + '</div>' +
+      '</div>';
+  }
+  function check() {
+    var q = (inp.value || '').trim();
+    if (q.length < 2) { inp.focus(); return; }
+    go.disabled = true; go.innerHTML = 'Проверявам…';
+    res.innerHTML = '<div class="b6-sk"><div class="b6-sk-line" style="width:35%"></div><div class="b6-sk-line" style="width:85%;margin-top:10px"></div><div class="b6-sk-line" style="width:60%;margin-top:8px"></div></div>';
+    fetch(CFG.rest + '/novel-check', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingredient: q })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        go.disabled = false; go.innerHTML = I.flask + ' Провери';
+        if (!x.ok) {
+          res.innerHTML = '<div class="b6-nv-card" style="background:var(--red-bg);border-color:var(--red-line)"><div class="b6-nv-sum" style="color:var(--red)">' + esc((x.d && x.d.message) || 'Грешка при проверката.') + '</div></div>';
+          return;
+        }
+        showResult(x.d);
+        nvHistory = [x.d].concat(nvHistory.filter(function (h) { return h.ingredient !== x.d.ingredient; })).slice(0, 8);
+        renderHist();
+      }).catch(function () {
+        go.disabled = false; go.innerHTML = I.flask + ' Провери';
+        res.innerHTML = '<div class="b6-nv-card" style="background:var(--red-bg);border-color:var(--red-line)"><div class="b6-nv-sum" style="color:var(--red)">Грешка при връзка — опитай пак.</div></div>';
+      });
+  }
+  go.addEventListener('click', check);
+  inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') check(); });
+  renderHist();
+  setTimeout(function () { inp.focus(); }, 100);
+}
+
 function renderSoon(c, title, desc, source, isPro) {
   c.innerHTML =
     '<div class="b6-head"><div><div class="b6-title">' + esc(title) + '</div></div></div>' +
@@ -482,6 +589,7 @@ function renderSoon(c, title, desc, source, isPro) {
 }
 
 /* ===== Init ===== */
+if (String(CFG.locked) === '1') { renderGate(); return; }
 renderShell();
 var m = location.hash.match(/#p=([^&]+)/);
 if (m) { state.q = decodeURIComponent(m[1]); state.deepReg = state.q; }
