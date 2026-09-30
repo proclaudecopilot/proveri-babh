@@ -61,6 +61,18 @@ function babh6_build_where($req, &$where, &$args) {
     $obl = sanitize_text_field((string)$req->get_param('obl'));
     if ($obl !== '') { $where[] = 'oblast = %s'; $args[] = $obl; }
 
+    /* Филтри по фирма (от профилите в Pro) — по нормализирания ключ */
+    $pn = (string)$req->get_param('producer');
+    if ($pn !== '') { $where[] = 'producer_norm = %s'; $args[] = mb_substr($pn, 0, 191, 'UTF-8'); }
+    $tn = (string)$req->get_param('trader');
+    if ($tn !== '') { $where[] = 'trader_norm = %s'; $args[] = mb_substr($tn, 0, 191, 'UTF-8'); }
+    if ($req->get_param('own')) {
+        /* продукти без насрещна фирма (собствена марка / без търговец) */
+        if ($pn !== '') $where[] = "(trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)";
+        elseif ($tn !== '') $where[] = "(producer_kind <> 'firm' OR producer_norm = '' OR producer_norm = trader_norm)";
+    }
+    if ($req->get_param('deleted')) { $where[0] = 'deleted_at IS NOT NULL'; }
+
     if ($req->get_param('recent')) {
         $where[] = 'notif_date >= %s';
         $args[]  = gmdate('Y-m-d', strtotime('-12 months'));
@@ -144,8 +156,10 @@ function babh6_row_to_item($r) {
         'n'    => $r->name,
         'p'    => $r->producer_name,
         'pk'   => $r->producer_kind,
+        'pn'   => isset($r->producer_norm) ? $r->producer_norm : '',
         'tr'   => $r->trader_name,
         'tk'   => $r->trader_kind,
+        'tn'   => isset($r->trader_norm) ? $r->trader_norm : '',
         'c'    => $r->composition,
         'pp'   => $r->purpose,
         'st'   => $r->storage,
@@ -173,7 +187,7 @@ function babh6_rest_products($req) {
     $offset = ($page - 1) * $per;
 
     $order = babh6_order_sql((string)$req->get_param('sort'));
-    $cols  = 'reg, rtype, ryear, oblast, name, purpose, composition, producer_name, producer_kind, trader_name, trader_kind, storage, notif_date, launch_date, deletion, category, flags, flag_count';
+    $cols  = 'reg, rtype, ryear, oblast, name, purpose, composition, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, storage, notif_date, launch_date, deletion, category, flags, flag_count';
 
     $rows = $wpdb->get_results($wpdb->prepare(
         "SELECT $cols FROM $t WHERE $wsql ORDER BY $order LIMIT %d OFFSET %d",
