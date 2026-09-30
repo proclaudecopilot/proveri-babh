@@ -1,0 +1,160 @@
+<?php
+if (!defined('ABSPATH')) exit;
+
+/**
+ * Pro: профили на производители и търговци.
+ *
+ *   GET /parties?kind=p|t&q=&sort=&page=&per=&bg=1   — списък фирми с брой продукти, партньори, флагове
+ *   GET /party?kind=p|t&norm=…                       — профил: партньори (клиенти / доставчици) с брой продукти при всеки,
+ *                                                       собствени продукти, категории, регистрации по години
+ *
+ * Достъп (Pro): логнат администратор ИЛИ сайтът е с парола и посетителят я е въвел.
+ * Без парола на сайта (напълно публичен) Pro частта остава „Скоро" + waitlist.
+ */
+
+function babh6_pro_ok() {
+    if (current_user_can('manage_options')) return true;
+    return babh6_password() !== '' && babh6_gate_ok();
+}
+
+function babh6_rest_permission_pro() {
+    if (!babh6_gate_ok()) return new WP_Error('babh6_locked', 'Достъпът изисква парола.', array('status' => 401));
+    if (!babh6_pro_ok()) return new WP_Error('babh6_pro', 'Pro функция.', array('status' => 403));
+    return true;
+}
+
+add_action('rest_api_init', function () {
+    register_rest_route('babh6/v1', '/parties', array(
+        'methods' => 'GET', 'callback' => 'babh6_rest_parties', 'permission_callback' => 'babh6_rest_permission_pro',
+    ));
+    register_rest_route('babh6/v1', '/party', array(
+        'methods' => 'GET', 'callback' => 'babh6_rest_party', 'permission_callback' => 'babh6_rest_permission_pro',
+    ));
+});
+
+function babh6_party_kind($req) {
+    $k = (string)$req->get_param('kind');
+    return $k === 't' ? 't' : 'p';
+}
+
+/* ============ GET /parties ============ */
+function babh6_rest_parties($req) {
+    global $wpdb;
+    $pt   = babh6_table('parties');
+    $kind = babh6_party_kind($req);
+
+    $where = array('kind = %s');
+    $args  = array($kind);
+    if ($req->get_param('bg')) $where[] = 'is_bg = 1';
+    $q = trim((string)$req->get_param('q'));
+    if ($q !== '' && mb_strlen($q, 'UTF-8') >= 2) {
+        $ors = array();
+        foreach (babh6_query_variants($q) as $v) {
+            $ors[] = 'name LIKE %s'; $args[] = '%' . $wpdb->esc_like($v) . '%';
+            $ors[] = 'norm LIKE %s'; $args[] = '%' . $wpdb->esc_like(babh6_norm_firm($v)) . '%';
+        }
+        $where[] = '(' . implode(' OR ', $ors) . ')';
+    }
+    $wsql = implode(' AND ', $where);
+
+    $sorts = array(
+        'products' => 'product_count DESC, name ASC',
+        'partners' => 'partner_count DESC, product_count DESC',
+        'flagged'  => 'flagged_count DESC, product_count DESC',
+        'name'     => 'name ASC',
+        'newest'   => 'last_year DESC, product_count DESC',
+    );
+    $sort  = (string)$req->get_param('sort');
+    $order = isset($sorts[$sort]) ? $sorts[$sort] : $sorts['products'];
+
+    $page = max(1, (int)$req->get_param('page'));
+    $per  = (int)$req->get_param('per');
+    if ($per < 1 || $per > 100) $per = 40;
+    $offset = ($page - 1) * $per;
+
+    $total = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $pt WHERE $wsql", $args));
+    $rows  = $wpdb->get_results($wpdb->prepare(
+        "SELECT norm, name, is_bg, product_count, flagged_count, partner_count, first_year, last_year
+         FROM $pt WHERE $wsql ORDER BY $order LIMIT %d OFFSET %d",
+        array_merge($args, array($per, $offset))
+    ));
+    $items = array();
+    foreach ((array)$rows as $r) {
+        $items[] = array(
+            'norm' => $r->norm, 'name' => $r->name, 'bg' => (int)$r->is_bg,
+            'products' => (int)$r->product_count, 'flagged' => (int)$r->flagged_count, 'partners' => (int)$r->partner_count,
+            'y1' => $r->first_year ? (int)$r->first_year : null, 'y2' => $r->last_year ? (int)$r->last_year : null,
+        );
+    }
+    $sums = $wpdb->get_row($wpdb->prepare("SELECT COUNT(*) AS n, SUM(is_bg) AS bg FROM $pt WHERE kind = %s", $kind));
+    return rest_ensure_response(array(
+        'kind' => $kind, 'total' => $total, 'page' => $page, 'per' => $per, 'items' => $items,
+        'all' => (int)$sums->n, 'all_bg' => (int)$sums->bg,
+    ));
+}
+
+/* ============ GET /party/{kind}/{norm} ============ */
+function babh6_rest_party($req) {
+    global $wpdb;
+    $t    = babh6_table('products');
+    $pt   = babh6_table('parties');
+    $kind = babh6_party_kind($req);
+    $norm = mb_substr((string)$req->get_param('norm'), 0, 191, 'UTF-8');
+
+    $party = $wpdb->get_row($wpdb->prepare("SELECT * FROM $pt WHERE kind = %s AND norm = %s", $kind, $norm));
+    if (!$party) return new WP_Error('babh6_notfound', 'Фирмата не е намерена.', array('status' => 404));
+
+    /* own = колоната на фирмата; other = насрещната страна */
+    $own_norm   = $kind === 'p' ? 'producer_norm' : 'trader_norm';
+    $other_norm = $kind === 'p' ? 'trader_norm'   : 'producer_norm';
+    $other_name = $kind === 'p' ? 'trader_name'   : 'producer_name';
+    $other_kind = $kind === 'p' ? 'trader_kind'   : 'producer_kind';
+
+    $partners = $wpdb->get_results($wpdb->prepare(
+        "SELECT $other_norm AS norm, SUBSTRING_INDEX(MAX($other_name), ',', 1) AS name,
+                COUNT(*) AS c, SUM(CASE WHEN flag_count > 0 THEN 1 ELSE 0 END) AS f,
+                MIN(notif_date) AS d1, MAX(notif_date) AS d2, MAX(ryear) AS y2
+         FROM $t
+         WHERE deleted_at IS NULL AND $own_norm = %s AND $other_kind = 'firm' AND $other_norm <> '' AND $other_norm <> $own_norm
+         GROUP BY $other_norm ORDER BY c DESC, name ASC LIMIT 500",
+        $norm
+    ));
+    $total = (int)$party->product_count;
+    $plist = array();
+    foreach ((array)$partners as $p) {
+        $plist[] = array(
+            'norm' => $p->norm, 'name' => trim((string)$p->name), 'count' => (int)$p->c, 'flagged' => (int)$p->f,
+            'first' => $p->d1, 'last' => $p->d2, 'y2' => $p->y2 ? (int)$p->y2 : null,
+            'share' => $total ? round(100 * (int)$p->c / $total, 1) : 0,
+        );
+    }
+
+    /* Без насрещна фирма: собствена марка / без търговец / насрещната страна е държава */
+    $own = (int)$wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $t WHERE deleted_at IS NULL AND $own_norm = %s
+         AND ($other_kind <> 'firm' OR $other_norm = '' OR $other_norm = $own_norm)", $norm));
+
+    $labels = array('other' => 'Други');
+    foreach (babh6_categories() as $c) $labels[$c[0]] = $c[1];
+    $cats = array();
+    foreach ((array)$wpdb->get_results($wpdb->prepare(
+        "SELECT category, COUNT(*) AS c FROM $t WHERE deleted_at IS NULL AND $own_norm = %s GROUP BY category ORDER BY c DESC LIMIT 8", $norm)) as $r) {
+        $code = $r->category ? $r->category : 'other';
+        $cats[] = array('code' => $code, 'label' => isset($labels[$code]) ? $labels[$code] : $code, 'count' => (int)$r->c);
+    }
+    $years = array();
+    foreach ((array)$wpdb->get_results($wpdb->prepare(
+        "SELECT ryear AS y, COUNT(*) AS c FROM $t WHERE deleted_at IS NULL AND $own_norm = %s AND ryear IS NOT NULL GROUP BY ryear ORDER BY ryear ASC", $norm)) as $r) {
+        $years[] = array('y' => (int)$r->y, 'c' => (int)$r->c);
+    }
+    $deleted = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE deleted_at IS NOT NULL AND $own_norm = %s", $norm));
+    $full_name = (string)$wpdb->get_var($wpdb->prepare(
+        "SELECT " . ($kind === 'p' ? 'producer_name' : 'trader_name') . " FROM $t WHERE $own_norm = %s ORDER BY LENGTH(" . ($kind === 'p' ? 'producer_name' : 'trader_name') . ") DESC LIMIT 1", $norm));
+
+    return rest_ensure_response(array(
+        'kind' => $kind, 'norm' => $party->norm, 'name' => $party->name, 'full' => $full_name, 'bg' => (int)$party->is_bg,
+        'products' => $total, 'flagged' => (int)$party->flagged_count, 'deleted' => $deleted,
+        'y1' => $party->first_year ? (int)$party->first_year : null, 'y2' => $party->last_year ? (int)$party->last_year : null,
+        'own' => $own, 'partners' => $plist, 'cats' => $cats, 'years' => $years,
+    ));
+}

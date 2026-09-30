@@ -62,6 +62,7 @@ function babh6_create_tables() {
         is_bg TINYINT(1) NOT NULL DEFAULT 0,
         product_count INT UNSIGNED NOT NULL DEFAULT 0,
         flagged_count INT UNSIGNED NOT NULL DEFAULT 0,
+        partner_count INT UNSIGNED NOT NULL DEFAULT 0,
         first_year SMALLINT UNSIGNED NULL,
         last_year SMALLINT UNSIGNED NULL,
         updated_at DATETIME NOT NULL,

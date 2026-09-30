@@ -426,14 +426,16 @@ function babh6_rebuild_parties() {
 
     $wpdb->query("TRUNCATE TABLE $parties_t");
 
-    foreach (array('p' => array('producer_norm', 'producer_name', 'producer_kind'),
-                   't' => array('trader_norm', 'trader_name', 'trader_kind')) as $kind => $cols) {
-        list($norm_col, $name_col, $kind_col) = $cols;
+    foreach (array('p' => array('producer_norm', 'producer_name', 'producer_kind', 'trader_norm', 'trader_kind'),
+                   't' => array('trader_norm', 'trader_name', 'trader_kind', 'producer_norm', 'producer_kind')) as $kind => $cols) {
+        list($norm_col, $name_col, $kind_col, $other_norm, $other_kind) = $cols;
+        /* partner_count: различни насрещни фирми (клиенти на производителя / доставчици на търговеца) */
         $agg = $wpdb->get_results(
             "SELECT $norm_col AS norm,
                     SUBSTRING_INDEX(MAX($name_col), ',', 1) AS name,
                     COUNT(*) AS cnt,
                     SUM(CASE WHEN flag_count > 0 THEN 1 ELSE 0 END) AS flagged,
+                    COUNT(DISTINCT CASE WHEN $other_kind = 'firm' AND $other_norm <> '' AND $other_norm <> $norm_col THEN $other_norm END) AS partners,
                     MIN(ryear) AS y1, MAX(ryear) AS y2
              FROM $products_t
              WHERE $kind_col = 'firm' AND $norm_col <> '' AND deleted_at IS NULL
@@ -448,17 +450,18 @@ function babh6_rebuild_parties() {
                 babh6_is_bg_firm((string)$a->name) ? 1 : 0,
                 intval($a->cnt),
                 intval($a->flagged),
+                intval($a->partners),
                 $a->y1 ? intval($a->y1) : 'NULL',
                 $a->y2 ? intval($a->y2) : 'NULL',
                 $wpdb->prepare('%s', $now),
             )) . ')';
             if (count($batch) >= 300) {
-                $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
+                $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
                 $batch = array();
             }
         }
         if ($batch) {
-            $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
+            $wpdb->query("INSERT INTO $parties_t (kind,norm,name,is_bg,product_count,flagged_count,partner_count,first_year,last_year,updated_at) VALUES " . implode(',', $batch));
         }
     }
 }
