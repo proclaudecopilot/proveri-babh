@@ -2,7 +2,7 @@
 /**
  * Plugin Name: БАБХ Регистър v6
  * Description: Регистър на хранителните добавки — публично търсене (shortcode [babh_register]), REST API, ETL за Excel файлове от БАБХ, автоматично обновяване от портала на БАБХ по график, diff между качвания, регулаторни флагове. Работи паралелно с v5.6 (отделни таблици).
- * Version: 6.1.1
+ * Version: 6.1.2
  * GitHub Plugin URI: proclaudecopilot/proveri-babh
  * Author: BABH Register
  * Requires PHP: 7.4
@@ -11,7 +11,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BABH6_VERSION', '6.1.1');
+define('BABH6_VERSION', '6.1.2');
 define('BABH6_PATH', plugin_dir_path(__FILE__));
 define('BABH6_URL', plugin_dir_url(__FILE__));
 
