@@ -205,6 +205,7 @@ function babh6_sync_fetch_page($url, $strategy = array()) {
     $t0  = microtime(true);
     $res = wp_remote_get($url, babh6_sync_http_args(array('timeout' => $timeout, 'stream' => true, 'filename' => $tmp), $strategy));
     $secs = round(microtime(true) - $t0, 1);
+    $GLOBALS['babh6_sync_curl'] = null;
     $body = is_file($tmp) ? (string)file_get_contents($tmp) : '';
     @unlink($tmp);
     $bytes = strlen($body);
