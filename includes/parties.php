@@ -109,15 +109,16 @@ function babh6_rest_party($req) {
     if (!$party) return new WP_Error('babh6_notfound', 'Фирмата не е намерена в наличните данни.', array('status' => 404));
 
     /* own = колоната на фирмата; other = насрещната страна.
-       Търговецът е „ефективен“: посоченият в регистъра, а ако липсва — определеният по името (trader_inf_*). */
-    $eff_norm = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm)";
-    $eff_name = "IF(trader_inf_norm <> '', trader_inf_name, trader_name)";
+       Търговецът е „ефективен“ (babh6_eff_trader_sql): предположен по името → посочен → самият производител. */
+    $eff = babh6_eff_trader_sql();
+    $eff_norm = $eff['norm'];
+    $eff_name = $eff['name'];
     if ($kind === 'p') {
         $own_cond   = 'producer_norm = %s';
         $other_norm = $eff_norm;
         $other_name = $eff_name;
-        $other_ok   = "(trader_inf_norm <> '' OR (trader_kind = 'firm' AND trader_norm <> '' AND trader_norm <> producer_norm))";
-        $none_cond  = "trader_inf_norm = '' AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)";
+        $other_ok   = "($eff_norm <> '' AND $eff_norm <> producer_norm)";
+        $none_cond  = "($eff_norm = '' OR $eff_norm = producer_norm)";
     } else {
         $own_cond   = "$eff_norm = %s";
         $other_norm = 'producer_norm';
@@ -224,7 +225,7 @@ function babh6_rest_party($req) {
     foreach ($mkeys as $i => $k) { $c = isset($mmap[$k]) ? $mmap[$k] : 0; $monthly[] = array('m' => $k, 'c' => $c); if ($i >= 12) $recent12 += $c; else $prev12 += $c; }
     $latest = array();
     foreach ((array)$wpdb->get_results($wpdb->prepare(
-        "SELECT id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, notif_date, deletion, category, flag_count, deleted_at
+        "SELECT id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, notif_date, deletion, category, flag_count, deleted_at
          FROM $t WHERE deleted_at IS NULL AND $own_cond ORDER BY (notif_date IS NULL) ASC, notif_date DESC, ryear DESC, id DESC LIMIT 6", $norm)) as $r) { $latest[] = babh6_row_to_card($r); }
 
     return rest_ensure_response(array(

@@ -113,19 +113,20 @@ function babh6_build_where($req, &$where, &$args) {
     /* Филтри по фирма (от профилите в Pro) — по нормализирания ключ */
     $pn = (string)$req->get_param('producer');
     if ($pn !== '') { $where[] = 'producer_norm = %s'; $args[] = mb_substr($pn, 0, 191, 'UTF-8'); }
-    /* Търговец: един модел навсякъде (CO-07) — „ефективният“ търговец: определеният по името,
-       ако има такъв, иначе посоченият в регистъра; inferred=0 ограничава до посочените. */
+    /* Търговец: един модел навсякъде (CO-07) — „ефективният“ търговец (babh6_eff_trader_sql): предположеният
+       по името → посоченият в регистъра → самият производител (собствена марка); inferred=0 ограничава до посочените. */
+    $eff = babh6_eff_trader_sql();
     $tn = (string)$req->get_param('trader');
     if ($tn !== '') {
         if ((string)$req->get_param('inferred') === '0') { $where[] = 'trader_norm = %s'; }
-        else { $where[] = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm) = %s"; }
+        else { $where[] = "{$eff['norm']} = %s"; }
         $args[] = mb_substr($tn, 0, 191, 'UTF-8');
     }
     if ((string)$req->get_param('inferred') === '1') $where[] = "trader_inf_norm <> ''";
     if ($req->get_param('own')) {
-        /* продукти без насрещна фирма (без посочен търговец / производител), и нищо определено по името */
-        if ($pn !== '') $where[] = "trader_inf_norm = '' AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm)";
-        elseif ($tn !== '') $where[] = "(producer_kind <> 'firm' OR producer_norm = '' OR producer_norm = IF(trader_inf_norm <> '', trader_inf_norm, trader_norm))";
+        /* продукти без друга насрещна фирма: собствена марка на производителя / собствено производство на търговеца */
+        if ($pn !== '') $where[] = "({$eff['norm']} = '' OR {$eff['norm']} = producer_norm)";
+        elseif ($tn !== '') $where[] = "(producer_kind <> 'firm' OR producer_norm = '' OR producer_norm = {$eff['norm']})";
     }
     $brand = trim((string)$req->get_param('brand'));
     if ($brand !== '' && function_exists('babh6_brand_like_variants')) {
@@ -299,6 +300,8 @@ function babh6_row_to_item($r) {
         'ti'   => $inf ? 1 : 0,
         'tin'  => $inf ? (string)$r->trader_inf_name : '',
         'tinn' => $inf ? (string)$r->trader_inf_norm : '',
+        /* v6.8.1: без посочен търговец → търговецът е самият производител (собствена марка) */
+        'to'   => babh6_row_trader_is_producer($r) ? 1 : 0,
         'c'    => $r->composition,
         'pp'   => $r->purpose,
         'st'   => $r->storage,
@@ -329,6 +332,7 @@ function babh6_row_to_card($r) {
         'tr'   => $first($r->trader_name),
         'tk'   => $r->trader_kind,
         'tn'   => isset($r->trader_norm) ? $r->trader_norm : '',
+        'to'   => babh6_row_trader_is_producer($r) ? 1 : 0,
         'nd'   => $r->notif_date,
         'cat'  => $r->category,
         'catl' => babh6_category_label($r->category ? $r->category : 'other'),
@@ -350,7 +354,7 @@ function babh6_rest_products($req) {
     if ($per < 1 || $per > 50) $per = 20;
     $offset = ($page - 1) * $per;
 
-    $cols = 'id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, notif_date, deletion, category, flag_count, deleted_at';
+    $cols = 'id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, notif_date, deletion, category, flag_count, deleted_at';
     $sel = babh6_products_select($req, $cols, $per, $offset);
     if (is_wp_error($sel)) return $sel;
 

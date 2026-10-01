@@ -559,10 +559,9 @@ function babh6_rebuild_parties() {
     if ($wpdb->query("CREATE TABLE $new_t LIKE $parties_t") === false) return false;
     $parties_t_live = $parties_t; $parties_t = $new_t;
 
-    /* Ефективен търговец: посоченият в регистъра, а ако липсва — определеният по името */
-    $eff_norm = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm)";
-    $eff_name = "IF(trader_inf_norm <> '', trader_inf_name, trader_name)";
-    $eff_ok   = "(trader_inf_norm <> '' OR (trader_kind = 'firm' AND trader_norm <> ''))";
+    /* Ефективен търговец (v6.8.1): предположеният по името → посоченият в регистъра → самият производител (собствена марка) */
+    $eff = babh6_eff_trader_sql();
+    $eff_norm = $eff['norm']; $eff_name = $eff['name'];
     $longest  = function ($col) { return "SUBSTRING(MAX(CONCAT(LPAD(CHAR_LENGTH($col), 5, '0'), $col)), 6)"; };
 
     $kinds = array(
@@ -570,12 +569,12 @@ function babh6_rebuild_parties() {
             'norm'     => 'producer_norm',
             'name'     => 'producer_name',
             'where'    => "producer_kind = 'firm' AND producer_norm <> ''",
-            'partners' => "COUNT(DISTINCT CASE WHEN $eff_ok AND $eff_norm <> '' AND $eff_norm <> producer_norm THEN $eff_norm END)",
+            'partners' => "COUNT(DISTINCT CASE WHEN $eff_norm <> '' AND $eff_norm <> producer_norm THEN $eff_norm END)",
         ),
         't' => array(
             'norm'     => $eff_norm,
             'name'     => $eff_name,
-            'where'    => $eff_ok . " AND $eff_norm <> ''",
+            'where'    => "$eff_norm <> ''",
             'partners' => "COUNT(DISTINCT CASE WHEN producer_kind = 'firm' AND producer_norm <> '' AND producer_norm <> $eff_norm THEN producer_norm END)",
         ),
     );
