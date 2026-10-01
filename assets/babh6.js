@@ -808,7 +808,7 @@ function renderActive() {
   f.cats.forEach(function (code) { chip('cat', null, code === 'other' ? 'Без определена категория' : catLabel(code), code); });
   if (f.producer) chip('producer', I.factory, 'Производител: ' + (f.producerName || f.producer));
   if (f.trader) chip('trader', I.store, 'Търговец: ' + (f.traderName || f.trader));
-  if (f.own) chip('own', null, f.producer ? 'Без посочен търговец' : 'Без посочен производител');
+  if (f.own) chip('own', null, f.producer ? 'Собствена марка (без друг търговец)' : 'Собствено производство (без друг производител)');
   if (f.brand) chip('brand', I.layers, 'Начало на наименованието: ' + f.brand);
   var fb = $('#b6-fbtn'); if (fb) fb.innerHTML = I.filter + 'Филтри' + (activeCount(f) ? ' · ' + activeCount(f) : '');
   if (!chips.length) { el.innerHTML = ''; el.classList.remove('has'); return; }
@@ -1116,10 +1116,14 @@ function bodyHTML(p) {
     if (p.pk === 'country') rows += row('Държава в полето „Производител“', esc(p.p) + '<div class="sub">В регистъра е посочена държава, а не фирма.</div>');
     else rows += row('Производител', partyLink('p', p.pn, firstPart(p.p)) + (restPart(p.p) ? '<div class="sub">' + esc(restPart(p.p)) + '</div>' : ''));
   } else rows += '<span class="l">Производител</span>' + na;
-  if (p.tr) {
-    if (p.tk === 'country') rows += row('Държава в полето „Търговец“', esc(p.tr));
-    else rows += row('Посочен търговец', partyLink('t', p.tn, firstPart(p.tr)) + (restPart(p.tr) ? '<div class="sub">' + esc(restPart(p.tr)) + '</div>' : ''));
-  } else rows += '<span class="l">Посочен търговец</span>' + na;
+  if (p.tr && p.tk === 'firm') {
+    rows += row('Посочен търговец', partyLink('t', p.tn, firstPart(p.tr)) + (restPart(p.tr) ? '<div class="sub">' + esc(restPart(p.tr)) + '</div>' : ''));
+  } else {
+    if (p.tr && p.tk === 'country') rows += row('Държава в полето „Търговец“', esc(p.tr));
+    else rows += '<span class="l">Посочен търговец</span>' + na;
+    /* v6.8.1: без посочен търговец → търговецът е самият производител (собствена марка); брои се така и в „Търговци“ */
+    if (p.to) rows += row('Търговец (приет)', partyLink('t', p.pn, firstPart(p.p)) + '<span class="b6-inf">собствена марка</span><div class="sub">В регистъра не е вписан търговец, затова се приема, че производителят продава продукта сам. Така се брои и в „Търговци“ и в класацията.</div>');
+  }
   /* Предположението е отделен ред, никога под „Данни от регистъра“ като факт (PR-11) */
   var infRow = p.ti ? row('Възможна връзка по наименование', partyLink('t', p.tinn, p.tin) + '<span class="b6-inf">автоматично предположение</span><div class="sub">Определено по началото на наименованието на продукта спрямо други записи. Не е поле на БАБХ; посоченото в регистъра поле „Търговец“ е показано отделно.</div>') : '';
   if (p.nn) rows += row('Номер на уведомление', esc(p.nn));
@@ -1154,6 +1158,7 @@ function glanceHTML(p, nIngs) {
   if (p.p && p.pk === 'firm') chips.push(firmChip('Производител', firstPart(p.p), 'p', p.pn));
   if (p.tr && p.tk === 'firm') chips.push(firmChip('Търговец', firstPart(p.tr), 't', p.tn));
   else if (p.ti && p.tin) chips.push(firmChip('Възможен търговец', p.tin, 't', p.tinn));
+  else if (p.to) chips.push(firmChip('Търговец · собствена марка', firstPart(p.p), 't', p.pn));
   if (p.y || p.o) chips.push('<span class="b6-gl"><span class="b6-gl-ic" aria-hidden="true">' + I.cal + '</span><span class="b6-gl-t"><small>По рег. №</small>' + (p.y ? esc(p.y) : '') + (p.o ? (p.y ? ' · ' : '') + esc(p.o) : '') + '</span></span>');
   if (nIngs) chips.push('<span class="b6-gl"><span class="b6-gl-ic" aria-hidden="true">' + I.flask + '</span><span class="b6-gl-t"><small>Състав</small>' + pluralN(nIngs, 'съставка', 'съставки') + '</span></span>');
   return chips.length ? '<div class="b6-glance">' + chips.join('') + '</div>' : '';
@@ -1592,7 +1597,7 @@ function renderPartyDetail(c) {
       '<button type="button" class="b6-bc link" data-view="products" style="text-align:left"><div class="b6-bc-l">' + I.layers + 'Продукти</div><div class="b6-bc-n">' + nfmt(d.products) + '</div><div class="b6-bc-s">' + (d.deleted ? nfmt(d.deleted) + ' липсват в последния файл (отделно)' : 'в наличните данни') + '</div></button>' +
       '<button type="button" class="b6-bc tint link" data-view="partners" style="text-align:left"><div class="b6-bc-l">' + (isP ? I.store : I.factory) + partnersLbl + '</div><div class="b6-bc-n">' + nfmt(pt) + '</div><div class="b6-bc-s">' + (d.partners_src != null && d.partners_src < pt ? nfmt(d.partners_src) + ' посочени в регистъра, останалите предположени' : 'по записите в регистъра') + '</div></button>' +
       '<button type="button" class="b6-bc link" data-view="brands" style="text-align:left"><div class="b6-bc-l">' + I.layers + 'Начала на наименованията</div><div class="b6-bc-n">' + nfmt(bt) + '</div><div class="b6-bc-s">автоматично групиране, не поле „марка“</div></button>' +
-      '<button type="button" class="b6-bc link" data-own="1" style="text-align:left"><div class="b6-bc-l">' + I.flag + 'Без посочена насрещна фирма</div><div class="b6-bc-n">' + nfmt(d.own) + '</div><div class="b6-bc-s">' + (isP ? 'без посочен търговец и без предположение' : 'без посочен производител (или е държава)') + '</div></button>' +
+      '<button type="button" class="b6-bc link" data-own="1" style="text-align:left"><div class="b6-bc-l">' + I.flag + (isP ? 'Собствена марка' : 'Собствено производство') + '</div><div class="b6-bc-n">' + nfmt(d.own) + '</div><div class="b6-bc-s">' + (isP ? 'без друг търговец — продава ги самата фирма' : 'без друг производител (или е държава)') + '</div></button>' +
       '<button type="button" class="b6-bc link" data-flagged="1" style="text-align:left"><div class="b6-bc-l">' + I.warn + 'За проверка</div><div class="b6-bc-n">' + nfmt(d.flagged) + '</div><div class="b6-bc-s">с автоматична бележка</div></button>' +
     '</div>' +
     '<form class="b6-pdq" id="b6-pdq" role="search"><label for="b6-pdq-i" class="b6-vh">Търси в профила</label>' + I.search +
@@ -1687,7 +1692,7 @@ function renderPartyView() {
       (list.length
         ? '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>' + (isP ? 'Свързан търговец' : 'Свързан производител') + '</th><th class="num">Общи продукти</th><th class="num">Дял</th><th class="num" title="Продукти с автоматична бележка за проверка">За проверка</th><th class="num">Период</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
           '<div class="b6-tbl-note">Връзка = общ запис, в който двете фирми са посочени (или търговецът е предположен по наименованието). Това не е доказателство за търговско отношение.</div>'
-        : '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма ' + partnersLbl + '</div><div>Всички продукти са без посочена насрещна фирма.</div></div>');
+        : '<div class="b6-empty">' + I.empty + '<div class="b6-empty-t">Няма ' + partnersLbl + '</div><div>' + (isP ? 'Всички продукти са собствена марка — без друг търговец.' : 'Всички продукти са собствено производство — без друг производител.') + '</div></div>');
     $$('[data-products]', c).forEach(function (a) {
       a.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
@@ -1817,7 +1822,7 @@ function renderPartyOverview(c, d, isP, self) {
     (top5.length ? top5.map(function (x, i) {
       return '<a href="#" class="b6-ovp" data-party="' + esc(partnerKind) + '|' + esc(x.norm) + '"><span class="b6-av sm" style="background:' + firmGrad(x.norm) + '" aria-hidden="true">' + esc(firmInitials(x.name)) + '</span><span class="n"><span class="nm">' + esc(x.name) + '</span><span class="bar" aria-hidden="true"><i style="width:' + Math.max(2, Math.round(100 * x.count / pmax)) + '%"></i></span></span><span class="c"><b>' + nfmt(x.count) + '</b><small>' + x.share + '%</small></span></a>';
     }).join('') + (pt > 5 ? '<button type="button" class="b6-link" data-goview="partners" style="margin-top:10px">Всички ' + nfmt(pt) + ' ' + cliLP + I.arrow + '</button>' : '')
-    : '<div class="b6-ov-note">Всички продукти са без посочена насрещна фирма.</div>') + '</div>';
+    : '<div class="b6-ov-note">' + (isP ? 'Всички продукти са собствена марка — без друг търговец.' : 'Всички продукти са собствено производство — без друг производител.') + '</div>') + '</div>';
 
   var latest = d.latest || [];
   var latestH = latest.length ? '<div class="b6-ovc"><div class="b6-sec-l"><span>Най-нови регистрации</span><span class="count">' + nfmt(d.products) + ' общо</span></div><div class="b6-plist2">' + latest.map(productRowHTML).join('') + '</div>' +
@@ -2048,7 +2053,7 @@ function moveSentence(mv, isP) {
   if (mv.new_partners) parts.push('<b>' + nfmt(mv.new_partners) + ' ' + (mv.new_partners === 1 ? cli[0] : cli[1]) + '</b>');
   if (mv.partners) parts.push(nfmt(mv.partners) + ' ' + (mv.partners === 1 ? cli[2] : cli[3]) + ' с нови продукти');
   parts.push('<b>' + nfmt(mv.a_new) + ' ' + plural(mv.a_new, 'нов продукт', 'нови продукта') + '</b>');
-  if (mv.own) parts.push(nfmt(mv.own) + ' без посочен ' + cli[2]);
+  if (mv.own) parts.push(nfmt(mv.own) + (isP ? ' под собствена марка' : ' собствено производство'));
   return parts.join(' · ');
 }
 function movesHTML(d) {
@@ -2100,7 +2105,7 @@ function openMove(mv, opener) {
 }
 function renderMoveDetail(c, top) {
   var mv = top.mv, kind = top.kind, isP = kind === 'p', d = top.detail;
-  var cli = isP ? ['клиент', 'клиенти', 'Нови клиенти', 'Други клиенти с нови продукти', 'Без посочен клиент', 'нов клиент'] : ['доставчик', 'доставчици', 'Нови доставчици', 'Други доставчици с нови продукти', 'Без посочен доставчик', 'нов доставчик'];
+  var cli = isP ? ['клиент', 'клиенти', 'Нови клиенти', 'Други клиенти с нови продукти', 'Собствена марка (без друг търговец)', 'нов клиент'] : ['доставчик', 'доставчици', 'Нови доставчици', 'Други доставчици с нови продукти', 'Собствено производство (без друг производител)', 'нов доставчик'];
   var pk = isP ? 't' : 'p';
   var head = '<div class="b6-mvd-h"><div class="b6-mv-m">' + I.cal + monthFull(mv.month) + '</div>' +
     '<h2 class="b6-mvd-t"><a href="#" class="b6-plink" data-party="' + esc(kind) + '|' + esc(mv.a) + '">' + esc(mv.a_name) + '</a> изпреварва <a href="#" class="b6-plink" data-party="' + esc(kind) + '|' + esc(mv.b) + '">' + esc(mv.b_name) + '</a></h2>' +

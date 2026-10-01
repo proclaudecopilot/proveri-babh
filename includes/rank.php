@@ -48,19 +48,19 @@ function babh6_rank_data_rev() {
 
 /** SQL изрази за фирмата („own“) и насрещната страна („partner“) според вида. Същият модел като /party. */
 function babh6_rank_firm_sql($kind) {
-    $eff_norm = "IF(trader_inf_norm <> '', trader_inf_norm, trader_norm)";
-    $eff_name = "IF(trader_inf_norm <> '', trader_inf_name, trader_name)";
+    $eff = babh6_eff_trader_sql();
+    $eff_norm = $eff['norm']; $eff_name = $eff['name'];
     if ($kind === 'p') {
         return array(
             'norm'  => 'producer_norm', 'name' => 'producer_name',
             'where' => "producer_kind = 'firm' AND producer_norm <> ''",
             'pnorm' => $eff_norm, 'pname' => $eff_name,
-            'pok'   => "(trader_inf_norm <> '' OR (trader_kind = 'firm' AND trader_norm <> '' AND trader_norm <> producer_norm))",
+            'pok'   => "($eff_norm <> '' AND $eff_norm <> producer_norm)",
         );
     }
     return array(
         'norm'  => $eff_norm, 'name' => $eff_name,
-        'where' => "(trader_inf_norm <> '' OR (trader_kind = 'firm' AND trader_norm <> '')) AND $eff_norm <> ''",
+        'where' => "$eff_norm <> ''",
         'pnorm' => 'producer_norm', 'pname' => 'producer_name',
         'pok'   => "(producer_kind = 'firm' AND producer_norm <> '' AND producer_norm <> $eff_norm)",
     );
@@ -366,7 +366,7 @@ function babh6_rest_rank_move($req) {
 
     /* Продуктите през месеца (карти), с ключ на насрещната фирма */
     $prod = $wpdb->get_results($wpdb->prepare(
-        "SELECT id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, notif_date, deletion, category, flag_count, deleted_at,
+        "SELECT id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, trader_inf_norm, notif_date, deletion, category, flag_count, deleted_at,
                 CASE WHEN {$f['pok']} THEN {$f['pnorm']} ELSE '' END AS en
          FROM $t WHERE deleted_at IS NULL AND {$f['where']} AND {$f['norm']} = %s AND notif_date >= %s AND notif_date < %s
          ORDER BY notif_date DESC, id DESC LIMIT 200", $norm, $from, $to));

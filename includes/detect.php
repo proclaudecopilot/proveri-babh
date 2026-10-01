@@ -170,6 +170,32 @@ function babh6_is_bg_firm($s) {
 }
 
 /* ============ Регистрационен номер ============ */
+/**
+ * Ефективен търговец (v6.8.1) — ЕДНО правило за профили, филтри, класация и ETL:
+ *   1. търговец, предположен по името на продукта (trader_inf_*);
+ *   2. посоченият в регистъра търговец, ако е фирма;
+ *   3. иначе самият производител — регистърът често не вписва търговец, когато
+ *      производителят продава собствената си марка (напр. „BIOnetic“ при Нутренд България).
+ * 'own' е условието за случай 3 (собствена марка).
+ */
+function babh6_eff_trader_sql() {
+    static $sql = null;
+    if ($sql === null) {
+        $sql = array(
+            'norm' => "CASE WHEN trader_inf_norm <> '' THEN trader_inf_norm WHEN trader_kind = 'firm' AND trader_norm <> '' THEN trader_norm WHEN producer_kind = 'firm' AND producer_norm <> '' THEN producer_norm ELSE '' END",
+            'name' => "CASE WHEN trader_inf_norm <> '' THEN trader_inf_name WHEN trader_kind = 'firm' AND trader_norm <> '' THEN trader_name WHEN producer_kind = 'firm' AND producer_norm <> '' THEN producer_name ELSE '' END",
+            'own'  => "(trader_inf_norm = '' AND (trader_kind <> 'firm' OR trader_norm = '' OR trader_norm = producer_norm) AND producer_kind = 'firm' AND producer_norm <> '')",
+        );
+    }
+    return $sql;
+}
+/** Същото правило за един ред в PHP: търговецът е самият производител (собствена марка)? */
+function babh6_row_trader_is_producer($r) {
+    if (!empty($r->trader_inf_norm)) return false;
+    if (!isset($r->producer_kind) || $r->producer_kind !== 'firm' || (string)$r->producer_norm === '') return false;
+    return !isset($r->trader_kind) || $r->trader_kind !== 'firm' || (string)$r->trader_norm === '' || $r->trader_norm === $r->producer_norm;
+}
+
 function babh6_obl_names() {
     return array(1=>'София-град',2=>'Бургас',3=>'Варна',4=>'Пловдив',5=>'Стара Загора',6=>'Велико Търново',7=>'Русе',8=>'Плевен',9=>'Хасково',10=>'Благоевград',11=>'Шумен',12=>'Сливен',13=>'Добрич',14=>'Кърджали',15=>'Кюстендил',16=>'Ловеч',17=>'Монтана',18=>'Пазарджик',19=>'Перник',20=>'Разград',21=>'Силистра',22=>'Смолян',23=>'София-област',24=>'Търговище',25=>'Видин',26=>'Враца',27=>'Габрово',28=>'Ямбол');
 }
