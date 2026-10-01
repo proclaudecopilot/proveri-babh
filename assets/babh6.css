@@ -691,7 +691,16 @@ body.babh6-body { margin: 0; background: #ECECE8; font-family: 'Geist', system-u
 .b6-dw-wrap.open .b6-dw { transform: none; }
 .admin-bar .b6-dw { top: var(--wp-admin--admin-bar--height, 0px); }
 .b6-dw-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--bd); flex-shrink: 0; }
-.b6-dw-l { font-size: 11px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: .6px; }
+.b6-dw-hl { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.b6-dw-l { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
+.b6-dw-l svg { width: 13px; height: 13px; flex-shrink: 0; }
+.b6-dw-l.kp { color: var(--acc-d); }
+.b6-dw-l.kt { color: var(--blue); }
+/* v6.7.4: типът на фирмата се вижда и като етикет над името (не само като икона) */
+.b6-kind { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; padding: 4px 10px 4px 8px; border-radius: 999px; margin-bottom: 8px; line-height: 1.2; }
+.b6-kind svg { width: 14px; height: 14px; flex-shrink: 0; }
+.b6-kind.kp { background: var(--acc-soft); color: var(--acc-d); }
+.b6-kind.kt { background: var(--blue-bg); color: var(--blue); }
 .b6-dw-back { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px 6px 6px; font-size: 13px; font-weight: 500; border: 1px solid var(--bd); background: var(--bg-card); color: var(--t2); border-radius: 8px; cursor: pointer; }
 .b6-dw-back svg { width: 15px; height: 15px; transform: rotate(90deg); }
 .b6-dw-x { width: 36px; height: 36px; }

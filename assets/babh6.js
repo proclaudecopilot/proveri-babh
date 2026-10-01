@@ -181,7 +181,7 @@ function gotoProducts(f) {
 }
 function partyLink(kind, norm, name) {
   if (!PRO || !norm) return esc(name);
-  return '<a href="#" class="b6-plink" data-party="' + esc(kind) + '|' + esc(norm) + '" title="Профил на фирмата">' + esc(name) + '</a>';
+  return '<a href="#" class="b6-plink" data-party="' + esc(kind) + '|' + esc(norm) + '" title="' + (kind === 'p' ? 'Профил на производителя' : 'Профил на търговеца') + '">' + esc(name) + '</a>';
 }
 
 /* ===== Composition parsing (PR-12) =====
@@ -877,6 +877,12 @@ function bindSort(c) {
    Стек: всеки отворен продукт/фирма е слой; „Назад“ връща предишния, × затваря всички. */
 var dw = [];
 function dwLabel(e) { return e.type === 'product' ? 'Продукт' : (e.kind === 'p' ? 'Производител' : 'Търговец'); }
+/* v6.7.4: етикетът на панела показва и иконата на типа (фабрика = производител, магазин = търговец) */
+function dwLabelHTML(e) {
+  if (e.type === 'product') return '<span class="b6-dw-l">' + dwLabel(e) + '</span>';
+  var isP = e.kind === 'p';
+  return '<span class="b6-dw-l ' + (isP ? 'kp' : 'kt') + '">' + (isP ? I.factory : I.store) + dwLabel(e) + '</span>';
+}
 function dwOpen(entry, opener) {
   if (!dw.length) entry.opener = opener || document.activeElement;
   dw.push(entry);
@@ -913,7 +919,7 @@ function dwRender(isNew) {
   panel.setAttribute('aria-label', dwLabel(top));
   panel.innerHTML =
     '<div class="b6-dw-h">' +
-      (dw.length > 1 ? '<button type="button" class="b6-dw-back" id="b6-dw-back">' + I.chev + 'Назад</button>' : '<span class="b6-dw-l">' + dwLabel(top) + '</span>') +
+      '<div class="b6-dw-hl">' + (dw.length > 1 ? '<button type="button" class="b6-dw-back" id="b6-dw-back">' + I.chev + 'Назад</button>' : '') + dwLabelHTML(top) + '</div>' +
       '<button type="button" class="b6-iconbtn b6-dw-x" id="b6-dw-x" aria-label="Затвори">' + I.x + '</button>' +
     '</div>' +
     '<div class="b6-dw-b" id="b6-dw-b"></div>';
@@ -1462,8 +1468,9 @@ function renderPartyDetail(c) {
   var views = [['partners', partnersLbl + ' (' + nfmt(pt) + ')'], ['brands', 'Начала на наименованията (' + nfmt(bt) + ')'], ['products', 'Продукти (' + nfmt(d.products) + ')']];
   c.innerHTML = back +
     '<div class="b6-head b6-dw-head"><div>' +
-      '<h2 class="b6-title" style="font-size:22px">' + (isP ? I.factory : I.store) + ' ' + esc(d.name) + (d.bg ? ' <span class="b6-tag green" title="Определена като българска по наименованието и адреса в регистъра">' + I.flag + 'БГ</span>' : ' <span class="b6-tag muted" title="Няма положително основание за българска регистрация по наименованието и адреса">държавата не е определена</span>') + '</h2>' +
-      '<div class="b6-sub">' + (d.full && d.full !== d.name ? 'Най-пълно изписване в регистъра: ' + esc(d.full) + ' · ' : '') + (isP ? 'производител' : 'търговец') + ' според регистъра' + (d.y1 || d.y2 ? ' · регистрации ' + yearsLabel(d.y1, d.y2) : '') + ' · групиране по името, без проверен фирмен идентификатор</div>' +
+      '<div class="b6-kind ' + (isP ? 'kp' : 'kt') + '" title="' + (isP ? 'Фирмата е вписана в регистъра като производител' : 'Фирмата е вписана в регистъра като търговец') + '">' + (isP ? I.factory : I.store) + '<span>' + (isP ? 'Производител' : 'Търговец') + '</span></div>' +
+      '<h2 class="b6-title" style="font-size:22px">' + esc(d.name) + (d.bg ? ' <span class="b6-tag green" title="Определена като българска по наименованието и адреса в регистъра">' + I.flag + 'БГ</span>' : ' <span class="b6-tag muted" title="Няма положително основание за българска регистрация по наименованието и адреса">държавата не е определена</span>') + '</h2>' +
+      '<div class="b6-sub">' + (isP ? 'Профил на производител' : 'Профил на търговец') + ' според регистъра' + (d.full && d.full !== d.name ? ' · най-пълно изписване: ' + esc(d.full) : '') + (d.y1 || d.y2 ? ' · регистрации ' + yearsLabel(d.y1, d.y2) : '') + ' · групиране по името, без проверен фирмен идентификатор</div>' +
     '</div><div class="b6-actions">' +
       '<button type="button" class="b6-btn" id="b6-pall">' + I.search + '<span>Отвори в „Продукти“</span></button>' +
       '<button type="button" class="b6-btn" id="b6-pcsv" title="Изнасят се показаните свързани фирми (до 500)">' + I.dl + '<span>Свързани фирми (CSV)</span></button>' +
