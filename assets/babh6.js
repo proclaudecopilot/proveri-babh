@@ -1637,7 +1637,7 @@ function renderPartyDetail(c) {
   $('[data-flagged]', c).addEventListener('click', function () { var f = JSON.parse(JSON.stringify(self)); f.flagged = true; gotoProducts(f); });
   $('#b6-pcsv').addEventListener('click', function () {
     var rows = [[isP ? 'Производител' : 'Търговец', isP ? 'Свързан търговец' : 'Свързан производител', 'Общи продукти', 'Дял от продуктите на фирмата %', 'От тях с автоматично предположен търговец', 'С бележки за проверка', 'Първо уведомление', 'Последно уведомление']];
-    d.partners.forEach(function (x) { rows.push([d.name, x.name, x.count, x.share, x.inferred || 0, x.flagged, x.first || '', x.last || '']); });
+    d.partners.forEach(function (x) { rows.push([d.name, x.name + (x.self ? (isP ? ' (собствена марка — без вписан търговец)' : ' (собствено производство — без вписан друг производител)') : ''), x.count, x.share, x.inferred || 0, x.flagged, x.first || '', x.last || '']); });
     rows.push(['# ' + d.partners.length + ' от общо ' + pt + ' свързани фирми; връзка = общ запис в регистъра, не доказано търговско отношение; генерирано на ' + new Date().toLocaleString('bg')]);
     var fn = d.norm.replace(/[^a-z0-9а-я]+/gi, '-').replace(/^-+|-+$/g, '');
     downloadCSV(rows, 'svarzani-firmi-' + (fn || d.norm.length) + '-' + new Date().toISOString().slice(0, 10) + '.csv');
@@ -1679,7 +1679,7 @@ function renderPartyView() {
     var rows = list.map(function (x, i) {
       return '<tr>' +
         '<td class="idx">' + (i + 1) + '</td>' +
-        '<td><div class="b6-pname"><a href="#" class="b6-plink" data-party="' + esc(partnerKind) + '|' + esc(x.norm) + '">' + esc(x.name) + '</a>' + (x.inferred ? '<span class="b6-inf" title="Част от общите записи са с автоматично предположен търговец по наименованието">' + nfmt(x.inferred) + ' предположени</span>' : '') + '</div>' +
+        '<td><div class="b6-pname"><a href="#" class="b6-plink" data-party="' + esc(partnerKind) + '|' + esc(x.norm) + '">' + esc(x.name) + '</a>' + (x.self ? '<span class="b6-tag green" title="' + (isP ? 'Без вписан търговец в регистъра — приема се, че производителят продава продуктите сам' : 'Без вписан друг производител — приема се, че търговецът произвежда продуктите сам') + '">' + (isP ? 'собствена марка' : 'собствено производство') + '</span>' : '') + (x.inferred ? '<span class="b6-inf" title="Част от общите записи са с автоматично предположен търговец по наименованието">' + nfmt(x.inferred) + ' предположени</span>' : '') + '</div>' +
           '<div class="b6-share" aria-hidden="true"><i style="width:' + Math.max(2, Math.round(100 * x.count / maxC)) + '%"></i></div></td>' +
         '<td class="num"><a href="#" class="b6-plink num" data-products="' + esc(x.norm) + '" title="Покажи общите продукти"><b>' + nfmt(x.count) + '</b></a></td>' +
         '<td class="num" style="color:var(--t3)" title="Дял от всички продукти на фирмата в наличните данни">' + x.share + '%</td>' +
@@ -1688,7 +1688,7 @@ function renderPartyView() {
       '</tr>';
     }).join('');
     if (q && !list.length) { c.innerHTML = pdqNoMatch(partnersLbl, q, d.partners.length < pt ? d.partners.length : 0); bindGoView(c); return; }
-    c.innerHTML = '<div class="b6-meta"><span>' + (q ? '<b>' + nfmt(list.length) + '</b> ' + plural(list.length, 'съвпадение', 'съвпадения') + ' за „' + esc(q) + '“ от ' + nfmt(pt) + ' ' + partnersLbl : '<b>' + nfmt(pt) + '</b> ' + partnersLbl + ' по записите в регистъра' + (d.partners.length < pt ? ' · показани първите ' + nfmt(d.partners.length) + ' по брой продукти' : '')) + ' · клик на числото показва общите продукти</span></div>' +
+    c.innerHTML = '<div class="b6-meta"><span>' + (q ? '<b>' + nfmt(list.length) + '</b> ' + plural(list.length, 'съвпадение', 'съвпадения') + ' за „' + esc(q) + '“ от ' + nfmt(pt) + ' ' + partnersLbl : '<b>' + nfmt(pt) + '</b> ' + partnersLbl + ' по записите в регистъра' + (d.own ? (isP ? ' и собствената марка' : ' и собственото производство') : '') + (d.partners.length - (d.own ? 1 : 0) < pt ? ' · показани първите ' + nfmt(d.partners.length) + ' по брой продукти' : '')) + ' · клик на числото показва общите продукти</span></div>' +
       (list.length
         ? '<div class="b6-tbl-wrap"><table class="b6-tbl"><thead><tr><th>#</th><th>' + (isP ? 'Свързан търговец' : 'Свързан производител') + '</th><th class="num">Общи продукти</th><th class="num">Дял</th><th class="num" title="Продукти с автоматична бележка за проверка">За проверка</th><th class="num">Период</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
           '<div class="b6-tbl-note">Връзка = общ запис, в който двете фирми са посочени (или търговецът е предположен по наименованието). Това не е доказателство за търговско отношение.</div>'
@@ -1798,7 +1798,9 @@ function renderPartyOverview(c, d, isP, self) {
   }
   var py = null; (d.years || []).forEach(function (y) { if (!py || y.c > py.c) py = y; });
   if (py) ins.push({ l: 'Най-активна година', v: String(py.y), s: pluralN(py.c, 'регистрация', 'регистрации') + ' по рег. №', act: 'year:' + py.y, ic: I.cal });
-  if (d.partners.length) ins.push({ l: 'Най-голям ' + cliL, v: d.partners[0].name, s: pluralN(d.partners[0].count, 'общ продукт', 'общи продукта') + ' · ' + d.partners[0].share + '% от всички', act: 'party:' + d.partners[0].norm, ic: isP ? I.store : I.factory, text: true });
+  var p0 = null; d.partners.forEach(function (x) { if (!p0 && !x.self) p0 = x; });
+  if (p0) ins.push({ l: 'Най-голям ' + cliL, v: p0.name, s: pluralN(p0.count, 'общ продукт', 'общи продукта') + ' · ' + p0.share + '% от всички', act: 'party:' + p0.norm, ic: isP ? I.store : I.factory, text: true });
+  if (d.own) ins.push({ l: isP ? 'Собствена марка' : 'Собствено производство', v: nfmt(d.own), s: Math.round(100 * d.own / Math.max(1, d.products)) + '% от продуктите · ' + (isP ? 'без друг търговец' : 'без друг производител'), act: 'own', ic: I.flag });
   if (d.cats.length) ins.push({ l: 'Водеща категория', v: d.cats[0].label, s: pluralN(d.cats[0].count, 'продукт', 'продукта') + ' · ' + Math.round(100 * d.cats[0].count / Math.max(1, d.products)) + '%', act: 'cat:' + d.cats[0].code, ic: CAT_ICONS[d.cats[0].code] || CAT_ICONS.other, text: true, col: CAT_COLORS[d.cats[0].code] });
   if (d.y1) ins.push({ l: 'В регистъра от', v: String(d.y1), s: (d.y2 && d.y2 > d.y1 ? (d.y2 - d.y1 + 1) + ' години с регистрации' : 'една година с регистрации'), ic: I.layers });
   var insH = '<div class="b6-ins">' + ins.map(function (x, i) {
@@ -1820,7 +1822,7 @@ function renderPartyOverview(c, d, isP, self) {
   var top5 = d.partners.slice(0, 5);
   var partnersH = '<div class="b6-ovc"><div class="b6-sec-l"><span>' + (isP ? 'Най-големи клиенти' : 'Най-големи доставчици') + '</span><span class="count">' + nfmt(pt) + '</span></div>' +
     (top5.length ? top5.map(function (x, i) {
-      return '<a href="#" class="b6-ovp" data-party="' + esc(partnerKind) + '|' + esc(x.norm) + '"><span class="b6-av sm" style="background:' + firmGrad(x.norm) + '" aria-hidden="true">' + esc(firmInitials(x.name)) + '</span><span class="n"><span class="nm">' + esc(x.name) + '</span><span class="bar" aria-hidden="true"><i style="width:' + Math.max(2, Math.round(100 * x.count / pmax)) + '%"></i></span></span><span class="c"><b>' + nfmt(x.count) + '</b><small>' + x.share + '%</small></span></a>';
+      return '<a href="#" class="b6-ovp" data-party="' + esc(partnerKind) + '|' + esc(x.norm) + '"><span class="b6-av sm" style="background:' + firmGrad(x.norm) + '" aria-hidden="true">' + esc(firmInitials(x.name)) + '</span><span class="n"><span class="nm">' + esc(x.name) + (x.self ? ' <span class="b6-tag green">' + (isP ? 'собствена марка' : 'собствено производство') + '</span>' : '') + '</span><span class="bar" aria-hidden="true"><i style="width:' + Math.max(2, Math.round(100 * x.count / pmax)) + '%"></i></span></span><span class="c"><b>' + nfmt(x.count) + '</b><small>' + x.share + '%</small></span></a>';
     }).join('') + (pt > 5 ? '<button type="button" class="b6-link" data-goview="partners" style="margin-top:10px">Всички ' + nfmt(pt) + ' ' + cliLP + I.arrow + '</button>' : '')
     : '<div class="b6-ov-note">' + (isP ? 'Всички продукти са собствена марка — без друг търговец.' : 'Всички продукти са собствено производство — без друг производител.') + '</div>') + '</div>';
 
@@ -1835,6 +1837,7 @@ function renderPartyOverview(c, d, isP, self) {
       var f = JSON.parse(JSON.stringify(self));
       if (x.act === 'rank') { if (!state.rank) state.rank = newRank(); state.rank.kind = isP ? 'p' : 't'; state.rank.all = !d.bg; state.rank.data = null; dwClose(true); setTab('rank'); return; }
       if (x.act === 'recent') { f.recent = '12m'; gotoProducts(f); return; }
+      if (x.act === 'own') { f.own = true; gotoProducts(f); return; }
       if (x.act.indexOf('year:') === 0) { f.year = x.act.slice(5); gotoProducts(f); return; }
       if (x.act.indexOf('cat:') === 0) { f.cats = [x.act.slice(4)]; gotoProducts(f); return; }
       if (x.act.indexOf('party:') === 0) { openParty(partnerKind, x.act.slice(6)); }
@@ -2123,12 +2126,14 @@ function renderMoveDetail(c, top) {
   var vs = '<div class="b6-vs-wrap">' + side(d.a, 'a') + (d.b ? '<span class="b6-vs-x">vs</span>' + side(d.b, 'b') : '') + '</div>' +
     '<div class="b6-ov-note">Броят е кумулативен: преди месеца → в края на месеца (записите без дата се броят като по-стари). Цветната част е новото през месеца.</div>';
   var byPartner = {}; (d.products || []).forEach(function (p) { (byPartner[p.en || ''] = byPartner[p.en || ''] || []).push(p); });
-  var partnerCard = function (p) {
-    var prods = byPartner[p.norm] || [];
+  var partnerCard = function (p, prodsOverride) {
+    var prods = prodsOverride || byPartner[p.norm] || [];
     var first = p.first ? fmtDate(p.first) : '';
+    var sub = p.self ? '<span class="b6-tag green">' + (isP ? 'собствена марка' : 'собствено производство') + '</span> ' + (isP ? 'без вписан търговец — продава ги самата фирма' : 'без вписан друг производител')
+      : (p.is_new ? '<span class="b6-tag green">' + cli[5] + '</span> първи общ продукт ' + first : 'общи продукти от ' + first + ' · ' + nfmt(p.total) + ' общо');
     return '<div class="b6-mp' + (p.is_new ? ' new' : '') + '">' +
       '<div class="b6-mp-h"><span class="b6-av sm" style="background:' + firmGrad(p.norm) + '" aria-hidden="true">' + esc(firmInitials(p.name)) + '</span>' +
-        '<div class="b6-mp-n"><a href="#" class="b6-plink" data-party="' + esc(pk) + '|' + esc(p.norm) + '">' + esc(p.name) + '</a><div class="sub">' + (p.is_new ? '<span class="b6-tag green">' + cli[5] + '</span> първи общ продукт ' + first : 'общи продукти от ' + first + ' · ' + nfmt(p.total) + ' общо') + '</div></div>' +
+        '<div class="b6-mp-n"><a href="#" class="b6-plink" data-party="' + esc(pk) + '|' + esc(p.norm) + '">' + esc(p.name) + '</a><div class="sub">' + sub + '</div></div>' +
         '<div class="b6-mp-c"><b>' + nfmt(p.count) + '</b><span>' + plural(p.count, 'нов продукт', 'нови продукта') + '</span></div></div>' +
       (prods.length ? '<div class="b6-plist2">' + prods.map(productRowHTML).join('') + '</div>' : '') +
     '</div>';
@@ -2139,7 +2144,8 @@ function renderMoveDetail(c, top) {
   c.innerHTML = head + vs +
     sec(cli[2] + ' през ' + monthFull(mv.month), news.length, news.length ? news.map(partnerCard).join('') : '<div class="b6-ov-note">Няма ' + cli[1] + ', които се появяват за първи път с тази фирма през месеца.</div>', true) +
     (olds.length ? sec(cli[3], olds.length, olds.map(partnerCard).join('')) : '') +
-    (own.length || d.own ? sec(cli[4], d.own || own.length, own.length ? '<div class="b6-plist2">' + own.map(productRowHTML).join('') + '</div>' : '') : '') +
+    /* собствена марка: ред с името на самата фирма (регистърът не вписва търговец при собствена марка) */
+    (own.length || d.own ? sec(cli[4], d.own || own.length, partnerCard({ norm: d.a.norm, name: d.a.name, count: d.own || own.length, is_new: 0, first: '', total: d.a.total, self: 1 }, own)) : '') +
     (d.products_total > (d.products || []).length ? '<div class="b6-ov-note">Показани са първите ' + nfmt((d.products || []).length) + ' от ' + nfmt(d.products_total) + ' продукта за месеца.</div>' : '') +
     '<div class="b6-actions" style="margin-top:14px"><button type="button" class="b6-btn" id="b6-mvd-all">' + I.search + '<span>Всички продукти на ' + esc(mv.a_name) + ' в „Продукти“</span></button></div>';
   bindProductRows(c, d.products || []);
