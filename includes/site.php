@@ -37,8 +37,8 @@ function babh6_render_standalone() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0E1116">
 <title><?php echo esc_html($title); ?></title>
+<?php echo babh6_pwa_head_tags(); ?>
 <meta name="description" content="<?php echo esc_attr($desc); ?>">
 <link rel="canonical" href="<?php echo $home; ?>">
 <meta property="og:type" content="website">
@@ -56,7 +56,7 @@ function babh6_render_standalone() {
   <div id="babh6-app" class="babh6"><div class="b6-boot">Регистърът се зарежда…</div><noscript><div class="b6-boot">За търсене в регистъра е необходим JavaScript. Включи го в браузъра и презареди страницата.</div></noscript></div>
   <footer class="b6-site-f">© <?php echo esc_html(date_i18n('Y')); ?> <?php echo esc_html($site ? $site : 'Регистър на добавките'); ?>. Данни от Българската агенция по безопасност на храните (БАБХ). Сайт за справки по данни от регистъра на БАБХ.</footer>
 </div>
-<script>window.BABH6_CFG = { rest: <?php echo wp_json_encode($rest); ?>, rest2: <?php echo wp_json_encode($rest2); ?>, locked: <?php echo babh6_gate_ok() ? '0' : '1'; ?>, hasAI: <?php echo babh6_api_key() !== '' ? '1' : '0'; ?>, pro: <?php echo babh6_pro_ok() ? '1' : '0'; ?>, pw: <?php echo babh6_password() !== '' ? '1' : '0'; ?>, nonce: <?php echo wp_json_encode(is_user_logged_in() ? wp_create_nonce('wp_rest') : ''); ?> };</script>
+<script>window.BABH6_CFG = { rest: <?php echo wp_json_encode($rest); ?>, rest2: <?php echo wp_json_encode($rest2); ?>, locked: <?php echo babh6_gate_ok() ? '0' : '1'; ?>, hasAI: <?php echo babh6_api_key() !== '' ? '1' : '0'; ?>, pro: <?php echo babh6_pro_ok() ? '1' : '0'; ?>, pw: <?php echo babh6_password() !== '' ? '1' : '0'; ?>, nonce: <?php echo wp_json_encode(is_user_logged_in() ? wp_create_nonce('wp_rest') : ''); ?>, sw: <?php echo wp_json_encode(apply_filters('babh6_pwa_enabled', true) ? babh6_pwa_sw_url() : ''); ?>, ver: <?php echo wp_json_encode(BABH6_VERSION); ?> };</script>
 <script src="<?php echo $js; ?>"></script>
 </body>
 </html><?php

@@ -209,6 +209,24 @@ function babh6_rest_party($req) {
             'match' => $top ? array('kind' => $kind === 'p' ? 't' : 'p', 'norm' => $top['norm'], 'name' => $top['name'], 'count' => (int)$top['n']) : null);
     }
 
+    /* v6.8: преглед на профила — позиция в класацията, последните 24 месеца, най-новите продукти */
+    $rank_all = 1 + (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $pt WHERE kind = %s AND product_count > %d", $kind, (int)$party->product_count));
+    $rank_bg  = $party->is_bg ? 1 + (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $pt WHERE kind = %s AND is_bg = 1 AND product_count > %d", $kind, (int)$party->product_count)) : null;
+    $rr = babh6_recent_range();
+    $m0 = new DateTime($rr['from'], new DateTimeZone('UTC')); $m0->modify('-12 months');
+    $mkeys = array(); $mk = clone $m0;
+    for ($i = 0; $i < 24; $i++) { $mkeys[] = $mk->format('Y-m'); $mk->modify('+1 month'); }
+    $mmap = array();
+    foreach ((array)$wpdb->get_results($wpdb->prepare(
+        "SELECT DATE_FORMAT(notif_date, '%%Y-%%m') AS m, COUNT(*) AS c FROM $t
+         WHERE deleted_at IS NULL AND $own_cond AND notif_date >= %s AND notif_date < %s GROUP BY m", $norm, $m0->format('Y-m-d'), $rr['to'])) as $r) { $mmap[$r->m] = (int)$r->c; }
+    $monthly = array(); $recent12 = 0; $prev12 = 0;
+    foreach ($mkeys as $i => $k) { $c = isset($mmap[$k]) ? $mmap[$k] : 0; $monthly[] = array('m' => $k, 'c' => $c); if ($i >= 12) $recent12 += $c; else $prev12 += $c; }
+    $latest = array();
+    foreach ((array)$wpdb->get_results($wpdb->prepare(
+        "SELECT id, reg, rtype, name, producer_name, producer_kind, producer_norm, trader_name, trader_kind, trader_norm, notif_date, deletion, category, flag_count, deleted_at
+         FROM $t WHERE deleted_at IS NULL AND $own_cond ORDER BY (notif_date IS NULL) ASC, notif_date DESC, ryear DESC, id DESC LIMIT 6", $norm)) as $r) { $latest[] = babh6_row_to_card($r); }
+
     return rest_ensure_response(array(
         'kind' => $kind, 'norm' => $party->norm, 'name' => $party->name, 'full' => $full_name, 'bg' => (int)$party->is_bg,
         'products' => $total, 'flagged' => (int)$party->flagged_count, 'deleted' => $deleted,
@@ -216,6 +234,8 @@ function babh6_rest_party($req) {
         'own' => $own, 'inferred' => $inferred, 'partners' => $plist, 'partners_total' => $partners_total, 'partners_src' => $partners_src,
         'cats' => $cats, 'years' => $years,
         'brands' => $brands, 'brands_total' => count($counts),
+        'rank_all' => $rank_all, 'rank_bg' => $rank_bg,
+        'monthly' => $monthly, 'recent12' => $recent12, 'prev12' => $prev12, 'latest' => $latest,
     ));
 }
 

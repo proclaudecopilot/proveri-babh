@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Регистър на добавките — версия 6
- * Description: Търсене в данни от регистъра на хранителните добавки на БАБХ. Качване на Excel файловете на регистъра или автоматично изтегляне от портала на БАБХ по график, преглед на продукти, профили на производители и търговци, изтегляне на резултатите в CSV. За вграждане в страница: [babh_register].
- * Version: 6.7.3
+ * Description: Търсене в данни от регистъра на хранителните добавки на БАБХ. Качване на Excel файловете на регистъра или автоматично изтегляне от портала на БАБХ по график, преглед на продукти, профили на производители и търговци, класация и изпреварвания (Pro), изтегляне на резултатите в CSV. Работи като инсталируемо приложение (PWA). За вграждане в страница: [babh_register].
+ * Version: 6.8.0
  * GitHub Plugin URI: proclaudecopilot/proveri-babh
  * Author: BABH Register
  * Requires PHP: 7.4
@@ -11,7 +11,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('BABH6_VERSION', '6.7.3');
+define('BABH6_VERSION', '6.8.0');
 /* Версия на правилата за производни данни (категории, автоматични бележки, ключове на фирмите).
    При промяна всички записи се преизчисляват на порции (AD-01). */
 define('BABH6_RULES_VERSION', '2026-09-30.1');
@@ -26,8 +26,10 @@ require_once BABH6_PATH . 'includes/sync.php';
 require_once BABH6_PATH . 'includes/ai.php';
 require_once BABH6_PATH . 'includes/rest.php';
 require_once BABH6_PATH . 'includes/parties.php';
+require_once BABH6_PATH . 'includes/rank.php';
 require_once BABH6_PATH . 'includes/infer.php';
 require_once BABH6_PATH . 'includes/frontend.php';
+require_once BABH6_PATH . 'includes/pwa.php';
 require_once BABH6_PATH . 'includes/site.php';
 require_once BABH6_PATH . 'includes/admin.php';
 
