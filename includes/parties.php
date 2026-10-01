@@ -154,9 +154,21 @@ function babh6_rest_party($req) {
         );
     }
 
-    /* Без насрещна фирма: собствена марка / без търговец / насрещната страна е държава (и нищо определено по името) */
-    $own = (int)$wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM $t WHERE deleted_at IS NULL AND $own_cond AND $none_cond", $norm));
+    /* Без друга насрещна фирма: собствена марка на производителя / собствено производство на търговеца */
+    $own_row = $wpdb->get_row($wpdb->prepare(
+        "SELECT COUNT(*) AS c, SUM(CASE WHEN flag_count > 0 THEN 1 ELSE 0 END) AS f, MIN(notif_date) AS d1, MAX(notif_date) AS d2, MAX(ryear) AS y2
+         FROM $t WHERE deleted_at IS NULL AND $own_cond AND $none_cond", $norm));
+    $own = $own_row ? (int)$own_row->c : 0;
+    /* v6.8.1: самата фирма е ред в списъка с насрещните фирми („собствена марка“), подреден по брой —
+       регистърът не вписва търговец при собствена марка и иначе тези продукти „изчезват“ от списъка */
+    if ($own > 0) {
+        $plist[] = array(
+            'norm' => $party->norm, 'name' => $party->name, 'count' => $own, 'flagged' => (int)$own_row->f, 'inferred' => 0,
+            'first' => $own_row->d1, 'last' => $own_row->d2, 'y2' => $own_row->y2 ? (int)$own_row->y2 : null,
+            'share' => $total ? round(100 * $own / $total, 1) : 0, 'self' => 1,
+        );
+        usort($plist, function ($a, $b) { if ($a['count'] !== $b['count']) return $b['count'] - $a['count']; return strcmp($a['name'], $b['name']); });
+    }
     $inferred = (int)$wpdb->get_var($wpdb->prepare(
         "SELECT COUNT(*) FROM $t WHERE deleted_at IS NULL AND $own_cond AND trader_inf_norm <> ''", $norm));
 
