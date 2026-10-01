@@ -977,3 +977,95 @@ html.b6-standalone .b6-dw-wrap { padding-top: env(safe-area-inset-top); }
 .b6-mvd-h + .b6-vs-wrap { margin-top: 4px; }
 @media (max-width: 680px) { .b6-phero { align-items: start; } .b6-phero .b6-av.lg { margin-top: 2px; } }
 @media (max-width: 400px) { .b6-bnav button { font-size: 9.5px; } }
+
+/* ===== v6.9: кратък панел + пълна страница на фирма с ясна йерархия ===== */
+.b6-fullbtn { width: 100%; justify-content: center; height: 46px; font-size: 14px; margin: 12px 0 14px; border-radius: 12px; }
+.b6-fullbtn svg { width: 16px; height: 16px; }
+.b6-fullbtn svg:last-child { margin-left: auto; }
+.b6-ins.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.b6-ins.compact .b6-in-v { font-size: 20px; }
+.b6-phero-a { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.b6-phero-a .b6-btn { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff; }
+.b6-phero-a .b6-btn:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.3); color: #fff; }
+.b6-fcrumb { margin-bottom: 12px; }
+.b6-crumb-l { color: var(--t3); }
+@media (max-width: 680px) { .b6-crumb-l { display: none; } }
+.b6-fpage .b6-phero { margin-bottom: 14px; }
+.b6-fpage .b6-phero-n { font-size: 24px; }
+.b6-fkpis { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 16px; }
+@media (max-width: 1100px) { .b6-fkpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .b6-fkpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.b6-fkpis .b6-bc { text-align: left; cursor: pointer; }
+.b6-fseg { margin: 0 0 14px; }
+.b6-fseg .b6-seg-b { padding: 8px 16px; font-size: 13.5px; }
+.b6-fseg .b6-seg-b i { font-style: normal; font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--t4); margin-left: 4px; }
+.b6-fseg .b6-seg-b.on i { color: var(--acc-d); }
+@media (max-width: 680px) { .b6-fseg { width: 100%; display: flex; } .b6-fseg .b6-seg-b { flex: 1; padding: 9px 6px; font-size: 12.5px; white-space: normal; line-height: 1.2; } }
+.b6-pdq.compact { margin: 0 0 8px; }
+.b6-pdq.compact input { height: 40px; font-size: 13.5px; border-radius: 10px; padding-left: 38px; }
+.b6-pdq.compact > svg { width: 15px; height: 15px; left: 12px; }
+/* списък + детайл */
+.b6-md { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.b6-md-l { background: var(--bg-card); border: 1px solid var(--bd); border-radius: 16px; padding: 12px; position: sticky; top: calc(72px + var(--wp-admin--admin-bar--height, 0px)); max-height: calc(100vh - 92px - var(--wp-admin--admin-bar--height, 0px)); overflow-y: auto; scrollbar-width: thin; min-width: 0; }
+.b6-md-list { display: flex; flex-direction: column; gap: 3px; }
+.b6-mdr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; padding: 8px 8px 8px 8px; border: 1px solid transparent; border-radius: 12px; background: none; text-align: left; cursor: pointer; transition: background .12s, border-color .12s; }
+.b6-mdr:hover { background: var(--bg-soft); }
+.b6-mdr.on { background: var(--acc-soft); border-color: var(--acc-line); }
+.b6-mdr > svg { width: 14px; height: 14px; color: var(--t4); transform: rotate(-90deg); }
+.b6-mdr.on > svg { color: var(--acc-d); }
+.b6-mdr-b { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.b6-mdr-b .nm { font-size: 13.5px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b6-mdr-b .sub { display: flex; flex-wrap: wrap; gap: 4px; min-height: 0; font-size: 11px; color: var(--t3); }
+.b6-mdr-b .sub:empty { display: none; }
+.b6-mdr-b .sub .b6-tag { padding: 1px 6px; font-size: 9.5px; }
+.b6-mdr-b .sub .b6-inf { margin: 0; padding: 1px 6px; font-size: 10px; }
+.b6-mdr-b .bar { height: 4px; border-radius: 2px; background: var(--bg-soft); overflow: hidden; }
+.b6-mdr-b .bar i { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--acc), #F4A47C); }
+.b6-mdr-c { text-align: right; font-family: 'Geist Mono', monospace; line-height: 1.1; }
+.b6-mdr-c b { display: block; font-size: 14px; font-weight: 500; }
+.b6-mdr-c small { font-size: 10px; color: var(--t4); }
+.b6-md-r { min-width: 0; }
+.b6-md-empty { padding: 48px 20px; text-align: center; color: var(--t3); background: var(--bg-card); border: 1px dashed var(--bd-hover); border-radius: 16px; }
+.b6-md-empty > svg { width: 36px; height: 36px; color: var(--t4); }
+.b6-md-back { display: none; margin-bottom: 12px; }
+.b6-md-h { display: flex; gap: 14px; align-items: flex-start; background: var(--bg-card); border: 1px solid var(--bd); border-radius: 16px; padding: 16px 18px; }
+.b6-md-h .b6-av { width: 52px; height: 52px; border-radius: 14px; font-size: 17px; }
+.b6-av.brand { background: linear-gradient(135deg, #3F4651, #0E1116); }
+.b6-md-ht { min-width: 0; flex: 1; }
+.b6-md-t { font-size: 17px; font-weight: 500; line-height: 1.35; letter-spacing: -.2px; color: var(--t2); }
+.b6-md-t b { color: var(--t1); font-weight: 600; }
+.b6-md-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.b6-mdc { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--t2); background: var(--bg); border: 1px solid var(--bd); border-radius: 999px; padding: 4px 10px; }
+.b6-mdc b { font-family: 'Geist Mono', monospace; font-weight: 500; color: var(--t1); }
+.b6-mdc svg { width: 12px; height: 12px; color: var(--t4); }
+.b6-mdc.warn { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber); }
+.b6-mdc.warn svg { color: inherit; }
+.b6-mdc.muted { color: var(--t3); }
+.b6-md-a { margin: 12px 0 10px; flex-wrap: wrap; }
+.b6-md-r .b6-ov-note { margin-bottom: 12px; }
+@media (max-width: 900px) {
+  .b6-md { grid-template-columns: minmax(0, 1fr); }
+  .b6-md-l { position: static; max-height: none; }
+  .b6-md.has-sel .b6-md-l { display: none; }
+  .b6-md:not(.has-sel) .b6-md-r { display: none; }
+  .b6-md-back { display: inline-flex; }
+  .b6-md-h { padding: 14px; gap: 10px; }
+  .b6-md-h .b6-av { width: 40px; height: 40px; font-size: 14px; border-radius: 11px; }
+  .b6-md-t { font-size: 15px; }
+}
+/* телефон: KPI на страницата на фирма са хоризонтална лента, героят е компактен — табовете остават на първия екран */
+@media (max-width: 680px) {
+  .b6-fkpis { display: flex; overflow-x: auto; gap: 8px; margin: 0 -14px 12px; padding: 0 14px 4px; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .b6-fkpis::-webkit-scrollbar { display: none; }
+  .b6-fkpis .b6-bc { flex: 0 0 150px; padding: 11px 12px; border-radius: 12px; scroll-snap-align: start; }
+  .b6-fkpis .b6-bc-n { font-size: 20px; }
+  .b6-fkpis .b6-bc-s { display: none; }
+  .b6-fpage .b6-phero { padding: 14px; gap: 10px 12px; }
+  .b6-fpage .b6-phero .b6-av.lg { width: 48px; height: 48px; font-size: 17px; border-radius: 14px; }
+  .b6-fpage .b6-phero-n { font-size: 19px; }
+  .b6-fpage .b6-phero-f { display: none; }
+  .b6-fpage .b6-phero-a { gap: 6px; margin-top: 8px; }
+  .b6-fpage .b6-phero-a .b6-btn { padding: 7px 10px; font-size: 12px; }
+  .b6-fpage .b6-phero-big { padding-top: 10px; }
+  .b6-fpage .b6-phero-big b { font-size: 22px; }
+}
