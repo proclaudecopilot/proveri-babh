@@ -541,7 +541,7 @@ function babh6_rest_waitlist($req) {
     if ($n > 10) return new WP_Error('babh6_rate', 'Направени са твърде много опити. Опитай отново по-късно.', array('status' => 429));
     set_transient($key, $n + 1, HOUR_IN_SECONDS);
 
-    $allowed = array('pro', 'producers', 'traders', 'novel', 'inspector', 'watchlist');
+    $allowed = array('pro', 'producers', 'traders', 'novel', 'inspector', 'watchlist', 'rank');
     $source = sanitize_key((string)$req->get_param('source'));
     if (!in_array($source, $allowed, true)) $source = 'pro';
     $wt = babh6_table('waitlist');

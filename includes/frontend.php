@@ -28,6 +28,8 @@ function babh6_shortcode() {
         'pro'    => babh6_pro_ok() ? 1 : 0,
         'pw'     => babh6_password() !== '' ? 1 : 0,
         'nonce'  => is_user_logged_in() ? wp_create_nonce('wp_rest') : '',
+        'sw'     => apply_filters('babh6_pwa_enabled', true) ? babh6_pwa_sw_url() : '',
+        'ver'    => BABH6_VERSION,
     ));
     return '<div id="babh6-app" class="babh6"><div class="b6-boot">Регистърът се зарежда…</div><noscript><div class="b6-boot">За търсене в регистъра е необходим JavaScript. Включи го в браузъра и презареди страницата.</div></noscript></div>';
 }
