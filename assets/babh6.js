@@ -819,7 +819,7 @@ function renderActive() {
   if (f.producer) chip('producer', I.factory, 'Производител: ' + (f.producerName || f.producer));
   if (f.trader) chip('trader', I.store, 'Търговец: ' + (f.traderName || f.trader));
   if (f.own) chip('own', null, f.producer ? 'Собствена марка (без друг търговец)' : 'Собствено производство (без друг производител)');
-  if (f.brand) chip('brand', I.layers, 'Начало на наименованието: ' + f.brand);
+  if (f.brand) chip('brand', I.layers, 'Марка (начало на наименованието): ' + String(f.brand).split('|').join(' / '));
   var fb = $('#b6-fbtn'); if (fb) fb.innerHTML = I.filter + 'Филтри' + (activeCount(f) ? ' · ' + activeCount(f) : '');
   if (!chips.length) { el.innerHTML = ''; el.classList.remove('has'); return; }
   el.classList.add('has');
@@ -1138,7 +1138,7 @@ function bodyHTML(p) {
   rows += p.nd ? row('Дата на уведомление', fmtDate(p.nd)) : '<span class="l">Дата на уведомление</span>' + na;
   if (p.ed) rows += row('Дата на вписване', fmtDate(p.ed));
   if (p.ld) rows += row('Дата на пускане на пазара', fmtDate(p.ld));
-  if (p.o) rows += row('Област според рег. №', esc(p.o));
+  if (p.o) rows += row('Област по рег. №', esc(p.o) + '<div class="sub">По двуцифрения код в началото на регистрационния номер — областната дирекция на БАБХ (ОДБХ), в която е подадено уведомлението. Не е адресът на фирмата.</div>');
   if (p.st) rows += row('Данни за съхранение', '<span style="font-size:12.5px;white-space:pre-wrap">' + esc(p.st) + '</span>'); else rows += '<span class="l">Данни за съхранение</span>' + na;
 
   return '<div class="b6-body">' +
@@ -1668,6 +1668,7 @@ function openFirm(kind, norm, view, sel, noPush) {
 function firmSyncHash() { if (history.replaceState) { try { history.replaceState(null, '', location.pathname + location.search + firmHash()); } catch (e) {} } }
 function setFirmView(v, sel, push) {
   var f = state.firm; if (!f) return;
+  if ((sel || null) !== f.sel) f.ob = null;
   f.view = v; f.sel = sel || null;
   if (push !== false && history.pushState) { try { history.pushState(null, '', location.pathname + location.search + firmHash()); } catch (e) {} }
   $$('#b6-fseg .b6-seg-b').forEach(function (b) { var on = b.getAttribute('data-view') === v; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); b.setAttribute('tabindex', on ? '0' : '-1'); });
@@ -1797,32 +1798,57 @@ function renderFirmPartners(c, d, isP, self) {
       '<div class="b6-md-ht"><h3 class="b6-md-t">' + title + '</h3><div class="b6-md-chips">' + chips.join('') + '</div></div></div>' +
     '<div class="b6-actions b6-md-a">' + (cur.self ? '' : '<button type="button" class="b6-btn primary" data-firm="' + esc(pk + '|' + cur.norm) + '">' + (isP ? I.store : I.factory) + '<span>Пълен профил на ' + esc(cur.name) + '</span></button>') +
       '<button type="button" class="b6-btn" id="b6-md-open">' + I.search + '<span>Отвори в „Продукти“</span></button></div>' +
-    (cur.self ? '<div class="b6-ov-note">В регистъра не е вписан търговец за тези продукти; приема се, че ' + (isP ? 'производителят ги продава сам' : 'търговецът ги произвежда сам') + '.</div>' : '<div class="b6-ov-note">Връзка = общ запис в регистъра, в който двете фирми са посочени (или търговецът е предположен по наименованието). Не е доказателство за търговско отношение.</div>') +
+    (cur.self ? '<div class="b6-ov-note">В регистъра не е вписан търговец за тези продукти; приема се, че ' + (isP ? 'производителят ги продава сам' : 'търговецът ги произвежда сам') + '.</div>' + ownBrandsHTML(d, f) : '<div class="b6-ov-note">Връзка = общ запис в регистъра, в който двете фирми са посочени (или търговецът е предположен по наименованието). Не е доказателство за търговско отношение.</div>') +
     '<div id="b6-md-prod"></div>';
   var p = JSON.parse(JSON.stringify(self)); delete p.producerName; delete p.traderName;
   if (cur.self) p.own = 1; else p[isP ? 'trader' : 'producer'] = cur.norm;
+  /* v6.9.1: собствената марка е разпределена по марки от наименованието — избраната марка стеснява списъка и „Отвори в Продукти“ */
+  var ob = cur.self ? ownBrandOf(d, f) : null;
+  var withBrand = function (base) { var x = JSON.parse(JSON.stringify(base)); if (ob) x.brand = brandParam(ob); return x; };
   $('#b6-md-back').addEventListener('click', function () { setFirmView('partners', null); });
-  $('#b6-md-open').addEventListener('click', function () { var x = JSON.parse(JSON.stringify(self)); if (cur.self) x.own = true; else { x[isP ? 'trader' : 'producer'] = cur.norm; x[isP ? 'traderName' : 'producerName'] = cur.name; } gotoProducts(x); });
-  plistInto($('#b6-md-prod'), p, { what: 'продукта' });
+  $('#b6-md-open').addEventListener('click', function () { var x = JSON.parse(JSON.stringify(self)); if (cur.self) x.own = true; else { x[isP ? 'trader' : 'producer'] = cur.norm; x[isP ? 'traderName' : 'producerName'] = cur.name; } gotoProducts(withBrand(x)); });
+  var loadProds = function () { plistInto($('#b6-md-prod'), withBrand(p), { what: ob ? 'продукта с марка „' + ob.token + '“' : 'продукта' }); };
+  $$('[data-ob]', r).forEach(function (btn) { btn.addEventListener('click', function () {
+    f.ob = btn.getAttribute('data-ob') || null; ob = ownBrandOf(d, f);
+    $$('[data-ob]', r).forEach(function (b2) { var on = (b2.getAttribute('data-ob') || '') === (ob ? ob.key : ''); b2.classList.toggle('on', on); b2.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    loadProds();
+  }); });
+  loadProds();
+}
+/* Марка от /party: изписванията за филтъра brand= (през „|“), иначе етикетът */
+function brandParam(b) { return b.names && b.names.length ? b.names.join('|') : b.token; }
+/* Избраната марка в собствените продукти (f.ob = ключ), ако я има в отговора */
+function ownBrandOf(d, f) { var out = null; (d.own_brands || []).forEach(function (b) { if (b.key === f.ob) out = b; }); return out; }
+/* Собствена марка: разпределение на продуктите по марки от наименованието (v6.9.1) */
+function ownBrandsHTML(d, f) {
+  var list = d.own_brands || []; if (!list.length) return '';
+  var cur = ownBrandOf(d, f), ck = cur ? cur.key : '';
+  var chip = function (key, label, n, title) { return '<button type="button" class="b6-chip' + (ck === key ? ' on' : '') + '" data-ob="' + esc(key) + '"' + (title ? ' title="' + esc(title) + '"' : '') + ' aria-pressed="' + (ck === key ? 'true' : 'false') + '">' + esc(label) + '<span class="c">' + nfmt(n) + '</span></button>'; };
+  return '<div class="b6-obr"><div class="b6-obr-h">' + I.layers + '<span>Марки в наименованията</span><span class="b6-inf">автоматично, по името</span></div>' +
+    '<div class="b6-obr-list" role="group" aria-label="Филтър по марка">' + chip('', 'Всички', d.own) +
+      list.map(function (b) { return chip(b.key, b.token, b.count, b.names && b.names.length > 1 ? 'Изписвания: ' + b.names.join(', ') : ''); }).join('') + '</div>' +
+    '<div class="b6-ov-note">Марка = началото на наименованието (една до три думи, когато се повтарят при фирмата); кирилица и латиница се приравняват. Не е поле на БАБХ.' +
+      (d.own_nobrand ? ' Без разпозната марка: ' + nfmt(d.own_nobrand) + '.' : '') +
+      ((d.own_brands_total || 0) > list.length ? ' Показани първите ' + nfmt(list.length) + ' от ' + nfmt(d.own_brands_total) + ' марки.' : '') + '</div></div>';
 }
 /* Марки: начала на наименованията вляво, продуктите с това начало вдясно */
 function renderFirmBrands(c, d, isP, self) {
   var f = state.firm, t = firmTotals(d), all = d.brands || [], q = (f.bq || '').trim();
   var list = q ? all.filter(function (x) { return fmatch(x.token, q); }) : all;
-  var cur = null; all.forEach(function (x) { if (x.token === f.sel) cur = x; });
-  if (!cur && f.sel == null && !isMobile() && all.length) { cur = all[0]; f.sel = cur.token; firmSyncHash(); }
+  var cur = null; all.forEach(function (x) { if (x.key === f.sel || x.token === f.sel) cur = x; });
+  if (!cur && f.sel == null && !isMobile() && all.length) { cur = all[0]; f.sel = cur.key; firmSyncHash(); }
   var bmax = 1; all.forEach(function (x) { if (x.count > bmax) bmax = x.count; });
   c.innerHTML = '<div class="b6-md' + (cur ? ' has-sel' : '') + '">' +
     '<aside class="b6-md-l" aria-label="Марки">' +
       '<form class="b6-pdq compact" id="b6-mdq" role="search"><label for="b6-mdq-i" class="b6-vh">Търси марка</label>' + I.search + '<input id="b6-mdq-i" type="search" autocomplete="off" placeholder="Търси марка…" value="' + esc(f.bq || '') + '"><button type="button" class="clr' + (q ? ' show' : '') + '" id="b6-mdq-x" aria-label="Изчисти">' + I.x + '</button></form>' +
       '<div class="b6-md-list" role="list">' + (list.length ? list.map(function (x) {
-        return '<button type="button" role="listitem" class="b6-mdr' + (cur && cur.token === x.token ? ' on' : '') + '" data-sel="' + esc(x.token) + '">' +
+        return '<button type="button" role="listitem" class="b6-mdr' + (cur && cur.key === x.key ? ' on' : '') + '" data-sel="' + esc(x.key) + '">' +
           '<span class="b6-av sm brand" aria-hidden="true">' + esc(x.token.charAt(0).toUpperCase()) + '</span>' +
-          '<span class="b6-mdr-b"><span class="nm">' + esc(x.token.toUpperCase()) + '</span><span class="sub">' + (x.match ? (isP ? 'най-често с ' : 'най-често от ') + esc(x.match.name) : '<span class="b6-inf">без насрещна фирма</span>') + '</span><span class="bar" aria-hidden="true"><i style="width:' + Math.max(2, Math.round(100 * x.count / bmax)) + '%"></i></span></span>' +
+          '<span class="b6-mdr-b"><span class="nm">' + esc(x.token) + '</span><span class="sub">' + (x.match ? (isP ? 'най-често с ' : 'най-често от ') + esc(x.match.name) : '<span class="b6-inf">без насрещна фирма</span>') + (x.names && x.names.length > 1 ? '<span class="b6-inf">също ' + esc(x.names.slice(1).join(', ')) + '</span>' : '') + '</span><span class="bar" aria-hidden="true"><i style="width:' + Math.max(2, Math.round(100 * x.count / bmax)) + '%"></i></span></span>' +
           '<span class="b6-mdr-c"><b>' + nfmt(x.count) + '</b></span>' + I.chev + '</button>';
       }).join('') : '<div class="b6-empty"><div class="b6-empty-t">Няма марки' + (q ? ' за „' + esc(q) + '“' : '') + '</div></div>') + '</div>' +
       (all.length < t.bt ? '<div class="b6-ov-note">Показани първите ' + nfmt(all.length) + ' от ' + nfmt(t.bt) + '.</div>' : '') +
-      '<div class="b6-ov-note">Марка = първата дума в наименованието (кирилица и латиница се приравняват). Автоматично предположение, не поле на БАБХ.</div>' +
+      '<div class="b6-ov-note">Марка = началото на наименованието: една дума, или две-три, когато се повтарят при фирмата („Health Upgrade“). Кирилица и латиница се приравняват, двуезичните имена сливат изписванията. Автоматично предположение, не поле на БАБХ.</div>' +
     '</aside>' +
     '<section class="b6-md-r" id="b6-md-r" aria-live="polite"></section></div>';
   var inp = $('#b6-mdq-i'), tm = null;
@@ -1835,13 +1861,13 @@ function renderFirmBrands(c, d, isP, self) {
   r.innerHTML =
     '<button type="button" class="b6-back b6-md-back" id="b6-md-back">' + I.chev + 'Марки</button>' +
     '<div class="b6-md-h"><span class="b6-av brand" aria-hidden="true">' + esc(cur.token.charAt(0).toUpperCase()) + '</span>' +
-      '<div class="b6-md-ht"><h3 class="b6-md-t">Наименования, започващи с <b>' + esc(cur.token.toUpperCase()) + '</b></h3><div class="b6-md-chips"><span class="b6-mdc"><b>' + nfmt(cur.count) + '</b> ' + plural(cur.count, 'продукт', 'продукта') + '</span>' +
+      '<div class="b6-md-ht"><h3 class="b6-md-t">Наименования, започващи с <b>' + esc(cur.token) + '</b>' + (cur.names && cur.names.length > 1 ? ' <small>(също: ' + esc(cur.names.slice(1).join(', ')) + ')</small>' : '') + '</h3><div class="b6-md-chips"><span class="b6-mdc"><b>' + nfmt(cur.count) + '</b> ' + plural(cur.count, 'продукт', 'продукта') + '</span>' +
       (cur.match ? '<span class="b6-mdc">' + (isP ? 'най-често с ' : 'най-често от ') + '<a href="#" class="b6-plink" data-firm="' + esc(cur.match.kind + '|' + cur.match.norm) + '">' + esc(cur.match.name) + '</a> (' + nfmt(cur.match.count) + ')</span>' : '') + '</div></div></div>' +
     '<div class="b6-actions b6-md-a"><button type="button" class="b6-btn" id="b6-md-open">' + I.search + '<span>Отвори в „Продукти“</span></button></div>' +
     '<div id="b6-md-prod"></div>';
-  var p = JSON.parse(JSON.stringify(self)); delete p.producerName; delete p.traderName; p.brand = cur.token;
+  var p = JSON.parse(JSON.stringify(self)); delete p.producerName; delete p.traderName; p.brand = brandParam(cur);
   $('#b6-md-back').addEventListener('click', function () { setFirmView('brands', null); });
-  $('#b6-md-open').addEventListener('click', function () { var x = JSON.parse(JSON.stringify(self)); x.brand = cur.token; gotoProducts(x); });
+  $('#b6-md-open').addEventListener('click', function () { var x = JSON.parse(JSON.stringify(self)); x.brand = brandParam(cur); gotoProducts(x); });
   plistInto($('#b6-md-prod'), p, { what: 'продукта' });
 }
 /* Общ списък продукти в контейнер: /products с параметри, редове + „Покажи още“; само последната заявка рисува */

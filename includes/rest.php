@@ -128,11 +128,17 @@ function babh6_build_where($req, &$where, &$args) {
         if ($pn !== '') $where[] = "({$eff['norm']} = '' OR {$eff['norm']} = producer_norm)";
         elseif ($tn !== '') $where[] = "(producer_kind <> 'firm' OR producer_norm = '' OR producer_norm = {$eff['norm']})";
     }
+    /* Марка = начало на наименованието. v6.9.1: няколко изписвания през „|“ („Naturalico|Натуралико“, от
+       babh6_brand_groups) — тогава точно тези начала; една стойност (стари линкове) — и кирилица/латиница. */
     $brand = trim((string)$req->get_param('brand'));
     if ($brand !== '' && function_exists('babh6_brand_like_variants')) {
         $ors = array();
-        foreach (babh6_brand_like_variants(mb_substr($brand, 0, 60, 'UTF-8')) as $v) { $ors[] = 'name LIKE %s'; $args[] = $v; }
-        $where[] = '(' . implode(' OR ', $ors) . ')';
+        $spellings = array_values(array_filter(array_map('trim', explode('|', $brand)), 'strlen'));
+        $multi = count($spellings) > 1;
+        foreach (array_slice($spellings, 0, 8) as $b) {
+            foreach (babh6_brand_like_variants(mb_substr($b, 0, 60, 'UTF-8'), !$multi) as $v) { $ors[] = 'name LIKE %s'; $args[] = $v; }
+        }
+        if ($ors) $where[] = '(' . implode(' OR ', $ors) . ')';
     }
 
     if ($req->get_param('recent')) {

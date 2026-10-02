@@ -1041,6 +1041,14 @@ html.b6-standalone .b6-dw-wrap { padding-top: env(safe-area-inset-top); }
 .b6-mdc.warn { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber); }
 .b6-mdc.warn svg { color: inherit; }
 .b6-mdc.muted { color: var(--t3); }
+/* v6.9.1: марки в собствените продукти (разпределение по началото на наименованието) */
+.b6-obr { margin: 14px 0 4px; }
+.b6-obr-h { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--t2); margin-bottom: 8px; }
+.b6-obr-h svg { width: 14px; height: 14px; color: var(--t4); }
+.b6-obr-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.b6-obr-list .b6-chip { max-width: 100%; }
+.b6-obr-list .b6-chip > span:first-child, .b6-obr-list .b6-chip { overflow: hidden; text-overflow: ellipsis; }
+.b6-md-t small { font-weight: 400; color: var(--t3); font-size: 12px; }
 .b6-md-a { margin: 12px 0 10px; flex-wrap: wrap; }
 .b6-md-r .b6-ov-note { margin-bottom: 12px; }
 @media (max-width: 900px) {

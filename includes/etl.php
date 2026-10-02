@@ -691,6 +691,7 @@ function babh6_merge_norm_aliases() {
  * преизчислява фирмите.
  */
 function babh6_renorm_start() {
+    delete_transient('babh6_stats');
     update_option('babh6_renorm', array('cursor' => 0, 'changed' => 0, 'started' => time()), false);
     if (!wp_next_scheduled('babh6_renorm_step')) wp_schedule_single_event(time() + 2, 'babh6_renorm_step');
 }
@@ -709,7 +710,7 @@ function babh6_renorm_step($budget = 20) {
     $t0 = time();
     while (time() - $t0 < $budget) {
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT id, name, composition, purpose, category, flags, flag_count, producer_name, trader_name, producer_norm, trader_norm, producer_kind, trader_kind FROM $t WHERE id > %d ORDER BY id LIMIT 1000", (int)$st['cursor']));
+            "SELECT id, reg, oblast, name, composition, purpose, category, flags, flag_count, producer_name, trader_name, producer_norm, trader_norm, producer_kind, trader_kind FROM $t WHERE id > %d ORDER BY id LIMIT 1000", (int)$st['cursor']));
         if (!$rows) {
             delete_option('babh6_renorm');
             delete_transient('babh6_renorm_lock');
@@ -726,10 +727,14 @@ function babh6_renorm_step($budget = 20) {
             $cat   = babh6_categorize($r->name, (string)$r->composition);
             $fl    = babh6_find_flags_fields($r->name, (string)$r->composition, (string)$r->purpose);
             $fl_j  = $fl ? wp_json_encode($fl, JSON_UNESCAPED_UNICODE) : null;
+            /* v6.9.1: областта по кода в рег. № (таблицата с кодовете беше грешна) */
+            $ri = babh6_parse_reg($r->reg);
+            $ob = $ri ? (string)$ri['oblast'] : '';
             if ($pn !== $r->producer_norm || $tn !== $r->trader_norm || $pk !== $r->producer_kind || $tk !== $r->trader_kind
-                || $cat !== (string)$r->category || count($fl) !== (int)$r->flag_count || (string)$fl_j !== (string)$r->flags) {
+                || $cat !== (string)$r->category || count($fl) !== (int)$r->flag_count || (string)$fl_j !== (string)$r->flags
+                || $ob !== (string)$r->oblast) {
                 $wpdb->update($t, array('producer_norm' => $pn, 'producer_kind' => $pk, 'trader_norm' => $tn, 'trader_kind' => $tk,
-                    'category' => $cat, 'flags' => $fl_j, 'flag_count' => count($fl)), array('id' => (int)$r->id));
+                    'category' => $cat, 'flags' => $fl_j, 'flag_count' => count($fl), 'oblast' => $ob), array('id' => (int)$r->id));
                 $st['changed']++;
             }
             $st['cursor'] = (int)$r->id;
