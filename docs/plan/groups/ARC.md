@@ -8,12 +8,12 @@
 | ID | Задача | Пр. | Етап | Вълна | Статус | Зависимости | Резултат |
 |---|---|---|---|---|---|---|---|
 | ARC-001 | Установяване на текущата версия | P0 | R0 | 0 | in_progress | — | baseline-manifest.json и карта на разликите |
-| ARC-002 | Осигуряване на входните данни | P0 | R0 | 1 | planned | ARC-001 | source-corpus-manifest.json |
-| ARC-003 | Архитектурно решение за модулен плъгин | P0 | R0 | 1 | planned | ARC-001 | ADR-001 и карта на модулите |
+| ARC-002 | Осигуряване на входните данни | P0 | R0 | 1 | blocked | ARC-001 | source-corpus-manifest.json |
+| ARC-003 | Архитектурно решение за модулен плъгин | P0 | R0 | 1 | in_review | ARC-001 | ADR-001 и карта на модулите |
 | ARC-004 | Речник и семантика на продукта | P0 | R0 | 2 | in_review | ARC-003 | domain-glossary.md |
-| ARC-005 | Версионирани договори и правила за промяна | P0 | R0 | 3 | planned | ARC-004 | OpenAPI и JSON Schema contracts |
-| ARC-006 | Инвентар на екрани и единствен собственик на функция | P1 | R0 | 3 | planned | ARC-004 | screen-map.md и duplication-map.md |
-| ARC-007 | Изолирани среди и достъп за разработване | P0 | R0 | 2 | planned | ARC-003 | environment-contract.md и примерен env без секрети |
+| ARC-005 | Версионирани договори и правила за промяна | P0 | R0 | 3 | in_review | ARC-004 | OpenAPI и JSON Schema contracts |
+| ARC-006 | Инвентар на екрани и единствен собственик на функция | P1 | R0 | 3 | in_review | ARC-004 | screen-map.md и duplication-map.md |
+| ARC-007 | Изолирани среди и достъп за разработване | P0 | R0 | 2 | blocked | ARC-003 | environment-contract.md и примерен env без секрети |
 | ARC-008 | Оркестрация на работата на агентите | P1 | R0 | 4 | in_review | ARC-005, ARC-006 | AGENTS.md, ownership.yml и task-run template |
 
 ## ARC-001 · Установяване на текущата версия
@@ -41,7 +41,7 @@
 - **Резултат:** source-corpus-manifest.json
 - **Зависимости:** ARC-001
 - **Основание:** DESIGN · покрива: DESIGN
-- **Статус:** planned
+- **Статус:** blocked — Порталът на БАБХ не е достъпен от средата на сесията (HTTPS CONNECT 403 през прокси, 2026-10-17); реалните XLSX пакети трябва да дойдат от собственика (ръчно сваляне или staging с достъп). Блокира приемането на parser/dataset (QA-002), не останалата R0 работа. Нужни: всички части на поне 3 последователни пълни снимки + стари формати, с дата, размер, SHA-256.
 
 **Приемане**
 
@@ -58,7 +58,7 @@
 - **Резултат:** ADR-001 и карта на модулите
 - **Зависимости:** ARC-001
 - **Основание:** DESIGN · покрива: DESIGN
-- **Статус:** planned
+- **Статус:** in_review — docs/adr/ADR-001-modular-plugin.md: ограничения, 5 слоя, правило за чистота, карта на всеки файл към слой. Конкретна проверка: parser през CLI без браузър е изпълнен (tests/run.sh); entitlement policy не съществува още — отложено до BIL-002/IAM-003. Хостинг лимитите не са измерени (ARC-007/OPS-001).
 
 **Приемане**
 
@@ -92,7 +92,7 @@
 - **Резултат:** OpenAPI и JSON Schema contracts
 - **Зависимости:** ARC-004
 - **Основание:** DESIGN · покрива: DESIGN
-- **Статус:** planned
+- **Статус:** in_review — As-is договор 1.0: contracts/openapi-babh6-v1.yaml (12 маршрута), JSON Schema за карта/запис/грешка, правила за версии в contracts/README.md и CHANGES.md. Конкретна проверка: tests/php/contracts.test.php отхвърля невалиден enum и неочакван тип дата. Query AST и събития не са описани (няма ги в кода) — остават за версия 2.0 след DAT/API задачите.
 
 **Приемане**
 
@@ -109,7 +109,7 @@
 - **Резултат:** screen-map.md и duplication-map.md
 - **Зависимости:** ARC-004
 - **Основание:** DESIGN · покрива: DESIGN
-- **Статус:** planned
+- **Статус:** in_review — docs/screen-map.md: 15 екрана → целева навигация с решение за всеки; duplication map с доказателства в кода; общи компоненти → къде са днес. Конкретната проверка (експорт, търсене, профил от всички входни точки) е направена по кода, не в браузър.
 
 **Приемане**
 
@@ -126,7 +126,7 @@
 - **Резултат:** environment-contract.md и примерен env без секрети
 - **Зависимости:** ARC-003
 - **Основание:** DESIGN · покрива: DESIGN
-- **Статус:** planned
+- **Статус:** blocked — docs/environment-contract.md и .env.example са написани (правила за local/staging/production, mail sink, sandbox). Smoke сценарият не е изпълнен: няма staging/local WordPress в сесията. Нужни от собственика: staging хост с отделна база, mail sink, хостинг лимити.
 
 **Приемане**
 

@@ -35,7 +35,7 @@ jobs:
         if: steps.v.outputs.exists == '0'
         run: |
           mkdir -p build/babh-register-v6
-          rsync -a --exclude '.git' --exclude '.github' --exclude 'build' --exclude 'docs' --exclude 'tests' --exclude '*.md' --exclude '.gitignore' ./ build/babh-register-v6/
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'build' --exclude 'docs' --exclude 'tests' --exclude 'contracts' --exclude '.env.example' --exclude '*.md' --exclude '.gitignore' ./ build/babh-register-v6/
           cd build && zip -qr ../babh-register-v6.zip babh-register-v6 && cd ..
           unzip -l babh-register-v6.zip | tail -1
       - name: Release v${{ steps.v.outputs.ver }}

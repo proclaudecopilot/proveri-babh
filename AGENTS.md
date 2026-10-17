@@ -4,7 +4,7 @@
 
 ## 1. Какво е това хранилище
 
-WordPress плъгин **babh-register-v6** (PHP 7.4+, MySQL през `$wpdb`, vanilla JS/CSS). Структурата е плоска: `includes/*.php`, `assets/babh6.js|css`. Няма тестове в хранилището (README описва локални jsdom/PHP проверки, които не са запазени). Няма Composer/npm. Release = вдигане на версията в `babh-register-v6.php` (header и `BABH6_VERSION`) и push в `main` → GitHub Action прави tag + zip. **Папките `docs/`, `tests/` и `*.md` не влизат в пакета** (виж `.github/workflows/release.yml`).
+WordPress плъгин **babh-register-v6** (PHP 7.4+, MySQL през `$wpdb`, vanilla JS/CSS). Структурата е плоска: `includes/*.php`, `assets/babh6.js|css`. Тестове без WordPress: `sh tests/run.sh` (lint + `tests/php/*.test.php` + `tests/js/*.test.js` + валидатор на backlog-а); `xfail` = известен дефект със задача. Няма Composer/npm. Release = вдигане на версията в `babh-register-v6.php` (header и `BABH6_VERSION`) и push в `main` → GitHub Action прави tag + zip. **Папките `docs/`, `tests/` и `*.md` не влизат в пакета** (виж `.github/workflows/release.yml`).
 
 Къде е какво:
 
@@ -19,6 +19,10 @@ WordPress плъгин **babh-register-v6** (PHP 7.4+, MySQL през `$wpdb`, v
 | Речник | `docs/domain-glossary.md` |
 | Собственост на файлове/договори | `docs/plan/ownership.yml` |
 | Шаблон за отчет на задача | `docs/plan/task-run-template.md` |
+| Архитектурни решения | `docs/adr/` (ADR-001: слоеве и карта на файловете) |
+| REST договори (as-is 1.0) | `contracts/openapi-babh6-v1.yaml`, `contracts/schemas/`, правила в `contracts/README.md` |
+| Екрани и дублирания | `docs/screen-map.md` |
+| Среди и секрети | `docs/environment-contract.md`, `.env.example` |
 | История на версиите на плъгина | `README.md` |
 
 ## 2. Как се взима задача

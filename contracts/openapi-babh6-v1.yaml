@@ -1,0 +1,355 @@
+openapi: 3.0.3
+info:
+  title: Провери БАБХ · REST babh6/v1 (as-is)
+  version: "1.0"
+  description: |
+    Описание на съществуващия договор на плъгина babh-register-v6 v6.9.0, фиксирано като версия 1.0 (ARC-005).
+    Базов път: `/wp-json/babh6/v1`. Всички отговори с данни носят `Cache-Control: private, no-store` и `Vary: Cookie`.
+    Достъп: „public“ = `babh6_rest_permission` (сайтът е отворен или посетителят е въвел общата парола);
+    „pro“ = `babh6_rest_permission_pro` (администратор или въведена парола при зададена парола). Няма акаунти.
+    Известните несъответствия със заданието са изброени в contracts/README.md и се решават с версия 2.0.
+servers:
+  - url: /wp-json/babh6/v1
+tags:
+  - {name: public, description: четене на регистъра}
+  - {name: pro, description: функции, видими само с Pro достъп}
+  - {name: auth, description: обща парола на сайта}
+components:
+  parameters:
+    kind: {name: kind, in: query, schema: {type: string, enum: [p, t], default: p}, description: "p = производител, t = търговец"}
+    page: {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+  schemas:
+    Error: {$ref: './schemas/error.schema.json'}
+    ProductCard: {$ref: './schemas/product-card.schema.json'}
+    ProductItem: {$ref: './schemas/product-item.schema.json'}
+    Monthly:
+      type: array
+      description: Точно 12 (или 24) последователни календарни месеца в часовата зона на сайта; 0 = нула записи, не „няма данни“
+      items: {type: object, required: [m, c], properties: {m: {type: string, pattern: '^\d{4}-\d{2}$'}, c: {type: integer, minimum: 0}}}
+    PartyListItem:
+      type: object
+      required: [norm, name, bg, products, flagged, partners, inferred, y1, y2]
+      properties:
+        norm: {type: string, description: нормализиран ключ (евристика)}
+        name: {type: string, description: най-често срещаното изписване}
+        bg: {type: integer, enum: [0, 1], description: "българска регистрация по евристика (CO-03)"}
+        products: {type: integer, description: брой регистрации с тази роля}
+        flagged: {type: integer, description: "брой с автоматични бележки (Pro)"}
+        partners: {type: integer, description: брой насрещни фирми (co-occurrence)}
+        inferred: {type: integer, description: брой регистрации с търговец, предположен по името}
+        y1: {type: [integer, 'null']}
+        y2: {type: [integer, 'null']}
+  responses:
+    Locked: {description: Нужна е парола (babh6_locked), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Pro: {description: Pro функция (babh6_pro), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Db: {description: Грешка в базата (babh6_db), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+paths:
+  /products:
+    get:
+      tags: [public]
+      summary: Списък регистрации (карти) по филтри и търсене
+      description: |
+        Един и същ избор на редове като /export (babh6_products_select). Релевантност само при sort празен или `rel` (PR-09).
+        Търсене: q от 2+ знака; ако q прилича на рег. номер (цифри ≥3 с/без П/Т), търси по reg LIKE; иначе по name, composition,
+        producer_name, trader_name, trader_inf_name (и reg в LIKE режим). Fulltext режим при наличен индекс и токени ≥3 знака.
+      parameters:
+        - {name: q, in: query, schema: {type: string, minLength: 2}, description: "1 знак → 400 babh6_query_short"}
+        - {name: status, in: query, schema: {type: string, enum: ['', deleted, delnote, all]}, description: "'' = в последните данни; deleted = липсва в последния пълен файл; delnote = бележка за заличаване в източника; all = всички"}
+        - {name: deleted, in: query, schema: {type: integer}, deprecated: true, description: стар параметър = status=deleted}
+        - {name: flagged, in: query, schema: {type: integer, enum: [1]}, description: само с автоматична бележка (игнорира се без Pro)}
+        - {name: rt, in: query, schema: {type: string, enum: [П, Т]}, description: тип на рег. номер}
+        - {name: bg, in: query, schema: {type: integer}, deprecated: true, description: стар параметър = rt=П}
+        - {name: cat, in: query, schema: {type: string}, description: "категории през запетая (поне една от тях), напр. cat=vitamins,herbal"}
+        - {name: year, in: query, schema: {type: integer, minimum: 1990, maximum: 2100}, description: година от рег. номера}
+        - {name: obl, in: query, schema: {type: string}, description: област от рег. номера (име)}
+        - {name: producer, in: query, schema: {type: string, maxLength: 191}, description: нормализиран ключ на производител}
+        - {name: trader, in: query, schema: {type: string, maxLength: 191}, description: "нормализиран ключ на ЕФЕКТИВНИЯ търговец (предположен → посочен → самият производител); с inferred=0 само посочения"}
+        - {name: inferred, in: query, schema: {type: string, enum: ['0', '1']}, description: "1 = само с предположен търговец; 0 = при trader= ограничава до посочения"}
+        - {name: own, in: query, schema: {type: integer, enum: [1]}, description: "с producer= или trader=: без друга насрещна фирма (собствена марка / собствено производство — извод по правило)"}
+        - {name: brand, in: query, schema: {type: string, maxLength: 60}, description: наименование, започващо с марката (кирилица/латиница, кавички)}
+        - {name: recent, in: query, schema: {type: integer, enum: [1]}, description: последните 12 календарни месеца по дата на уведомление (същият интервал като /stats.monthly)}
+        - {name: sort, in: query, schema: {type: string, enum: ['', rel, new, old, name, flagged, date]}, description: "new/old = по година от рег. №, дата, пореден №; flagged → new без Pro"}
+        - {$ref: '#/components/parameters/page'}
+        - {name: per, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, page, per, items]
+                properties:
+                  total: {type: integer}
+                  page: {type: integer}
+                  per: {type: integer}
+                  items: {type: array, items: {$ref: '#/components/schemas/ProductCard'}}
+        '400': {description: babh6_query_short, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '401': {$ref: '#/components/responses/Locked'}
+        '500': {$ref: '#/components/responses/Db'}
+  /product/{reg}:
+    get:
+      tags: [public]
+      summary: Пълен запис по регистрационен номер (включително липсващ в последния файл)
+      parameters:
+        - {name: reg, in: path, required: true, schema: {type: string}, description: интервалите се махат; латинско P/T се приема}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProductItem'}}}}
+        '404': {description: babh6_notfound, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '401': {$ref: '#/components/responses/Locked'}
+  /stats:
+    get:
+      tags: [public]
+      summary: Обобщение и актуалност (кеш transient babh6_stats)
+      responses:
+        '200':
+          description: OK (без Pro полето flagged липсва)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: {type: integer, description: регистрации в последните данни}
+                  flagged: {type: integer, description: само с Pro}
+                  producers_bg: {type: integer}
+                  traders_bg: {type: integer}
+                  deleted: {type: integer, description: липсват в последния пълен файл}
+                  delnote: {type: integer, description: с бележка за заличаване в източника}
+                  producers: {type: integer}
+                  traders: {type: integer}
+                  inferred: {type: integer}
+                  last_update: {type: [string, 'null'], description: "d.m.Y на последния импорт със status=done (форматирана, не ISO)"}
+                  last_update_at: {type: [string, 'null'], description: d.m.Y H:i}
+                  last_partial: {type: integer, enum: [0, 1], description: последният импорт има бележки (не е приет за пълен)}
+                  source_date: {type: [string, 'null'], description: d.m.Y от „Последна актуализация“ на портала}
+                  checked_at: {type: [string, 'null'], description: d.m.Y H:i на последната проверка на портала}
+                  sync_result: {type: string, enum: ['', ok, partial, nochange, running, started, queued, error, cancelled]}
+                  sync_enabled: {type: integer, enum: [0, 1]}
+                  check_overdue: {type: integer, enum: [0, 1], description: над 8 дни без проверка}
+                  monthly: {$ref: '#/components/schemas/Monthly'}
+                  cats: {type: array, description: категории с броячи, items: {type: object}}
+  /export:
+    get:
+      tags: [pro]
+      summary: CSV на същия набор като /products (до babh6_export_limit = 5000 реда)
+      description: "Параметрите са като /products (без page/per). Заглавки X-Babh6-Total (всички съвпадения) и X-Babh6-Rows (в файла). Формулни префикси са неутрализирани; разделител ';'; обхватът е записан в самия файл. Изисква _wpnonce."
+      responses:
+        '200': {description: text/csv; charset=utf-8 с BOM}
+        '401': {$ref: '#/components/responses/Locked'}
+        '403': {$ref: '#/components/responses/Pro'}
+  /waitlist:
+    post:
+      tags: [public]
+      summary: Заявен интерес към функция (email + source); honeypot поле website
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object, required: [email], properties: {email: {type: string, format: email, maxLength: 191}, source: {type: string, maxLength: 50}, website: {type: string, description: honeypot — трябва да е празно}}}
+      responses:
+        '200': {description: "{ok:1, source, exists:0|1}", content: {application/json: {schema: {type: object, properties: {ok: {type: integer}, source: {type: string}, exists: {type: integer}}}}}}
+        '400': {description: babh6_email, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '429': {description: babh6_rate (над 10 опита/IP), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /parties:
+    get:
+      tags: [pro]
+      summary: Списък фирми по роля (по подразбиране само с българска регистрация)
+      parameters:
+        - {$ref: '#/components/parameters/kind'}
+        - {name: q, in: query, schema: {type: string, minLength: 2}, description: по име и ключ, кирилица/латиница}
+        - {name: all, in: query, schema: {type: integer, enum: [1]}, description: всички държави}
+        - {name: sort, in: query, schema: {type: string, enum: [products, partners, flagged, name, newest], default: products}}
+        - {$ref: '#/components/parameters/page'}
+        - {name: per, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 40}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, total, page, per, items, all, all_bg, bg_only]
+                properties:
+                  kind: {type: string, enum: [p, t]}
+                  total: {type: integer}
+                  page: {type: integer}
+                  per: {type: integer}
+                  items: {type: array, items: {$ref: '#/components/schemas/PartyListItem'}}
+                  all: {type: integer, description: всички фирми с тази роля}
+                  all_bg: {type: integer}
+                  bg_only: {type: integer, enum: [0, 1]}
+        '401': {$ref: '#/components/responses/Locked'}
+        '403': {$ref: '#/components/responses/Pro'}
+  /party:
+    get:
+      tags: [pro]
+      summary: Профил на фирма (партньори, собствена марка, категории, години, марки-кандидати, класация, 24 месеца, най-нови)
+      parameters:
+        - {$ref: '#/components/parameters/kind'}
+        - {name: norm, in: query, required: true, schema: {type: string, maxLength: 191}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, norm, name, full, bg, products, flagged, deleted, y1, y2, own, inferred, partners, partners_total, partners_src, cats, years, brands, brands_total, rank_all, rank_bg, monthly, recent12, prev12, latest]
+                properties:
+                  kind: {type: string, enum: [p, t]}
+                  norm: {type: string}
+                  name: {type: string}
+                  full: {type: string, description: най-пълното изписване с адрес}
+                  bg: {type: integer, enum: [0, 1]}
+                  products: {type: integer, description: регистрации с тази роля}
+                  flagged: {type: integer}
+                  deleted: {type: integer, description: липсващи в последния пълен файл}
+                  y1: {type: [integer, 'null']}
+                  y2: {type: [integer, 'null']}
+                  own: {type: integer, description: "регистрации без друга насрещна фирма (извод по правило: собствена марка / собствено производство)"}
+                  inferred: {type: integer}
+                  partners: {type: array, description: до 500 насрещни фирми (co-occurrence), самата фирма е ред със self=1, items: {type: object, properties: {norm: {type: string}, name: {type: string}, products: {type: integer}, flagged: {type: integer}, inferred: {type: integer}, y1: {type: [integer, 'null']}, y2: {type: [integer, 'null']}, self: {type: integer}}}}
+                  partners_total: {type: integer, description: брой на ДРУГИТЕ насрещни фирми (без self)}
+                  partners_src: {type: string}
+                  cats: {type: array, items: {type: object}}
+                  years: {type: array, items: {type: object}}
+                  brands: {type: array, description: "първи думи на наименованията (кандидати, не марки — CO-06)", items: {type: object}}
+                  brands_total: {type: integer}
+                  rank_all: {type: integer, description: позиция сред всички фирми с тази роля по брой регистрации}
+                  rank_bg: {type: [integer, 'null']}
+                  monthly: {$ref: '#/components/schemas/Monthly'}
+                  recent12: {type: integer}
+                  prev12: {type: integer}
+                  latest: {type: array, maxItems: 6, items: {$ref: '#/components/schemas/ProductCard'}}
+        '404': {description: babh6_notfound, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '401': {$ref: '#/components/responses/Locked'}
+        '403': {$ref: '#/components/responses/Pro'}
+  /rank:
+    get:
+      tags: [pro]
+      summary: Класация по брой регистрации за период + кумулативна серия и „изпреварвания“ (кеш 12 ч.)
+      description: "Записи без дата на уведомление влизат само в period=all и се третират като най-стари (известно нарушение на „неизвестно ≠ най-старо“, ANA-005)."
+      parameters:
+        - {$ref: '#/components/parameters/kind'}
+        - {name: period, in: query, schema: {type: string, enum: [all, 12m, year, month], default: all}}
+        - {name: year, in: query, schema: {type: integer}}
+        - {name: month, in: query, schema: {type: string, pattern: '^\d{4}-\d{2}$'}}
+        - {name: all, in: query, schema: {type: integer, enum: [1]}, description: всички държави}
+        - {name: limit, in: query, schema: {type: integer, minimum: 3, maximum: 100, default: 20}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, all, limit, range, total, prev_total, firms, prev_firms, items, months, series, moves, moves_scope, years, min_month]
+                properties:
+                  kind: {type: string, enum: [p, t]}
+                  all: {type: integer, enum: [0, 1]}
+                  limit: {type: integer}
+                  range: {type: object, properties: {period: {type: string}, from: {type: [string, 'null']}, to: {type: [string, 'null']}, prev_from: {type: [string, 'null']}, prev_to: {type: [string, 'null']}, year: {type: [integer, 'null']}, month: {type: [string, 'null']}}}
+                  total: {type: integer}
+                  prev_total: {type: integer}
+                  firms: {type: integer}
+                  prev_firms: {type: integer}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [rank, norm, name, bg, count, partners, prev_count, delta, prev_rank, move, is_new, share, new_partners]
+                      properties:
+                        rank: {type: integer}
+                        norm: {type: string}
+                        name: {type: string}
+                        bg: {type: integer}
+                        count: {type: integer}
+                        partners: {type: integer}
+                        prev_count: {type: integer}
+                        delta: {type: integer}
+                        prev_rank: {type: [integer, 'null']}
+                        move: {type: [integer, 'null'], description: "null = нов в класацията"}
+                        is_new: {type: integer, enum: [0, 1]}
+                        share: {type: number, description: дял в % от всички регистрации в периода}
+                        new_partners: {type: integer, description: насрещни фирми с първа обща регистрация в периода (co-occurrence)}
+                  months: {type: array, items: {type: string}}
+                  series: {type: array, description: кумулативни стойности на първите фирми по месеци, items: {type: object}}
+                  moves: {type: array, description: "A изпреварва B през месец M (строго повече в края на M, ≤ в края на M−1)", items: {type: object}}
+                  moves_scope: {type: object}
+                  years: {type: array, items: {type: integer}}
+                  min_month: {type: string}
+        '401': {$ref: '#/components/responses/Locked'}
+        '403': {$ref: '#/components/responses/Pro'}
+  /rank/move:
+    get:
+      tags: [pro]
+      summary: Подробности за едно изпреварване (A срещу B през месец)
+      parameters:
+        - {$ref: '#/components/parameters/kind'}
+        - {name: norm, in: query, required: true, schema: {type: string, maxLength: 191}}
+        - {name: vs, in: query, schema: {type: string, maxLength: 191}}
+        - {name: month, in: query, required: true, schema: {type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, month, from, to, a, b, partners, new_partners, own, products, products_total]
+                properties:
+                  kind: {type: string}
+                  month: {type: string}
+                  from: {type: string}
+                  to: {type: string}
+                  a: {type: object, properties: {norm: {type: string}, name: {type: string}, bg: {type: integer}, total: {type: integer}, before: {type: integer}, after: {type: integer}, new: {type: integer}}}
+                  b: {type: [object, 'null']}
+                  partners: {type: array, maxItems: 200, items: {type: object, properties: {norm: {type: string}, name: {type: string}, count: {type: integer}, first: {type: [string, 'null']}, total: {type: integer}, is_new: {type: integer}}}}
+                  new_partners: {type: integer}
+                  own: {type: integer, description: регистрации през месеца без насрещна фирма}
+                  products: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ProductCard'}}
+                  products_total: {type: integer}
+        '400': {description: babh6_bad, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '404': {description: babh6_notfound, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /auth:
+    post:
+      tags: [auth]
+      summary: Вход с общата парола на сайта → cookie babh6_auth (подписан токен с exp, 30 дни)
+      requestBody: {content: {application/json: {schema: {type: object, required: [password], properties: {password: {type: string}}}}}}
+      responses:
+        '200': {description: "{ok:1, expires:<unix>}", content: {application/json: {schema: {type: object, properties: {ok: {type: integer}, expires: {type: integer}}}}}}
+        '403': {description: babh6_wrongpw, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '429': {description: babh6_rate (над 20 опита/IP/час), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /logout:
+    post:
+      tags: [auth]
+      summary: Изтрива cookie-то
+      responses:
+        '200': {description: "{ok:1}"}
+  /novel-check:
+    post:
+      tags: [public]
+      summary: AI проверка на една съставка (кеш 7 дни по метод+съставка; лимити по IP и дневен бюджет)
+      description: "Не е регулаторно решение. Категоричен статус без нито един източник се превръща в unknown (AI-01). Неуспешен/невалиден отговор не се кешира."
+      requestBody: {content: {application/json: {schema: {type: object, required: [ingredient], properties: {ingredient: {type: string, minLength: 2, maxLength: 120}}}}}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, label_bg, summary_bg, source, sources, confidence, ingredient, checked_at, method]
+                properties:
+                  status: {type: string, enum: [banned, ok, caution, pending, unknown]}
+                  label_bg: {type: string, description: генерира се локално от status}
+                  summary_bg: {type: string, maxLength: 600}
+                  source: {type: string, maxLength: 200}
+                  sources: {type: array, items: {type: object, properties: {url: {type: string}, title: {type: string}}}}
+                  confidence: {type: string, enum: [high, medium, low], description: самооценка на модела — не е измерена точност}
+                  ingredient: {type: string}
+                  checked_at: {type: string, description: d.m.Y H:i}
+                  method: {type: string, description: BABH6_AI_METHOD}
+        '400': {description: babh6_input, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '429': {description: babh6_rate, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '502': {description: babh6_ai_http / babh6_ai_invalid, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '503': {description: babh6_noai (няма ключ), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}

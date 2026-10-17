@@ -27,6 +27,10 @@ shared_contracts:
   - path: .github/workflows/release.yml
     owner: OPS
     reviewers: [ARC]
+  - path: contracts/                     # OpenAPI + JSON Schema (ARC-005); версия = договор
+    owner: ARC
+    reviewers: [API, APP, DAT]
+    change_rule: промяна = ред в contracts/CHANGES.md + версия; tests/php/contracts.test.php минава
   - path: docs/plan/backlog.json         # генериран — не се редактира на ръка
     owner: ARC
     change_rule: само чрез docs/plan/tools/build_backlog.py; статусите през docs/plan/status.json
@@ -54,7 +58,10 @@ files:
   docs/domain-glossary.md:     {owner: ARC, reviewers: [DAT, API, APP]}
   docs/plan/:                  {owner: ARC}
   docs/adr/:                   {owner: ARC}
-  tests/:                      {owner: QA, change_rule: тестът проверява поведение; промяна на очакване изисква причина в PR-а}
+  tests/:                      {owner: QA, change_rule: тестът проверява поведение; промяна на очакване изисква причина в PR-а; xfail се маха само със затворена задача}
+  .env.example:                {owner: OPS, reviewers: [SEC], change_rule: никога стойности на секрети}
+  docs/environment-contract.md: {owner: OPS, reviewers: [ARC, SEC]}
+  docs/screen-map.md:          {owner: ARC, reviewers: [APP, UX]}
   AGENTS.md:                   {owner: ARC}
   README.md:                   {owner: ARC, change_rule: changelog по версии остава; новите секции описват поведение, не планове}
 

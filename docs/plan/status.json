@@ -24,5 +24,46 @@
       "docs/plan/tools/build_backlog.py",
       "docs/plan/tools/validate_backlog.py"
     ]
+  },
+  "ARC-002": {
+    "status": "blocked",
+    "note": "Порталът на БАБХ не е достъпен от средата на сесията (HTTPS CONNECT 403 през прокси, 2026-10-17); реалните XLSX пакети трябва да дойдат от собственика (ръчно сваляне или staging с достъп). Блокира приемането на parser/dataset (QA-002), не останалата R0 работа. Нужни: всички части на поне 3 последователни пълни снимки + стари формати, с дата, размер, SHA-256.",
+    "artifacts": []
+  },
+  "ARC-003": {
+    "status": "in_review",
+    "note": "docs/adr/ADR-001-modular-plugin.md: ограничения, 5 слоя, правило за чистота, карта на всеки файл към слой. Конкретна проверка: parser през CLI без браузър е изпълнен (tests/run.sh); entitlement policy не съществува още — отложено до BIL-002/IAM-003. Хостинг лимитите не са измерени (ARC-007/OPS-001).",
+    "artifacts": [
+      "docs/adr/ADR-001-modular-plugin.md",
+      "tests/run.sh",
+      "tests/php/detect.test.php",
+      "tests/js/parse-comp.test.js"
+    ]
+  },
+  "ARC-005": {
+    "status": "in_review",
+    "note": "As-is договор 1.0: contracts/openapi-babh6-v1.yaml (12 маршрута), JSON Schema за карта/запис/грешка, правила за версии в contracts/README.md и CHANGES.md. Конкретна проверка: tests/php/contracts.test.php отхвърля невалиден enum и неочакван тип дата. Query AST и събития не са описани (няма ги в кода) — остават за версия 2.0 след DAT/API задачите.",
+    "artifacts": [
+      "contracts/openapi-babh6-v1.yaml",
+      "contracts/schemas/",
+      "contracts/README.md",
+      "contracts/CHANGES.md",
+      "tests/php/contracts.test.php"
+    ]
+  },
+  "ARC-006": {
+    "status": "in_review",
+    "note": "docs/screen-map.md: 15 екрана → целева навигация с решение за всеки; duplication map с доказателства в кода; общи компоненти → къде са днес. Конкретната проверка (експорт, търсене, профил от всички входни точки) е направена по кода, не в браузър.",
+    "artifacts": [
+      "docs/screen-map.md"
+    ]
+  },
+  "ARC-007": {
+    "status": "blocked",
+    "note": "docs/environment-contract.md и .env.example са написани (правила за local/staging/production, mail sink, sandbox). Smoke сценарият не е изпълнен: няма staging/local WordPress в сесията. Нужни от собственика: staging хост с отделна база, mail sink, хостинг лимити.",
+    "artifacts": [
+      "docs/environment-contract.md",
+      ".env.example"
+    ]
   }
 }

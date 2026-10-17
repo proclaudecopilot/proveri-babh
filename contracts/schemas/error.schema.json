@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/schemas/error.schema.json",
+  "title": "Грешка от babh6/v1 (as-is 1.0)",
+  "description": "WordPress WP_Error, сериализиран от REST сървъра. Кодовете са изброени от кода на v6.9.0. Липсват correlation_id, retryable и field_errors (API-003, версия 2.0).",
+  "type": "object",
+  "required": ["code", "message", "data"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": ["babh6_locked", "babh6_pro", "babh6_wrongpw", "babh6_rate", "babh6_query_short", "babh6_notfound", "babh6_db", "babh6_bad", "babh6_email", "babh6_input", "babh6_noai", "babh6_ai_http", "babh6_ai_err", "babh6_ai_invalid", "rest_no_route", "rest_forbidden", "rest_cookie_invalid_nonce"]
+    },
+    "message": {"type": "string", "description": "Безопасен текст на български за показване"},
+    "data": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {"status": {"type": "integer", "enum": [400, 401, 403, 404, 429, 500, 502, 503]}}
+    }
+  }
+}
