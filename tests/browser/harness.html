@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>babh6 browser harness</title>
+<!-- Същото, което includes/frontend.php рендира: CFG + #babh6-app + реалните assets. REST API-то се подменя от теста (Playwright route). -->
+<link rel="stylesheet" href="/assets/babh6.css">
+<script>
+window.BABH6_CFG = { rest: 'http://babh6.test/api', rest2: '', locked: 0, hasAI: 0, pro: 0, pw: 0, nonce: '', sw: '', ver: 'test' };
+</script>
+</head>
+<body>
+<div id="babh6-app" class="babh6"><div class="b6-boot">Регистърът се зарежда…</div></div>
+<script src="/assets/babh6.js"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|---|---|
 | UX-001 | Дизайн tokens и четима кирилица | P1 | R2 | 4 | planned | ARC-006 | design tokens и component inventory |
 | UX-002 | Responsive shell | P1 | R2 | 5 | planned | UX-001 | app shell |
-| UX-003 | Router и възстановим URL | P1 | R2 | 6 | planned | UX-002 | router и URL state schema |
+| UX-003 | Router и възстановим URL | P1 | R2 | 6 | in_progress | UX-002 | router и URL state schema |
 | UX-004 | Управление на асинхронни заявки | P1 | R2 | 15 | planned | UX-003, API-003 | query state hooks/services |
 | UX-005 | Бутони, форми и системни състояния | P1 | R2 | 5 | planned | UX-001 | component library |
 | UX-006 | Диалози, drawer и mobile filters | P1 | R2 | 6 | planned | UX-002, UX-005 | Dialog/Drawer/FilterSheet |
@@ -62,7 +62,7 @@
 - **Резултат:** router и URL state schema
 - **Зависимости:** UX-002
 - **Основание:** PR-10, CO-08, LIVE-07 · покрива: LIVE-07, PR-10, CO-08
-- **Статус:** planned
+- **Статус:** in_progress — Частично: LIVE-07 (стар #p= след ново търсене/филтър/подредба/екран/затваряне) е поправен в v6.9.1 с браузърна регресия tests/browser/live07-product-hash.test.js (Chromium, 1280/390 px; 14 отказа преди, 0 след). Започната преди зависимостите (UX-002 → UX-001 → ARC-006) като ограничена поправка по master-spec раздел 2/13. Остава: canonical URL за query/tab/detail, legacy mapping, Back/Forward и scroll restoration.
 
 **Приемане**
 

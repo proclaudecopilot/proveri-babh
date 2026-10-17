@@ -2782,7 +2782,14 @@
     "CO-08",
     "LIVE-07"
    ],
-   "status": "planned",
+   "status": "in_progress",
+   "status_note": "Частично: LIVE-07 (стар #p= след ново търсене/филтър/подредба/екран/затваряне) е поправен в v6.9.1 с браузърна регресия tests/browser/live07-product-hash.test.js (Chromium, 1280/390 px; 14 отказа преди, 0 след). Започната преди зависимостите (UX-002 → UX-001 → ARC-006) като ограничена поправка по master-spec раздел 2/13. Остава: canonical URL за query/tab/detail, legacy mapping, Back/Forward и scroll restoration.",
+   "artifacts": [
+    "assets/babh6.js",
+    "tests/browser/live07-product-hash.test.js",
+    "tests/browser/stub-api.js",
+    "tests/browser/harness.html"
+   ],
    "covers": [
     "LIVE-07",
     "PR-10",
