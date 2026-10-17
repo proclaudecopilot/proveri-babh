@@ -1,0 +1,6620 @@
+{
+ "schema": "docs/plan/backlog.schema.json",
+ "spec_version": "1.0",
+ "spec_date": "2026-10-17",
+ "generated_from": {
+  "file": "docs/plan/source/proveri-babh-full-plan-bg-v1.0.html",
+  "sha256": "7d78033aea6368252c3e1d6dbb4af70699799d7a94c886416184d70cfb6c3c5d"
+ },
+ "milestones": [
+  "R0",
+  "R1",
+  "R2",
+  "R3",
+  "R4",
+  "R5"
+ ],
+ "priorities": [
+  "P0",
+  "P1"
+ ],
+ "statuses": [
+  "planned",
+  "in_progress",
+  "blocked",
+  "in_review",
+  "done",
+  "dropped"
+ ],
+ "groups": [
+  {
+   "id": "ARC",
+   "title": "Обхват, договори и архитектура",
+   "owner": "Архитект / технически ръководител",
+   "description": "ADR, contracts, repository map; само този поток променя общите договори след преглед.",
+   "task_count": 8
+  },
+  {
+   "id": "DAT",
+   "title": "Модел на данните и публикуване",
+   "owner": "Backend / data инженер",
+   "description": "Domain repositories, schema migrations и dataset publisher.",
+   "task_count": 11
+  },
+  {
+   "id": "SRC",
+   "title": "Източници, сваляне и работни задачи",
+   "owner": "Data / backend инженер",
+   "description": "Source adapters, durable queue и import orchestration.",
+   "task_count": 12
+  },
+  {
+   "id": "XLS",
+   "title": "Четене и разпознаване на таблиците на БАБХ",
+   "owner": "Parser инженер",
+   "description": "Чист workbook reader; без мрежа, UI или плащания.",
+   "task_count": 12
+  },
+  {
+   "id": "NRM",
+   "title": "Нормализация и качество на полетата",
+   "owner": "Data quality инженер",
+   "description": "Field normalizers, validation rules и quality flags.",
+   "task_count": 10
+  },
+  {
+   "id": "ING",
+   "title": "Алгоритъм за състав и количества",
+   "owner": "Parser / domain инженер",
+   "description": "Composition lexer, AST, ingredient dictionary; без медицински решения.",
+   "task_count": 12
+  },
+  {
+   "id": "ENT",
+   "title": "Фирми, роли, марки и категории",
+   "owner": "Entity resolution / data инженер",
+   "description": "Canonical entities и derived relationships; няма самостоятелен регистър за всеки екран.",
+   "task_count": 12
+  },
+  {
+   "id": "API",
+   "title": "Търсене, филтри, договори и експорт",
+   "owner": "Backend API инженер",
+   "description": "Един query service за списъци, KPI, saved searches и export.",
+   "task_count": 12
+  },
+  {
+   "id": "UX",
+   "title": "Дизайн система, мобилен интерфейс и достъпност",
+   "owner": "UI / frontend инженер",
+   "description": "Общи компоненти, layout, router и client state.",
+   "task_count": 12
+  },
+  {
+   "id": "APP",
+   "title": "Потребителски екрани и премахване на дублирането",
+   "owner": "Product frontend инженер",
+   "description": "Екранни композиции от общите UX/API компоненти.",
+   "task_count": 12
+  },
+  {
+   "id": "ANA",
+   "title": "Метрики, класации и сравнения",
+   "owner": "Analytics / backend инженер",
+   "description": "Един metric registry и versioned aggregates.",
+   "task_count": 10
+  },
+  {
+   "id": "ADM",
+   "title": "Администрация и контрол на данните",
+   "owner": "Admin frontend + backend инженер",
+   "description": "Admin console върху същите domain services; не директни ad hoc SQL редакции.",
+   "task_count": 14
+  },
+  {
+   "id": "MON",
+   "title": "История, наблюдение и известия",
+   "owner": "Backend event/notification инженер",
+   "description": "Публична история и частни watches споделят event model, но имат различен достъп.",
+   "task_count": 12
+  },
+  {
+   "id": "AI",
+   "title": "Проверка на съставки с доказателства",
+   "owner": "AI application / evidence инженер",
+   "description": "Evidence retrieval и структурирано обяснение; не авторитетен регулаторен статус.",
+   "task_count": 10
+  },
+  {
+   "id": "IAM",
+   "title": "Акаунти, организации, роли и собственост",
+   "owner": "Identity / backend инженер",
+   "description": "Потребител ≠ организация абонат ≠ фирма в регистъра.",
+   "task_count": 12
+  },
+  {
+   "id": "BIL",
+   "title": "PRO архитектура, абонаменти и плащания",
+   "owner": "Billing / backend инженер",
+   "description": "Capability service и payment adapter; UI не определя платения достъп.",
+   "task_count": 16
+  },
+  {
+   "id": "SEC",
+   "title": "Сигурност и защита на достъпа",
+   "owner": "Security / backend инженер",
+   "description": "Threat model и конкретни проверки по реалните surfaces; без неограничен pentest на live сайта.",
+   "task_count": 11
+  },
+  {
+   "id": "OPS",
+   "title": "Миграции, производителност и експлоатация",
+   "owner": "Platform / DevOps инженер",
+   "description": "CI/CD, scheduler, backups, releases и operational runbooks.",
+   "task_count": 13
+  },
+  {
+   "id": "QA",
+   "title": "Приемане, регресии и критерии за пускане",
+   "owner": "Независим QA / release owner",
+   "description": "Доказателства за поведение; QA не се свежда до одобрение на собствения код.",
+   "task_count": 14
+  }
+ ],
+ "tasks": [
+  {
+   "id": "ARC-001",
+   "group": "ARC",
+   "title": "Установяване на текущата версия",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Свържи работещия сайт с точен commit, пакет, схема и конфигурация; сравни с историческия v6.5.0.",
+   "deliverable": "baseline-manifest.json и карта на разликите",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [],
+   "depends_note": "Проверка на външните входове",
+   "acceptance": [
+    "Посочени са hash и версия на текущия код",
+    "Всяка стара констатация е confirmed, fixed или unverified с доказателство"
+   ],
+   "check": "Сравни etl.php comp_hash и текущия запис на промяна само в търговеца.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "in_progress",
+   "status_note": "Baseline на кода (commit 4403727, v6.9.0) и проверка на 90+16 констатации са в docs/baseline/. Остава: сверяване на deployed файловете на proveribabh.com с commit-а и конкретната проверка (промяна само в търговеца) върху реални данни — няма достъп до сайта/DB в сесията от 2026-10-17.",
+   "artifacts": [
+    "docs/baseline/baseline-manifest.json",
+    "docs/baseline/findings-verification.md"
+   ],
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 0
+  },
+  {
+   "id": "ARC-002",
+   "group": "ARC",
+   "title": "Осигуряване на входните данни",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Събери оригинални файлове с всички части, поне три последователни пълни снимки и представителни стари формати; обезличи тестовите акаунти.",
+   "deliverable": "source-corpus-manifest.json",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [
+    "ARC-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всеки файл има произход, дата, размер и SHA-256",
+    "Липсващите входове са изрично описани и блокират само съответното приемане"
+   ],
+   "check": "Възстанови една снимка само от manifest и оригиналните байтове.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 1
+  },
+  {
+   "id": "ARC-003",
+   "group": "ARC",
+   "title": "Архитектурно решение за модулен плъгин",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Потвърди WordPress/PHP/MySQL ограниченията; отдели чиста обработка на данни, приложни услуги, WordPress адаптери и UI; избягвай необоснован rewrite.",
+   "deliverable": "ADR-001 и карта на модулите",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [
+    "ARC-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Бизнес правилата работят без HTTP и UI",
+    "Хостингът поддържа избраните транзакции, worker и storage"
+   ],
+   "check": "Извикай parser и entitlement policy през CLI тест без браузър.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 1
+  },
+  {
+   "id": "ARC-004",
+   "group": "ARC",
+   "title": "Речник и семантика на продукта",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Дефинирай регистрация, фирма, роля, марка, съставка, снимка, версия, бележка и наблюдение; фиксирай какво не доказва регистърът.",
+   "deliverable": "domain-glossary.md",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [
+    "ARC-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Регистрация не се представя като уникален продукт",
+    "Липса, заличаване и неизвестно са различни понятия"
+   ],
+   "check": "Провери едни и същи определения в API, UI, CSV и админ.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "in_review",
+   "status_note": "Чернова на речника в docs/domain-glossary.md с текущото място на всеки термин в кода и предложения за текстове в интерфейса. Конкретната проверка (еднакви определения в API/UI/CSV/админ) е таблицата „Терминология“ — нуждае се от независим преглед. Започната като чернова преди зависимостта ARC-003 да е done; приемането ѝ чака ARC-003.",
+   "artifacts": [
+    "docs/domain-glossary.md"
+   ],
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 2
+  },
+  {
+   "id": "ARC-005",
+   "group": "ARC",
+   "title": "Версионирани договори и правила за промяна",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Опиши DTO, грешки, query AST, събития и съвместимост; всички потребители използват един договор.",
+   "deliverable": "OpenAPI и JSON Schema contracts",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [
+    "ARC-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Промяна на договор изисква version/migration решение",
+    "Фронтенд и бекенд имат едни и същи enum и null semantics"
+   ],
+   "check": "Contract test отхвърля невалиден status и неочакван тип дата.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 3
+  },
+  {
+   "id": "ARC-006",
+   "group": "ARC",
+   "title": "Инвентар на екрани и единствен собственик на функция",
+   "priority": "P1",
+   "milestone": "R0",
+   "summary": "Съпостави старите екрани с целевата навигация; избери едно място за всяка операция и общи компоненти.",
+   "deliverable": "screen-map.md и duplication-map.md",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [
+    "ARC-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всеки стар сценарий е запазен, заменен или оттеглен с причина",
+    "Няма два независими алгоритъма за един показател"
+   ],
+   "check": "Проследи експорт, търсене и фирмен профил от всички входни точки.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 3
+  },
+  {
+   "id": "ARC-007",
+   "group": "ARC",
+   "title": "Изолирани среди и достъп за разработване",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Настрой локална и staging среда, тестова поща и платежен sandbox; забрани случайни production writes от тестове.",
+   "deliverable": "environment-contract.md и примерен env без секрети",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [
+    "ARC-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Средите имат отделни бази, ключове и storage",
+    "Тестовите известия стигат само до mail sink"
+   ],
+   "check": "Изпълни smoke сценарий и докажи липса на реален имейл или плащане.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 2
+  },
+  {
+   "id": "ARC-008",
+   "group": "ARC",
+   "title": "Оркестрация на работата на агентите",
+   "priority": "P1",
+   "milestone": "R0",
+   "summary": "Определи собственост на файлове, ред по зависимости, PR шаблон и независим преглед; състоянията на задачите се записват.",
+   "deliverable": "AGENTS.md, ownership.yml и task-run template",
+   "owner": "Архитект / технически ръководител",
+   "depends_on": [
+    "ARC-005",
+    "ARC-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма паралелно некоординирано изменение на schema/router/contracts",
+    "Завършването изисква артефакти и резултат от приемане"
+   ],
+   "check": "Симулирай конфликт на API договор между два работни потока.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "in_review",
+   "status_note": "AGENTS.md, docs/plan/ownership.yml, docs/plan/task-run-template.md, генератор и валидатор на backlog-а (docs/plan/tools/). Симулацията на конфликт на API договор между два потока не е изпълнена — описано е правилото (ownership.yml shared_contracts); остава за reviewer-а. Започната преди ARC-005/ARC-006 да са done (договорите и screen map още липсват) — приемането ѝ чака тях; ownership.yml ще бъде допълнен с целевата структура от ARC-003.",
+   "artifacts": [
+    "AGENTS.md",
+    "docs/plan/ownership.yml",
+    "docs/plan/task-run-template.md",
+    "docs/plan/tools/build_backlog.py",
+    "docs/plan/tools/validate_backlog.py"
+   ],
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 4
+  },
+  {
+   "id": "DAT-001",
+   "group": "DAT",
+   "title": "Неизменяеми оригинали и произход",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Съхранявай файлове, sheet, ред, клетка, сурова стойност и версия на parser; не режи текст до UI/SQL лимит.",
+   "deliverable": "raw/source schema и repository",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "ARC-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "100% от приетите полета сочат към оригинал",
+    "Дълъг състав и фирма се пазят без загуба"
+   ],
+   "check": "Импортирай състав над 5000 и име на фирма над 490 символа.",
+   "evidence": [
+    "IM-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-07"
+   ],
+   "wave": 4
+  },
+  {
+   "id": "DAT-002",
+   "group": "DAT",
+   "title": "Стабилна идентичност на регистрация",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Използвай вътрешен ID и доказан source key; пази регистрационния номер като текст; различавай липсващ ID и конфликт.",
+   "deliverable": "registration identity service",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Еднакъв номер в един scope не създава два активни записа",
+    "Конфликтните редове не се решават с first wins"
+   ],
+   "check": "Два различни реда с един номер попадат в преглед с двата оригинала.",
+   "evidence": [
+    "IM-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-06"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "DAT-003",
+   "group": "DAT",
+   "title": "Пълна история на полетата",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Версионирай всички бизнес полета; отдели raw hash от normalized hash и derivation version; историята пази причина и източник.",
+   "deliverable": "record_versions и field_diff service",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Промяна само в дата, фирма или бележка създава diff",
+    "Повторен идентичен импорт не създава нова бизнес промяна"
+   ],
+   "check": "Промени поотделно всяко поле и сравни точния diff.",
+   "evidence": [
+    "IM-01",
+    "IM-10"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-01",
+    "IM-10"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "DAT-004",
+   "group": "DAT",
+   "title": "Изолирани версии на наборите",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Обработвай в staging dataset; публичният API чете само активната валидирана версия, включително фирми и индекси.",
+   "deliverable": "dataset lifecycle и read context",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма TRUNCATE или частично обновяване на активния набор",
+    "Свързаните заявки ползват един dataset_version"
+   ],
+   "check": "Чети продукт и фирмени броячи по време на rebuild и сравни версиите.",
+   "evidence": [
+    "IM-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-04"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "DAT-005",
+   "group": "DAT",
+   "title": "Атомарно публикуване",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Публикувай с един проверен switch след всички валидатори; DB грешка спира commit и прогреса.",
+   "deliverable": "publisher transaction и readiness checklist",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Грешка в запис или индекс не премества active pointer",
+    "Успех се отчита само след успешен commit"
+   ],
+   "check": "Инжектирай SQL отказ непосредствено преди публикация.",
+   "evidence": [
+    "IM-02",
+    "IM-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-02",
+    "IM-09"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "DAT-006",
+   "group": "DAT",
+   "title": "Отделни оси за статус",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Моделирай presence, source deletion note и quality отделно; missing се изчислява само между съпоставими пълни снимки.",
+   "deliverable": "status policy",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Непълен пакет никога не заличава/маркира липсващи масово",
+    "Източниковата бележка остава видима и при повторна поява"
+   ],
+   "check": "Сравни непълна снимка, после пълна с една липса и последващо завръщане.",
+   "evidence": [
+    "IM-03",
+    "OV-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "OV-05",
+    "IM-03"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "DAT-007",
+   "group": "DAT",
+   "title": "Корекции като отделен слой",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Админ корекция съдържа автор, основание, доказателство и обхват; не променя оригиналния запис.",
+   "deliverable": "correction overlays и conflict model",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Видими са source value и corrected value",
+    "Нова източникова стойност поражда проверка на конфликт"
+   ],
+   "check": "Коригирай фирма, после импортирай нова различна стойност.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "DAT-008",
+   "group": "DAT",
+   "title": "Rollback с проследимост",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Върни активната версия чрез контролирана операция; запази истории, плащания и частни данни извън rollback на регистъра.",
+   "deliverable": "rollback service и runbook",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Rollback възстановява консистентни данни и индекси",
+    "Не възстановява изтекъл PRO достъп и не повтаря известия"
+   ],
+   "check": "Публикувай B, върни A и публикувай B отново.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "DAT-009",
+   "group": "DAT",
+   "title": "Ограничения и индекси",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Добави unique/check constraints според DB възможностите, индекси по scope/version/key и query plans.",
+   "deliverable": "schema constraints и EXPLAIN evidence",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Дублирани активни ключове са невъзможни",
+    "Основните заявки имат проверени индекси"
+   ],
+   "check": "Изпълни конкурентен запис на един ключ и тежък company filter.",
+   "evidence": [
+    "CO-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "CO-09"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "DAT-010",
+   "group": "DAT",
+   "title": "Версия в кеша и последователни четения",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Ключовете включват dataset, derivation и разрешен tenant context; стар кеш не замества нов набор.",
+   "deliverable": "cache policy и version token",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Числа, списъци и CSV за един request context ползват една версия",
+    "Частен резултат не попада в публичен кеш"
+   ],
+   "check": "Публикувай нова версия между първа и втора страница.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "DAT-011",
+   "group": "DAT",
+   "title": "Политика за съхранение и заличаване",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Определи срокове по клас данни, legal hold и ограничения за лични данни; архивирай източници без смесване с профили.",
+   "deliverable": "retention policy и purge jobs",
+   "owner": "Backend / data инженер",
+   "depends_on": [
+    "DAT-001",
+    "ARC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Публичен източник и частен акаунт имат отделни правила",
+    "Заличаване на акаунт не руши регистъра или счетоводния журнал"
+   ],
+   "check": "Пробно изтриване на тестов акаунт с export, watch и billing записи.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "SRC-001",
+   "group": "SRC",
+   "title": "Каталог на източници и части",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Опиши официалния портал, видове файлове, териториален/времеви scope и очакван набор от части; unknown schema се спира.",
+   "deliverable": "source manifest contract",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "ARC-002",
+    "ARC-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Пълнота не се извежда само от брой редове или намерени URL",
+    "Ръчното качване изисква същата декларация за обхват"
+   ],
+   "check": "Пропусни една част от известен пакет и виж блокирана публикация.",
+   "evidence": [
+    "SY-02"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-02"
+   ],
+   "wave": 4
+  },
+  {
+   "id": "SRC-002",
+   "group": "SRC",
+   "title": "Откриване на промяна по съдържание",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Записвай URL, bytes hash, HTTP metadata, source date и fetch time; повторен файл се разпознава независимо от името.",
+   "deliverable": "content-addressed download inventory",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Същият URL с нови байтове се обработва",
+    "Нов URL със същите байтове не създава фалшива промяна"
+   ],
+   "check": "Повтори двете комбинации и сравни job и dataset идентичностите.",
+   "evidence": [
+    "SY-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-01"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "SRC-003",
+   "group": "SRC",
+   "title": "Ограничен и проверен download transport",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Валидирай схема, host, redirects, resolved IP, size, timeouts и MIME/content; настрой HTTP преди изпълнение.",
+   "deliverable": "download adapter",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Не се следват redirects към вътрешна мрежа",
+    "HTML error page не се приема за XLSX"
+   ],
+   "check": "Тестове с redirect chain, частен IP, HTML 200 и oversized body.",
+   "evidence": [
+    "SY-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-07"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "SRC-004",
+   "group": "SRC",
+   "title": "Безопасно продължаване на сваляне",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Свържи Range с валиден strong validator и провери Content-Range; при несъответствие започни отначало.",
+   "deliverable": "resume protocol",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Две версии на файл не се съединяват",
+    "200 вместо 206 не се добавя към стар partial файл"
+   ],
+   "check": "Смени ETag/съдържание по време на resume.",
+   "evidence": [
+    "SY-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-03"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "SRC-005",
+   "group": "SRC",
+   "title": "Трайна state machine за импорт",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Опиши discovery→download→parse→validate→review→publish и failed/cancelled; състоянията и checkpoints са в DB.",
+   "deliverable": "import_jobs schema и transition service",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "DAT-004",
+    "SRC-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Невалиден преход се отхвърля",
+    "Cancel е отчетен преди всяка необратима стъпка"
+   ],
+   "check": "Отмени job при parsing, validation и преди publish.",
+   "evidence": [
+    "IM-05",
+    "SY-08"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-05",
+    "SY-08"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "SRC-006",
+   "group": "SRC",
+   "title": "Lease и fencing на worker",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Използвай атомарен lock, lease owner, heartbeat и fencing token; стар worker няма право да публикува.",
+   "deliverable": "worker ownership service",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Два старта не създават две публикации",
+    "Закъснял worker не записва след загубен lease"
+   ],
+   "check": "Спрян worker оживява след поет от друг lease.",
+   "evidence": [
+    "IM-05",
+    "SY-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-05",
+    "SY-04"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "SRC-007",
+   "group": "SRC",
+   "title": "Идемпотентни порции и checkpoints",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Обработвай ограничени порции; checkpoint след успешен commit; не препрочитай целия workbook за всяка порция.",
+   "deliverable": "chunk executor",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Retry не дублира редове и събития",
+    "Cursor не се мести при SQL failure"
+   ],
+   "check": "Убий процес след запис и преди ack, после възстанови.",
+   "evidence": [
+    "IM-02",
+    "IM-08"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-02",
+    "IM-08"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "SRC-008",
+   "group": "SRC",
+   "title": "Валидатори преди публикуване",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Провери manifest, EOF, schema, row accounting, conflicts и аномалии; праговете за спад са допълнителен сигнал.",
+   "deliverable": "validation report и publish policy",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-007",
+    "DAT-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всеки прочетен ред е accounted с причина",
+    "Нула реда или голям спад изискват изричен преглед, не automatic done"
+   ],
+   "check": "Пакет с 51% от старите записи остава непотвърден без доказана пълнота.",
+   "evidence": [
+    "IM-03",
+    "IM-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-03",
+    "IM-09"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "SRC-009",
+   "group": "SRC",
+   "title": "Надежден график",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Пускай worker от реален scheduler с timezone Europe/Sofia; проверявай синтаксиса и показвай следващото изпълнение.",
+   "deliverable": "scheduler adapter и status",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-005",
+    "ARC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма зависимост от посетителски трафик",
+    "Невалиден график не се записва с тиха подмяна"
+   ],
+   "check": "Преминаване към лятно/зимно време и сайт без посещения.",
+   "evidence": [
+    "SY-05",
+    "SY-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-05",
+    "SY-06"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "SRC-010",
+   "group": "SRC",
+   "title": "Retry и оперативни състояния",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Различавай retryable/terminal failures, exponential backoff, stopped schedule и cancelled job; покажи stale heartbeat.",
+   "deliverable": "retry policy и job API",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Изключен график не се отчита като отменен активен job",
+    "Изчерпан retry отива в опашка за намеса"
+   ],
+   "check": "Timeout, 429, invalid schema и загубена връзка с status endpoint.",
+   "evidence": [
+    "SY-08",
+    "SY-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-08",
+    "SY-09"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "SRC-011",
+   "group": "SRC",
+   "title": "Повторна обработка без изтегляне",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Избери запазени оригинали и нов parser/rule version; направи dry run и отдели промените в алгоритъм от source changes.",
+   "deliverable": "reprocess command и impact report",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-008",
+    "DAT-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Старите raw данни остават неизменни",
+    "Повторната обработка не поражда ново уведомление от БАБХ"
+   ],
+   "check": "Промени правило за категория при идентични файлове.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "SRC-012",
+   "group": "SRC",
+   "title": "Метрики за пълния import pipeline",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Записвай duration, throughput, memory, failed rows, source lag и последна успешна публикация по job.",
+   "deliverable": "import telemetry",
+   "owner": "Data / backend инженер",
+   "depends_on": [
+    "SRC-008",
+    "SRC-010"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Зелено здраве означава успешни проверки и свежи данни",
+    "Download success не се представя като import success"
+   ],
+   "check": "Източникът е достъпен, но parser отказва; статусът остава проблемен.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "XLS-001",
+   "group": "XLS",
+   "title": "Инвентар на реалните формати",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Раздели XLSX/XLS/CSV/PDF само ако са реално срещнати; документирай поддържаните варианти и explicit unsupported.",
+   "deliverable": "format support matrix",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "ARC-002",
+    "ARC-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Разширението не определя самостоятелно формата",
+    "Неподдържан формат води до контролирана грешка"
+   ],
+   "check": "XLS файл, преименуван на XLSX, не се обработва като ZIP.",
+   "evidence": [
+    "IM-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-06"
+   ],
+   "wave": 4
+  },
+  {
+   "id": "XLS-002",
+   "group": "XLS",
+   "title": "Избор на лист и схема по съдържание",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Чети workbook relationships; откривай header signature и версии на schema; не избирай най-големия лист.",
+   "deliverable": "sheet detector и schema registry",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Помощен голям лист не се приема за регистър",
+    "Разместени колони се map-ват по проверени заглавия"
+   ],
+   "check": "Workbook с cover sheet, два data sheets и разменени колони.",
+   "evidence": [
+    "IM-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-06"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "XLS-003",
+   "group": "XLS",
+   "title": "Пълно четене на текстови клетки",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Поддържай shared strings, inline strings, rich text runs и Unicode; пази raw content и normalized text отделно.",
+   "deliverable": "cell decoder",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всички rich text сегменти се запазват",
+    "Не се губят кирилица, NBSP и нови редове"
+   ],
+   "check": "Състав в shared string с множество rich text runs.",
+   "evidence": [
+    "IM-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-07"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "XLS-004",
+   "group": "XLS",
+   "title": "Координати, празни и слети клетки",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Използвай cell references при sparse rows; forward fill само в изрично разрешени merged header/record правила.",
+   "deliverable": "row assembler",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Празна клетка не измества следващите колони",
+    "Не се пренася фирма от предишна регистрация по предположение"
+   ],
+   "check": "Ред без C и със стойност в D; merged header над три колони.",
+   "evidence": [
+    "IM-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-06"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "XLS-005",
+   "group": "XLS",
+   "title": "Заглавия, бележки и продължаващи редове",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Класифицирай повторени headers, footer, празни редове и доказани continuation patterns; пази причината за изключване.",
+   "deliverable": "row classifier",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма тихо изхвърлен некласифициран ред",
+    "Продължение се свързва само при проверено правило"
+   ],
+   "check": "Повторено заглавие насред sheet и състав на два реда.",
+   "evidence": [
+    "IM-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-06"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "XLS-006",
+   "group": "XLS",
+   "title": "Дати в Excel",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Обработвай 1900/1904 epoch, number formats и фиктивния serial 60 с изрична политика; запази raw serial.",
+   "deliverable": "excel date decoder",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Датите са детерминистични и валидни календарно",
+    "Ambiguous или serial 60 се маркира за преглед"
+   ],
+   "check": "Еднаква дата в двата epoch и тест около февруари 1900.",
+   "evidence": [
+    "IM-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-07"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "XLS-007",
+   "group": "XLS",
+   "title": "Числа и формули без изпълнение",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Различавай cached formula result от липсващ резултат; не изпълнявай формули, макроси или external links.",
+   "deliverable": "safe scalar decoder",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Липсващ cached result не става нула",
+    "Водещи нули и scientific notation при идентификатори се пазят/маркират"
+   ],
+   "check": "Формула без cache, номер 000123 и числово E notation.",
+   "evidence": [
+    "IM-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-07"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "XLS-008",
+   "group": "XLS",
+   "title": "Дублирани и конфликтни source редове",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Сравни canonical key и сурово съдържание в и между части; identical duplicate има отчет, conflict има quarantine.",
+   "deliverable": "duplicate classifier",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма first wins/last wins без политика",
+    "И двата конфликтни оригинала са достъпни"
+   ],
+   "check": "Един номер с различни фирми в две части на снимката.",
+   "evidence": [
+    "IM-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-06"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "XLS-009",
+   "group": "XLS",
+   "title": "Потоково четене с лимити",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Ограничи RAM, compressed/uncompressed sizes, rows, cells и време; shared strings се обработват с bounded storage.",
+   "deliverable": "stream reader и resource budgets",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Консумацията е измерена с най-големия реален файл и stress fixture",
+    "Няма повторно пълно разархивиране за всяка порция"
+   ],
+   "check": "Голям sharedStrings.xml и лист с разредени високи индекси.",
+   "evidence": [
+    "IM-08"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-08"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "XLS-010",
+   "group": "XLS",
+   "title": "Различаване на край от повреда",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "XML/ZIP грешка или truncated stream е fatal за снимката; checkpoint не маскира счупен EOF.",
+   "deliverable": "reader error model",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Повреден файл никога не достига validated",
+    "Съобщението включва file/sheet/row и безопасна причина"
+   ],
+   "check": "Прекъсни XML в последните 5% от файла.",
+   "evidence": [
+    "IM-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-09"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "XLS-011",
+   "group": "XLS",
+   "title": "Защита на parser от злонамерени файлове",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Забрани XXE/external entities, path traversal и zip bombs; ограниченията важат и за админ upload.",
+   "deliverable": "parser security policy",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Четенето няма достъп до външна мрежа или системни файлове",
+    "Archive expansion над лимита се прекратява"
+   ],
+   "check": "Тестов XXE payload, ../ entry и висок compression ratio.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "XLS-012",
+   "group": "XLS",
+   "title": "Приемане на workbook reader",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Изгради отделен набор от реални и синтетични fixtures с очаквани клетки, редове, причини и hashes.",
+   "deliverable": "reader golden suite",
+   "owner": "Parser инженер",
+   "depends_on": [
+    "XLS-006",
+    "XLS-007",
+    "XLS-008",
+    "XLS-010",
+    "XLS-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "100% от очакваните клетки и класификации съвпадат",
+    "Нов формат не се допуска без fixture и schema version"
+   ],
+   "check": "Изпълни целия corpus два пъти с идентичен резултат.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "NRM-001",
+   "group": "NRM",
+   "title": "Договор за raw, normalized и unknown",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Пази source value, нормализирана стойност, method/version, confidence basis и quality reason; null не е празен текст.",
+   "deliverable": "FieldValue schema",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "DAT-001",
+    "XLS-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всяка трансформация е обратимо обяснима чрез raw",
+    "Unknown, absent и invalid са различни състояния"
+   ],
+   "check": "Празна клетка, тире и невалидна дата дават различими резултати.",
+   "evidence": [
+    "IM-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-07"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "NRM-002",
+   "group": "NRM",
+   "title": "Строги календарни дати",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Валидирай формат, ден/месец и range; отдели notification, entry и launch; бъдеща дата е аномалия според полето.",
+   "deliverable": "date normalizer",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "31.02 не се прехвърля тихо в март",
+    "Не се поправя година по догадка"
+   ],
+   "check": "Провери 17.04.2027 спрямо снимка от 13.10.2026 и запази оригинала.",
+   "evidence": [
+    "LIVE-08",
+    "IM-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-08",
+    "IM-07"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "NRM-003",
+   "group": "NRM",
+   "title": "Регистрационни номера и производни",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Нормализирай допустими знаци без загуба; област/година/П-Т се извеждат само от документирано правило.",
+   "deliverable": "registration parser",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Производните полета имат method и evidence",
+    "Непознат prefix не изчезва от резултатите"
+   ],
+   "check": "Кирилски/латински визуално сходни букви и нов непознат формат.",
+   "evidence": [
+    "PR-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-07"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "NRM-004",
+   "group": "NRM",
+   "title": "Разделяне на фирма, адрес и държава",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Разпознай държава без фирма; не създавай организация Полша; запази ambiguous текст за преглед.",
+   "deliverable": "party field parser",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Country-only стойност не увеличава броя фирми",
+    "Предположена роля не се показва като source fact"
+   ],
+   "check": "Производител=Полша, липсваща фирма и свободен адрес.",
+   "evidence": [
+    "LIVE-05",
+    "PR-11"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-05",
+    "PR-11"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "NRM-005",
+   "group": "NRM",
+   "title": "Безопасна текстова нормализация",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Използвай Unicode NFC, whitespace и punctuation policy; transliteration е search alias, не идентичност.",
+   "deliverable": "text normalization library",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Оригиналното изписване е достъпно",
+    "Различни правни имена не се сливат заради transliteration"
+   ],
+   "check": "ООД/ЕООД, кавички, латинско A и кирилско А.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "NRM-006",
+   "group": "NRM",
+   "title": "Бележки и наличие",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Раздели дословна бележка, автоматично намерена фраза и presence state; статутът не се извежда от един keyword.",
+   "deliverable": "note classifier",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Text match не става административно решение",
+    "Източниковата бележка включва точен откъс и ред"
+   ],
+   "check": "Фраза за отменена забрана не се класифицира като текуща забрана.",
+   "evidence": [
+    "OV-05",
+    "LIVE-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-03",
+    "OV-05"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "NRM-007",
+   "group": "NRM",
+   "title": "Единни quality rules",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Версионирай правила за липси, бъдещи дати, конфликтни роли и необичайни стойности; централизирай броячите.",
+   "deliverable": "quality ruleset и aggregation",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Карта, филтър и админ броят едни и същи flags",
+    "Промяна на правило създава нов derivation version"
+   ],
+   "check": "Смени правило, направи dry run и сравни всички броячи.",
+   "evidence": [
+    "AD-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-01"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "NRM-008",
+   "group": "NRM",
+   "title": "Quarantine без загуба на оригинал",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Определи row-blocking и field-warning условия; конфликтен primary key блокира реда, не се измисля стойност.",
+   "deliverable": "validation severity matrix",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-002",
+    "NRM-003",
+    "NRM-004",
+    "NRM-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Критичната грешка не става валиден запис",
+    "Частично неизвестно поле не изтрива останалата регистрация"
+   ],
+   "check": "Невалиден номер срещу валиден номер с неясна дата.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "NRM-009",
+   "group": "NRM",
+   "title": "Ръчен преглед и обучение на правилата",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Свържи одобрено решение с fixture и версия; човешка корекция не обновява глобален речник без отделно одобрение.",
+   "deliverable": "review decision protocol",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-007",
+    "DAT-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Има автор, причина и история на решението",
+    "Отхвърлено правило може да се върне"
+   ],
+   "check": "Локална корекция за една фирма не променя всички сходни имена.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "NRM-010",
+   "group": "NRM",
+   "title": "Регресионен набор за полетата",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Етикетирай реални трудни случаи и отдели holdout; сравнявай raw preservation, exactness и abstention coverage.",
+   "deliverable": "field quality benchmark",
+   "owner": "Data quality инженер",
+   "depends_on": [
+    "NRM-008",
+    "NRM-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма тихи грешки в ID/дата/роля в critical fixtures",
+    "Отчетът показва и непарснатите стойности, не само успешните"
+   ],
+   "check": "Пусни нов normalizer върху неизползван holdout и публикувай разликите.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ING-001",
+   "group": "ING",
+   "title": "Етикетиран корпус за съставите",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Събери реални разделители, езикови варианти, единици, смеси и грешки; очакванията се преглеждат от domain reviewer.",
+   "deliverable": "composition-corpus.jsonl",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "NRM-001",
+    "ARC-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Има отделни training/regression/holdout набори",
+    "Очакваният резултат пази текстовите позиции"
+   ],
+   "check": "Примерът магнезий/B6/ашваганда е включен като критична регресия.",
+   "evidence": [
+    "LIVE-05",
+    "PR-12"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-05",
+    "PR-12"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "ING-002",
+   "group": "ING",
+   "title": "Lexer за разделители и скоби",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Разделяй по граматика с decimal comma, вложени скоби и именувани смеси; пази source offsets.",
+   "deliverable": "composition lexer",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "187,5 не се разцепва на две съставки",
+    "Разделител в скоби не разкъсва именуван комплекс"
+   ],
+   "check": "Магнезий-187,5 мг, Витамин B6-1,05 мг, Ашваганда-74,5 мг дава три позиции.",
+   "evidence": [
+    "LIVE-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-05"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "ING-003",
+   "group": "ING",
+   "title": "Количества, диапазони и сравнения",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Парсни mg/g/µg/μg/мкг/IU/CFU/% и min/max/≤/≥; пази числото с decimal точност.",
+   "deliverable": "quantity parser",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Не се губят дробни части и сравнителни знаци",
+    "Непозната единица остава raw с флаг"
+   ],
+   "check": "0,05 g; 2–5 mg; ≥10⁹ CFU; 5% без база.",
+   "evidence": [
+    "PR-12"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-12"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ING-004",
+   "group": "ING",
+   "title": "Основа на дозата",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Раздели per capsule, serving, daily dose, 100g и unspecified; общ заглавен контекст се наследява само явно.",
+   "deliverable": "dose context model",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Несъвместими бази не се сравняват като равни",
+    "Липсваща база не се приема за дневна доза"
+   ],
+   "check": "Две капсули съдържат 100 mg срещу 100 mg в една капсула.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "ING-005",
+   "group": "ING",
+   "title": "Форма и активно количество",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Съхрани сол/хелат, екстракт, DER ratio и standardization отделно; без неподкрепено преизчисление към елемент.",
+   "deliverable": "ingredient form AST",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Маса на солта не се представя като елементарен минерал",
+    "10:1 не се превръща автоматично в активна доза"
+   ],
+   "check": "Магнезиев цитрат 500 mg, от които магнезий 80 mg.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "ING-006",
+   "group": "ING",
+   "title": "Ботанически и микробни уточнения",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Моделирай Latin name, част на растение, solvent, extract и strain; пази неуверени идентификатори.",
+   "deliverable": "botanical/strain extensions",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Корен и лист са различни контексти",
+    "Различни щамове не се сливат по вид"
+   ],
+   "check": "Withania somnifera root extract и L. rhamnosus GG.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 16
+  },
+  {
+   "id": "ING-007",
+   "group": "ING",
+   "title": "Смеси, помощни вещества и вложени съставки",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Поддържай parent/child връзки и active/excipient/unknown; общо количество на смес не се разпределя произволно.",
+   "deliverable": "composition tree",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Общо 500 mg не става 500 mg за всеки компонент",
+    "Непосоченото количество остава неизвестно"
+   ],
+   "check": "Билкова смес 500 mg (ашваганда, родиола), капсула HPMC.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ING-008",
+   "group": "ING",
+   "title": "Канонични съставки и алиаси",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Създай reviewed dictionary с език, форма, evidence и merge history; fuzzy match предлага кандидат.",
+   "deliverable": "ingredient identity service",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-006",
+    "NRM-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Автоматично приемане изисква измерен праг",
+    "Нееднозначен alias не се решава с първия резултат"
+   ],
+   "check": "Витамин B6 срещу конкретна сол и две различни растения с общо име.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 17
+  },
+  {
+   "id": "ING-009",
+   "group": "ING",
+   "title": "Честно частично разпознаване",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Върни parsed, ambiguous и unparsed spans; броят е на разпознати компоненти с пояснение, не на произволни токени.",
+   "deliverable": "parser result contract",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-004",
+    "ING-005",
+    "ING-007",
+    "ING-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Непознат остатък е видим",
+    "Пълен raw състав винаги е достъпен"
+   ],
+   "check": "Непозната единица в средата не скрива следващата съставка.",
+   "evidence": [
+    "LIVE-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-05"
+   ],
+   "wave": 18
+  },
+  {
+   "id": "ING-010",
+   "group": "ING",
+   "title": "Версии и повторна обработка на състава",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Запиши parser/dictionary versions и сравнение old/new; parser update не е промяна на източника.",
+   "deliverable": "composition reprocessing job",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-009",
+    "DAT-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Изходът е детерминистичен за една версия",
+    "Промяна в parse не поражда фалшиво source-change известие"
+   ],
+   "check": "Нов alias разпознава стар текст без промяна в оригинала.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 19
+  },
+  {
+   "id": "ING-011",
+   "group": "ING",
+   "title": "Измерване на качество и отказ от догадки",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Изчисли exact match, precision на приетите mappings, quantity accuracy и coverage върху holdout.",
+   "deliverable": "composition benchmark report",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Целта за auto-accepted identity е ≥99,5% precision с размер на извадката и интервал",
+    "Критичните units/dose fixtures имат нула silent conversions"
+   ],
+   "check": "Намали confidence threshold и докажи как precision/coverage се променят.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 19
+  },
+  {
+   "id": "ING-012",
+   "group": "ING",
+   "title": "API за съставки и review кандидати",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Публикувай AST за UI и филтри; евентуално AI предлага само кандидати в отделен review слой.",
+   "deliverable": "ingredient query API",
+   "owner": "Parser / domain инженер",
+   "depends_on": [
+    "ING-010",
+    "ING-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "AI предложение не се записва като source fact",
+    "Филтриране използва приетите канонични IDs"
+   ],
+   "check": "Непотвърден AI alias не променя броя продукти в търсенето.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "ENT-001",
+   "group": "ENT",
+   "title": "Една фирма с множество роли",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Създай canonical company и роли върху конкретни регистрации; manufacturer/trader са филтри, не дублирани таблици.",
+   "deliverable": "company/registration_party schema",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "NRM-004",
+    "DAT-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Една фирма може да има двете роли",
+    "Всички продуктови списъци използват едни и същи връзки"
+   ],
+   "check": "Фирма производител по един запис и търговец по друг има един профил.",
+   "evidence": [
+    "CO-07",
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN",
+    "CO-07"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "ENT-002",
+   "group": "ENT",
+   "title": "Идентичност и алиаси на фирмите",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Използвай проверени идентификатори когато са налични; името предлага candidate, не доказва идентичност.",
+   "deliverable": "entity matching policy",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-001",
+    "NRM-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "ООД/ЕООД не се сливат автоматично само по обща дума",
+    "Alias има произход и confidence basis"
+   ],
+   "check": "Сравни Ревита ООД и Ревита ЕООД с противоречиви адреси.",
+   "evidence": [
+    "LIVE-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-06"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ENT-003",
+   "group": "ENT",
+   "title": "Обратими merge и split",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Изгради preview на засегнати записи, одобрение, audit и връщане; стабилните IDs пазят redirects.",
+   "deliverable": "merge/split service",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-002",
+    "DAT-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нито един source ред не се губи",
+    "След split броячи и watches се преизчисляват по явна политика"
+   ],
+   "check": "Обедини две фирми погрешно и възстанови отделните им връзки.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "ENT-004",
+   "group": "ENT",
+   "title": "Държава и българска връзка",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Раздели изрична държава, адресна евристика и verified registration jurisdiction; именувай филтъра според доказателството.",
+   "deliverable": "country evidence model",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Не се твърди българска регистрация само от адрес/име",
+    "Unknown остава отделен филтър"
+   ],
+   "check": "Фирма с български адрес и липсващ идентификатор.",
+   "evidence": [
+    "CO-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "CO-03"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "ENT-005",
+   "group": "ENT",
+   "title": "Честни връзки между фирми",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Покажи съвместно посочени в регистрации, период и evidence; липсващ производител не означава собствено производство.",
+   "deliverable": "relationship projection",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма inferred договор, клиент или собствена марка без доказателство",
+    "Source и inferred връзките се филтрират отделно"
+   ],
+   "check": "1636 записа без друг производител се означават с липсващи данни.",
+   "evidence": [
+    "CO-04",
+    "LIVE-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-06",
+    "CO-04"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ENT-006",
+   "group": "ENT",
+   "title": "Марки с проверим произход",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Премахни first-word extraction като факт; създай brand entity, aliases и reviewed assignment или unknown.",
+   "deliverable": "brand dictionary и assignments",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "NRM-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "КУРКУМА и ЧЕРЕН не се броят автоматично за марки",
+    "Brand filter и KPI използват същите assignments"
+   ],
+   "check": "Име с обща съставка в началото остава без установена марка.",
+   "evidence": [
+    "CO-06",
+    "LIVE-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-06",
+    "CO-06"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "ENT-007",
+   "group": "ENT",
+   "title": "Версионирана многозначна категоризация",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Раздели продуктова категория, форма и съставка; поддържай multi-label с evidence и review на некатегоризираните.",
+   "deliverable": "taxonomy и classifier rules",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ING-008",
+    "NRM-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Един запис може да има повече от една категория",
+    "Общият брой не се получава със сумиране на припокриващи се категории"
+   ],
+   "check": "Комбинация магнезий/ашваганда попада в две релевантни категории.",
+   "evidence": [
+    "LIVE-02"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-02"
+   ],
+   "wave": 18
+  },
+  {
+   "id": "ENT-008",
+   "group": "ENT",
+   "title": "Редакционни речници и reclassification",
+   "priority": "P1",
+   "milestone": "R1",
+   "summary": "Публикувай версии на aliases, категории, държави и правила с dry run impact и rollback.",
+   "deliverable": "dictionary release service",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нови правила не променят raw данните",
+    "Има review на големи промени в coverage"
+   ],
+   "check": "Ново правило мести 5000 записа; публикуването показва засегнатите IDs.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 19
+  },
+  {
+   "id": "ENT-009",
+   "group": "ENT",
+   "title": "Единни броячи на фирмен профил",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Изчислявай totals от пълния scope; разграничай total, loaded и self-relations; не брои ограничена страница за всичко.",
+   "deliverable": "company summary projection",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-005",
+    "ENT-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "KPI и таб показват един и същ total",
+    "Self relation не се появява като външен контрагент"
+   ],
+   "check": "Фирма с над 500 връзки и собствено участие в списъка.",
+   "evidence": [
+    "CO-05",
+    "LIVE-16"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-16",
+    "CO-05"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "ENT-010",
+   "group": "ENT",
+   "title": "Предварително изчислени фирмени данни",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Изгради versioned projections за профил/мрежа/брой; heavy rebuild е background job.",
+   "deliverable": "company read model",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-003",
+    "ENT-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Отварянето не сканира всички записи в PHP",
+    "Projection е готов преди dataset activation"
+   ],
+   "check": "Зареди голям профил по време на rebuild.",
+   "evidence": [
+    "CO-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "CO-09"
+   ],
+   "wave": 16
+  },
+  {
+   "id": "ENT-011",
+   "group": "ENT",
+   "title": "Оценка на entity matching",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Изгради labelled positive/negative pairs и holdout; мери auto-merge precision, false merges и coverage.",
+   "deliverable": "entity benchmark",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-002",
+    "ENT-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Цел ≥99,5% precision за auto-accepted matches с отчетен размер/интервал",
+    "Критичните различни юридически лица никога не се сливат"
+   ],
+   "check": "Сходни имена в различни държави и legal form промени.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 16
+  },
+  {
+   "id": "ENT-012",
+   "group": "ENT",
+   "title": "Каталог и API за фирмени факти",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Върни роли, aliases, confidence basis, source links и reviewed brands; no-data не става нула доказани факти.",
+   "deliverable": "company detail contract",
+   "owner": "Entity resolution / data инженер",
+   "depends_on": [
+    "ENT-006",
+    "ENT-007",
+    "ENT-010",
+    "ENT-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "UI може да обясни всеки брояч и връзка",
+    "Непроверена марка е видимо различима"
+   ],
+   "check": "Съпостави API response с един source row и един reviewed alias.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 19
+  },
+  {
+   "id": "API-001",
+   "group": "API",
+   "title": "Версиониран REST слой",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Регистрирай routes с schema validation, permission callback, стандартизирани errors и correlation ID; поддържай WP fallback route.",
+   "deliverable": "REST controllers и OpenAPI",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "ARC-005",
+    "DAT-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "GET/POST имат единна authentication/permission политика",
+    "Грешка не връща HTML вместо договорения JSON"
+   ],
+   "check": "Тествай pretty permalinks включени и изключени.",
+   "evidence": [
+    "AU-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "AU-03"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "API-002",
+   "group": "API",
+   "title": "Единна семантика на търсене",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Дефинирай exact registration, име, фирма, съставка, кирилица/латиница и token behavior; fulltext/fallback имат еднакви обещания.",
+   "deliverable": "search query service",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-001",
+    "NRM-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Exact номер е предвидим и при кратка заявка",
+    "Fallback не променя тайно обхвата"
+   ],
+   "check": "магнезий, ашваганда, ashvaganda, Т162618382 и еднобуквен input.",
+   "evidence": [
+    "PR-04",
+    "LIVE-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-04",
+    "PR-04"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "API-003",
+   "group": "API",
+   "title": "Договор за празни и невалидни заявки",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Опиши empty query, minimum text length, invalid filters, timeout и no results с ясни status codes.",
+   "deliverable": "query validation и error map",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нула резултата не е техническа грешка",
+    "Невалиден филтър не се игнорира тихо"
+   ],
+   "check": "Празна заявка, неизвестна категория, 500 и 429.",
+   "evidence": [
+    "PR-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-05"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "API-004",
+   "group": "API",
+   "title": "Контекстни facets",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Брой facets в текущия dataset и query scope; за текущия facet изключвай собственото му ограничение по документирано правило.",
+   "deliverable": "facet aggregation",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-002",
+    "ENT-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Counts се преизчисляват с търсенето",
+    "Multi-select union/intersection е описан и еднакъв в UI/API"
+   ],
+   "check": "Търси магнезий, избери две категории и сравни count с резултатите.",
+   "evidence": [
+    "PR-06",
+    "PR-08",
+    "LIVE-14"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-14",
+    "PR-06",
+    "PR-08"
+   ],
+   "wave": 19
+  },
+  {
+   "id": "API-005",
+   "group": "API",
+   "title": "Стабилно сортиране и странициране",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Потребителската сортировка има предимство; cursor включва dataset/query/sort и deterministic tie-breaker.",
+   "deliverable": "pagination contract",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма повторени/пропуснати записи между страници",
+    "Стар cursor не се използва върху нов dataset без контрол"
+   ],
+   "check": "Еднакви дати на 200 записи, публикация между page 1 и 2.",
+   "evidence": [
+    "PR-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-09"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "API-006",
+   "group": "API",
+   "title": "Детайл с произход и качество",
+   "priority": "P0",
+   "milestone": "R2",
+   "summary": "Върни всички полезни source fields, parsed values, source row, flags и correction context; скрий само неразрешени частни данни.",
+   "deliverable": "registration detail endpoint",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-001",
+    "DAT-006",
+    "DAT-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Източник и предположение са различими машинно",
+    "Наличната стойност не се губи поради UI truncation"
+   ],
+   "check": "Дълъг състав, country-only producer и manual correction.",
+   "evidence": [
+    "PR-11",
+    "PR-13"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-11",
+    "PR-13"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "API-007",
+   "group": "API",
+   "title": "Възстановими списъци",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Next-page retry запазва query и cursor; client получава retryable flag и timeout context.",
+   "deliverable": "list error contract",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Провалена страница не изтрива заредените резултати",
+    "Retry не прескача и не дублира страница"
+   ],
+   "check": "Откажи третата страница веднъж, после върни успешен отговор.",
+   "evidence": [
+    "CO-02"
+   ],
+   "status": "planned",
+   "covers": [
+    "CO-02"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "API-008",
+   "group": "API",
+   "title": "Единен обхват на експорта",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Export request съдържа точните query, sort, dataset, columns и all/selected/page scope; лимитът е видим преди старта.",
+   "deliverable": "export contract и preview count",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-004",
+    "API-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Експортът не означава неявно само loaded rows",
+    "Ограничен план съобщава лимита и реалния count"
+   ],
+   "check": "Фирмен списък с 24 заредени реда и 2615 общо.",
+   "evidence": [
+    "EX-01",
+    "LIVE-12"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-12",
+    "EX-01"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "API-009",
+   "group": "API",
+   "title": "Фонови големи експорти",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Изпълнявай chunked export с immutable query и version; job има progress, expiry и authorized download.",
+   "deliverable": "export worker",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-008",
+    "SRC-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Повторен request_id не прави два export job-а",
+    "Отказан/изтекъл файл не е публично достъпен"
+   ],
+   "check": "50k реда, прекъсване на worker и възстановяване.",
+   "evidence": [
+    "EX-01",
+    "EX-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "EX-01",
+    "EX-03"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "API-010",
+   "group": "API",
+   "title": "Безопасен и самостоятелен CSV",
+   "priority": "P0",
+   "milestone": "R2",
+   "summary": "Сериализирай UTF-8, quotes, delimiters, newlines и spreadsheet formula mitigation; metadata е отделен README/manifest.",
+   "deliverable": "CSV serializer и export metadata",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "=,+,-,@ и leading controls не изпълняват формули",
+    "Файлът съдържа raw/derived разграничение, scope и версия"
+   ],
+   "check": "Клетки с formula payload, кавички, нов ред и кирилица се отварят безопасно.",
+   "evidence": [
+    "EX-02",
+    "EX-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "EX-02",
+    "EX-03"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "API-011",
+   "group": "API",
+   "title": "Изолирани откази и cache contract",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Раздели ресурси и stale/error policy; отказ на overview не подменя активен product screen.",
+   "deliverable": "resource cache contract",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-001",
+    "DAT-010"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Stale data е означена с версия/дата",
+    "Грешка в един endpoint не изтрива независим резултат"
+   ],
+   "check": "500 от statistics по време на работещо търсене.",
+   "evidence": [
+    "PR-15"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-15"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "API-012",
+   "group": "API",
+   "title": "Профилиране и ограничения на API",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Измери queries, plans, rate/concurrency limits и скъпите комбинации; лимитите връщат полезен retry ответ.",
+   "deliverable": "API benchmark и limits",
+   "owner": "Backend API инженер",
+   "depends_on": [
+    "API-004",
+    "API-005",
+    "ENT-010"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Покрит е договореният p95 бюджет при конкретен товар",
+    "Няма неограничен wildcard/regex/offset обход"
+   ],
+   "check": "200k записа, 50 паралелни четения и активен import.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "UX-001",
+   "group": "UX",
+   "title": "Дизайн tokens и четима кирилица",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Уеднакви типография, spacing, цвят, граници и плътност; ограничи hero височините и оранжевото до действия/акценти.",
+   "deliverable": "design tokens и component inventory",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "ARC-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Текстовете имат четима йерархия и контраст",
+    "Еднакви елементи ползват един token"
+   ],
+   "check": "Преглед на дълги български имена на desktop и 320px.",
+   "evidence": [
+    "UX-11",
+    "LIVE-13"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-13",
+    "UX-11"
+   ],
+   "wave": 4
+  },
+  {
+   "id": "UX-002",
+   "group": "UX",
+   "title": "Responsive shell",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Направи устойчив sidebar/header на desktop и едно мобилно меню; safe areas и viewport height не скриват съдържание.",
+   "deliverable": "app shell",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма хоризонтален overflow на страницата при 320px",
+    "Навигацията не закрива последния ред или action"
+   ],
+   "check": "320, 390, 768, 900, 1024 и 1440px с отворена клавиатура.",
+   "evidence": [
+    "UX-01",
+    "UX-02",
+    "UX-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "UX-01",
+    "UX-02",
+    "UX-05"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "UX-003",
+   "group": "UX",
+   "title": "Router и възстановим URL",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Адресът носи query, filters, sort, detail и profile tab; старите #p/#f връзки се поддържат чрез mapping.",
+   "deliverable": "router и URL state schema",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Back/Forward/reload възстановяват правилния екран",
+    "Ново търсене премахва стария product deep link"
+   ],
+   "check": "Отвори #p, търси друго, reload: старият продукт не се появява.",
+   "evidence": [
+    "PR-10",
+    "CO-08",
+    "LIVE-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-07",
+    "PR-10",
+    "CO-08"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "UX-004",
+   "group": "UX",
+   "title": "Управление на асинхронни заявки",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Комбинирай AbortController, request identity и debounce cleanup; при навигация ресурсите се изолират.",
+   "deliverable": "query state hooks/services",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-003",
+    "API-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Само отговорът за текущия request обновява view",
+    "Clear отменя чакащ debounce и loading state"
+   ],
+   "check": "Бавна A, бърза B; A пристига последна; Clear преди debounce.",
+   "evidence": [
+    "PR-01",
+    "PR-02",
+    "CO-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-01",
+    "PR-02",
+    "CO-01"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "UX-005",
+   "group": "UX",
+   "title": "Бутони, форми и системни състояния",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Създай общи Button/Input/Select/Notice/Skeleton/Empty/Error; иконите имат фиксиран box.",
+   "deliverable": "component library",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Disabled/loading/error са различими и достъпни",
+    "SVG и inherited CSS не увеличават контролите"
+   ],
+   "check": "Проверка на бутона Провери и waitlist form с дълга грешка.",
+   "evidence": [
+    "UX-03",
+    "UX-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "UX-03",
+    "UX-04"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "UX-006",
+   "group": "UX",
+   "title": "Диалози, drawer и mobile filters",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Осигури focus trap, Escape, inert фон, restore focus и cleanup на scroll lock; не rerender-вай целия filter tree.",
+   "deliverable": "Dialog/Drawer/FilterSheet",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-002",
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Затваряне по всички пътища връща фокуса",
+    "Apply/Cancel имат ясна семантика за черновата на филтрите"
+   ],
+   "check": "Затвори чрез Escape, route change и network error.",
+   "evidence": [
+    "UX-06",
+    "UX-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "UX-06",
+    "UX-07"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "UX-007",
+   "group": "UX",
+   "title": "Семантика и клавиатурна работа",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Използвай link за навигация, button за действие, labels, headings и live regions; screen reader съобщава резултата.",
+   "deliverable": "accessibility behavior contract",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всички действия работят без мишка",
+    "Фокусът е видим и не се скрива под sticky header"
+   ],
+   "check": "Клавиатурно търсене, филтър, детайл, експорт и връщане.",
+   "evidence": [
+    "UX-08"
+   ],
+   "status": "planned",
+   "covers": [
+    "UX-08"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "UX-008",
+   "group": "UX",
+   "title": "Дълги стойности и адаптивни детайли",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Правило за line clamp само в списък; пълно име в детайл, controlled wrapping и copy с feedback.",
+   "deliverable": "text/display primitives",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-001",
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "ID, URL и фирма не разбиват layout",
+    "Няма огромна празна зона около един бутон"
+   ],
+   "check": "300-символно име, 20k състав, 200% размер на текста.",
+   "evidence": [
+    "UX-09",
+    "UX-10"
+   ],
+   "status": "planned",
+   "covers": [
+    "UX-09",
+    "UX-10"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "UX-009",
+   "group": "UX",
+   "title": "Един компонент за таблици и карти",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Общ data model със sort, selection, pagination, column visibility и mobile priorities; запази view preference.",
+   "deliverable": "DataList component",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-001",
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Desktop table и mobile cards имат идентични IDs/counts",
+    "Скритите колони остават достъпни в детайл"
+   ],
+   "check": "Смени breakpoint и view без загуба на query или selection.",
+   "evidence": [
+    "LIVE-12"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-12"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "UX-010",
+   "group": "UX",
+   "title": "Надеждни графики",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Ограничи размерите, правилни мащаби, нулеви стойности, keyboard tooltip и достъпна таблица.",
+   "deliverable": "ChartFrame и chart adapters",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Графиката не се разтяга според съседна секция",
+    "Графична дължина съответства на числата"
+   ],
+   "check": "0, 1, 1000, равни стойности и един месец.",
+   "evidence": [
+    "OV-01",
+    "OV-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "OV-01",
+    "OV-04"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "UX-011",
+   "group": "UX",
+   "title": "Контраст, reflow и намалено движение",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Покрий WCAG 2.2 AA target, prefers-reduced-motion, 400% reflow и touch target product goal 44px.",
+   "deliverable": "a11y tokens и styles",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-007",
+    "UX-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма цветово единствено означаване на статус",
+    "Zoom и reduced motion не премахват функционалност"
+   ],
+   "check": "Клавиатура, 400% zoom, high contrast и touch на iOS.",
+   "evidence": [
+    "UX-12"
+   ],
+   "status": "planned",
+   "covers": [
+    "UX-12"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "UX-012",
+   "group": "UX",
+   "title": "Изолиран CSS и WordPress интеграция",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Премахни натрупани overrides; namespace styles и IDs; използвай нормалния WP lifecycle без чужд page takeover.",
+   "deliverable": "scoped assets и integration adapters",
+   "owner": "UI / frontend инженер",
+   "depends_on": [
+    "UX-002",
+    "UX-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Два shortcode instance не споделят случайно IDs/state",
+    "Плъгинът не счупва theme header/footer"
+   ],
+   "check": "Вгради в две теми и в страница с два instance.",
+   "evidence": [
+    "UX-12",
+    "AD-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "UX-12",
+    "AD-06"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "APP-001",
+   "group": "APP",
+   "title": "Нова информационна архитектура",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Главни раздели Преглед, Регистър, Анализи, Наблюдение; акаунтът и помощта са отделно; неподготвено не се представя като работещо.",
+   "deliverable": "navigation config",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "ARC-006",
+    "UX-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Производители/търговци са роли във Фирми",
+    "Няма два празни основни таба за интерес към бъдеща функция"
+   ],
+   "check": "Намери продукт, фирма, промени и план с ясен маршрут.",
+   "evidence": [
+    "WL-04",
+    "LIVE-11"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-11",
+    "WL-04"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "APP-002",
+   "group": "APP",
+   "title": "Полезен обзор",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Покажи кратки KPI с мерна единица, период, freshness и връзки към точния филтър; едно място за системния source status.",
+   "deliverable": "overview screen",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "APP-001",
+    "UX-010",
+    "API-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Статусът различава checked/downloaded/published/source date",
+    "Клик на KPI отваря същия набор и count"
+   ],
+   "check": "Последен неуспешен import при стар, но валиден активен набор.",
+   "evidence": [
+    "OV-06",
+    "OV-07",
+    "LIVE-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-01",
+    "OV-06",
+    "OV-07"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "APP-003",
+   "group": "APP",
+   "title": "Работен екран Регистрации",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Една активна търсачка, основни/разширени филтри, chips, table/cards и ясно поле за дата; запази контекста.",
+   "deliverable": "registration list screen",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "UX-009",
+    "API-004",
+    "API-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Търсачките не поддържат различни заявки",
+    "Изчистване премахва всички активни скрити филтри"
+   ],
+   "check": "Отвори от фирмен профил, добави дата и изчисти фирмения chip.",
+   "evidence": [
+    "PR-03",
+    "PR-08"
+   ],
+   "status": "planned",
+   "covers": [
+    "PR-03",
+    "PR-08"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "APP-004",
+   "group": "APP",
+   "title": "Пълен детайл на регистрация",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Секции идентичност, фирми, състав, дати, предназначение/съхранение, история и източник; drawer е preview на същия модел.",
+   "deliverable": "registration detail screen",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "API-006",
+    "UX-003",
+    "UX-008",
+    "ING-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Показани са всички налични полезни полета и uncertainties",
+    "Назад връща същия scroll/filter context"
+   ],
+   "check": "От списък на page 3 отвори детайл и се върни.",
+   "evidence": [
+    "PR-13",
+    "PR-14",
+    "LIVE-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-05",
+    "PR-13",
+    "PR-14"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "APP-005",
+   "group": "APP",
+   "title": "Общ каталог на фирми",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Ролеви филтри производител/търговец/двете; държава с evidence; една идентичност и общи sort/export контроли.",
+   "deliverable": "company list screen",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "APP-001",
+    "ENT-012",
+    "UX-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Промяна на роля не сменя идентичността на фирмата",
+    "Totals съвпадат със server query"
+   ],
+   "check": "Една фирма с две роли се отваря към един canonical profile.",
+   "evidence": [
+    "CO-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "CO-07"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "APP-006",
+   "group": "APP",
+   "title": "Един фирмен профил",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Tabs: обзор, регистрации, свързани фирми, доказани марки, история; compact preview води към същия record.",
+   "deliverable": "company profile screen",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "APP-005",
+    "ENT-012",
+    "UX-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "KPI не се повтарят без цел във всеки tab",
+    "URL запазва избрания tab и филтри"
+   ],
+   "check": "Сравни preview, full profile и директен линк към регистрации.",
+   "evidence": [
+    "CO-08",
+    "LIVE-15"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-15",
+    "CO-08"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "APP-007",
+   "group": "APP",
+   "title": "Коректни текстове за данните",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Замени неподкрепени собствено производство/нови клиенти/собствени марки с точни описания на evidence.",
+   "deliverable": "terminology и microcopy catalog",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "APP-004",
+    "ENT-005",
+    "ENT-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всяко твърдение съответства на domain glossary",
+    "Unknown не се превръща в нула или положителен факт"
+   ],
+   "check": "Провери спорните 1636 и 715 в profile presentation след reprocess.",
+   "evidence": [
+    "LIVE-06",
+    "LIVE-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-06",
+    "LIVE-09"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "APP-008",
+   "group": "APP",
+   "title": "Един експортен диалог",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Обхват, колони, count, лимит, версия, progress и download; ползва се от всички списъци.",
+   "deliverable": "ExportDialog",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "API-008",
+    "API-009",
+    "API-010",
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Еднаква операция има еднакво поведение навсякъде",
+    "При частичен export се виждат причината и реалният брой"
+   ],
+   "check": "Регистрации, фирми и свързани фирми с надлимитен резултат.",
+   "evidence": [
+    "LIVE-12"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-12"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "APP-009",
+   "group": "APP",
+   "title": "Речник на съставките",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Каталог с aliases, форми и свързани регистрации; регулаторната проверка е отделно действие, не свойство от parser.",
+   "deliverable": "ingredient catalog screen",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "ING-012",
+    "APP-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Показва разпознато и неразпознато без измислени количества",
+    "Alias link отваря правилния canonical ingredient"
+   ],
+   "check": "Избор на ашваганда от комбиниран състав води към същия речник.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "APP-010",
+   "group": "APP",
+   "title": "Методология и обяснения на място",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Добави достъпни обяснения за регистрации, inferred данни, периоди, freshness, липси и поправки.",
+   "deliverable": "methodology screen и contextual help",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "APP-002",
+    "NRM-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Tooltip не е единствен достъп до важно ограничение",
+    "Обясненията са общи, а не копирани различно по екрани"
+   ],
+   "check": "Четене на mobile без hover и от keyboard.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "APP-011",
+   "group": "APP",
+   "title": "Сигнал за грешка в данните",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Позволи сигнал с record/version/field context и attachment policy; частният контакт не е публичен.",
+   "deliverable": "data issue submission",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "UX-005",
+    "APP-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Потребителят не редактира директно source данни",
+    "Има номер, status и защита от spam"
+   ],
+   "check": "Подай сигнал за погрешна фирма и проследи admin resolution.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "APP-012",
+   "group": "APP",
+   "title": "Пълни състояния на основните екрани",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Изработи loading, partial, empty, error, offline, expired session и denied states за всеки реален маршрут.",
+   "deliverable": "screen-state matrix и UI implementations",
+   "owner": "Product frontend инженер",
+   "depends_on": [
+    "APP-003",
+    "APP-004",
+    "APP-006",
+    "APP-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма blank screen или нескончаем spinner",
+    "Retry запазва полезния контекст"
+   ],
+   "check": "Мрежата прекъсва при детайл, pagination и готов export.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 23
+  },
+  {
+   "id": "ANA-001",
+   "group": "ANA",
+   "title": "Каталог на метриките",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "За всяка метрика опиши unit, numerator, scope, date field, missing policy и distinct key; регистрации не са продажби.",
+   "deliverable": "metric-registry.json",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ARC-004",
+    "DAT-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всички KPI използват named metric definition",
+    "Няма недоказан market share или customer acquisition"
+   ],
+   "check": "Един продукт с две регистрации се брои според дефиницията.",
+   "evidence": [
+    "OV-07",
+    "LIVE-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-09",
+    "OV-07"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "ANA-002",
+   "group": "ANA",
+   "title": "Единни времеви граници",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Имплементирай календарни/rolling периоди със start-inclusive/end-exclusive и timezone; unknown date е отделно.",
+   "deliverable": "period service",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-001",
+    "NRM-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Графика, KPI, drilldown и CSV ползват същите граници",
+    "Месеците не се генерират чрез добавяне към 31-во число"
+   ],
+   "check": "31 януари, високосна година, DST и последен ден на периода.",
+   "evidence": [
+    "OV-02",
+    "OV-03",
+    "PR-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "OV-02",
+    "OV-03",
+    "PR-07"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "ANA-003",
+   "group": "ANA",
+   "title": "Непълни периоди и неизвестни дати",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Означи текущия месец/година като непълни; сравнявай еднакъв elapsed window или завършени периоди.",
+   "deliverable": "comparison policy",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма скрито приписване на unknown dates към миналото",
+    "Непълен октомври не се сравнява като пълен месец"
+   ],
+   "check": "57 записа към 13 октомври срещу цял септември.",
+   "evidence": [
+    "LIVE-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-09"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ANA-004",
+   "group": "ANA",
+   "title": "Един източник на агрегати",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Изчислявай totals, facets и chart series от общи projections и scope; valid dataset token навсякъде.",
+   "deliverable": "aggregate service",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-001",
+    "ENT-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Числото в карта съвпада с drilldown count",
+    "Няма derived count от ограничен списък"
+   ],
+   "check": "Голям профил с над page limit връзки и марки.",
+   "evidence": [
+    "CO-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "CO-05"
+   ],
+   "wave": 16
+  },
+  {
+   "id": "ANA-005",
+   "group": "ANA",
+   "title": "Класация с точна мярка",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Покажи регистрации за период, rank ties и filters; business отношения се описват само като register co-occurrence.",
+   "deliverable": "ranking screen/API",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-002",
+    "ANA-004",
+    "ENT-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Равни стойности имат детерминистичен ранг",
+    "Промяна в данни не се описва като продажби или нов договор"
+   ],
+   "check": "Две фирми с равен брой и липсващ producer.",
+   "evidence": [
+    "LIVE-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-09"
+   ],
+   "wave": 17
+  },
+  {
+   "id": "ANA-006",
+   "group": "ANA",
+   "title": "Графики с проверими числа",
+   "priority": "P1",
+   "milestone": "R2",
+   "summary": "Съгласувай series, tooltip, accessible table и export; ясно различи incremental от cumulative.",
+   "deliverable": "analytics chart suite",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-004",
+    "UX-010"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Сборовете и натрупването са математически верни",
+    "0 и missing са визуално различими"
+   ],
+   "check": "Последователност 0, 4, missing, 6 и cumulative вариант.",
+   "evidence": [
+    "OV-01",
+    "OV-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "OV-01",
+    "OV-04"
+   ],
+   "wave": 17
+  },
+  {
+   "id": "ANA-007",
+   "group": "ANA",
+   "title": "Исторически сравнения на снимки",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Избери две dataset версии и показвай added/changed/not_seen/reappeared с source scope и rule versions.",
+   "deliverable": "snapshot compare API/UI",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "DAT-003",
+    "ANA-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Несъпоставими scope се блокират или обясняват",
+    "Parser update не се брои като нов source record"
+   ],
+   "check": "Сравни една и съща снимка с две версии на classifier.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ANA-008",
+   "group": "ANA",
+   "title": "Сравнение на фирми за PRO",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Сравнявай ограничен набор по едни и същи metrics/period/source evidence; server capability контролира достъпа.",
+   "deliverable": "company comparison module",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-005",
+    "ENT-012",
+    "BIL-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма смесване на различни периоди или роли",
+    "Всички стойности се отварят към точния evidence набор"
+   ],
+   "check": "Фирма с unknown dates срещу фирма с пълни дати.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "ANA-009",
+   "group": "ANA",
+   "title": "Регресии за аналитиката",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Фиксирай малък ръчно сметнат dataset с duplicates, unknowns, роли и multi-label categories.",
+   "deliverable": "metric golden tests",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всички метрики съвпадат с ръчните очаквания",
+    "Смяна на правило изисква version и обяснение"
+   ],
+   "check": "Провери totals, union categories и distinct companies.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 17
+  },
+  {
+   "id": "ANA-010",
+   "group": "ANA",
+   "title": "Оптимизация и граници на аналитиката",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Предварително изчислявай скъпите серии; ограничи тежки network layouts и comparison scopes.",
+   "deliverable": "analytics performance report",
+   "owner": "Analytics / backend инженер",
+   "depends_on": [
+    "ANA-005",
+    "ANA-006",
+    "ANA-007",
+    "ANA-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Разходът не расте неконтролируемо с всяко отваряне",
+    "Видими са scope/лимитите на голяма графова връзка"
+   ],
+   "check": "Най-голямата фирма при едновременна публикация и 50 читатели.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 18
+  },
+  {
+   "id": "ADM-001",
+   "group": "ADM",
+   "title": "Структура на администрацията",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Раздели Обзор, Източници/импорти, Качество, Речници/фирми, Потребители/организации, Планове/плащания, Система/одит.",
+   "deliverable": "admin navigation и permissions map",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ARC-006",
+    "API-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всяка операция има един основен екран",
+    "Скрита функция няма достъпен незащитен endpoint"
+   ],
+   "check": "Провери карта на всички стари admin контроли към новите раздели.",
+   "evidence": [
+    "AD-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-03"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "ADM-002",
+   "group": "ADM",
+   "title": "Оперативен обзор",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Покажи active dataset, source freshness, jobs, quarantine, failed deliveries и system dependencies; health checks са независими.",
+   "deliverable": "admin overview",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "SRC-012",
+    "NRM-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "401 от защитен endpoint не се отчита като недостъпна услуга",
+    "Един бавен health check не блокира целия екран"
+   ],
+   "check": "Липсващ ZIP/XML, неработещ scheduler и недостъпен AI provider.",
+   "evidence": [
+    "AD-01",
+    "AD-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-01",
+    "AD-05"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ADM-003",
+   "group": "ADM",
+   "title": "Wizard за импорт и preview",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Стъпки избор на пакет, manifest/schema, dry run, diff, review и publish; покажи точно какво ще се промени.",
+   "deliverable": "import wizard",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "SRC-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Частичен пакет не може да се публикува с обикновен confirm",
+    "Потребителят вижда rejected rows и completeness evidence"
+   ],
+   "check": "Качване само на една от три части и неизвестна нова колона.",
+   "evidence": [
+    "AD-03",
+    "IM-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-03",
+    "AD-03"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "ADM-004",
+   "group": "ADM",
+   "title": "Управление на jobs",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Покажи етап, real progress, heartbeat, retry/cancel и постоянен финален отчет; без принудителен reload.",
+   "deliverable": "jobs console",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "SRC-010"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Progress не се преструва на 100% преди validation/publish",
+    "Грешка при polling се показва с retry"
+   ],
+   "check": "Прекъсване на status API и възстановяване без загуба на job ID.",
+   "evidence": [
+    "AD-02",
+    "SY-09"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-09",
+    "AD-02"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "ADM-005",
+   "group": "ADM",
+   "title": "Работна опашка за качество",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Филтрирай по severity, field, file и rule; сравни raw клетката, normalized value и контекста на реда.",
+   "deliverable": "quarantine/review console",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "NRM-008",
+    "DAT-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Причината е възпроизводима от file/sheet/row",
+    "Bulk action има preview и ограничен scope"
+   ],
+   "check": "Конфликтен номер, future date и country-only producer в една опашка.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 14
+  },
+  {
+   "id": "ADM-006",
+   "group": "ADM",
+   "title": "Корекции с преглед и история",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Дай draft, review, approve/reject и revoke; високорисков bulk change изисква втори reviewer.",
+   "deliverable": "correction workflow",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-005",
+    "DAT-007",
+    "NRM-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Редакторът не може сам да одобри високорискова масова промяна",
+    "Запазени са old/new/reason/actor/time"
+   ],
+   "check": "Нов source import влиза в конфликт с одобрена корекция.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "ADM-007",
+   "group": "ADM",
+   "title": "Конзола за идентичности",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Показвай merge candidates, aliases, roles, affected records и reversible split; не предоставяй безконтролен merge all.",
+   "deliverable": "entity review UI",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-005",
+    "ENT-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Прегледът включва потенциални false merges",
+    "Undo възстановява списъци и redirects по одобрена политика"
+   ],
+   "check": "Сходни ООД/ЕООД с различни identifiers.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 16
+  },
+  {
+   "id": "ADM-008",
+   "group": "ADM",
+   "title": "Управление на речници и правила",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Редакция като draft, sample preview, impact report, approval и publish version; без скрито незабавно recompute.",
+   "deliverable": "rules console",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "ENT-008",
+    "SRC-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Старите решения са проследими",
+    "Counts и показаните flags се обновяват заедно"
+   ],
+   "check": "Промени правило за бележки и сравни преди/след на всички екрани.",
+   "evidence": [
+    "AD-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-01"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "ADM-009",
+   "group": "ADM",
+   "title": "Потребители, екипи и поддръжка",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Покажи membership, активни сесии и права; support е ограничен и всяка промяна е одитирана.",
+   "deliverable": "account support console",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "IAM-004",
+    "IAM-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Support не вижда/сменя секрети или billing без право",
+    "Отнемане на membership влиза в сила веднага"
+   ],
+   "check": "Потребител е в две организации и напуска само едната.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "ADM-010",
+   "group": "ADM",
+   "title": "Каталог на функции и PRO достъп",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Управлявай feature availability, capability, quota и временно admin grant отделно от price/role.",
+   "deliverable": "entitlements admin UI",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "BIL-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Admin grant има причина, автор и expiry",
+    "Не създава фиктивно плащане"
+   ],
+   "check": "Дай едноседмичен trial grant и провери автоматичното му изтичане.",
+   "evidence": [
+    "AU-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "AU-01"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "ADM-011",
+   "group": "ADM",
+   "title": "Плащания и разминавания",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Read-first console за provider status, internal entitlement, invoice и reconciliation; финансови действия имат отделни права.",
+   "deliverable": "billing support console",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "BIL-008",
+    "BIL-013"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Показва несъответствия, не ги скрива с ръчна смяна на paid flag",
+    "Refund/cancel изискват конкретен reviewable action"
+   ],
+   "check": "Provider казва cancelled, локалният достъп е active.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "ADM-012",
+   "group": "ADM",
+   "title": "Настройки без връщане на секрети",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Покажи configured/last verified и masked suffix; write-only secret rotation, validate config и audit.",
+   "deliverable": "settings UI",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "SEC-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "API ключът не присъства в HTML/response/log",
+    "Празно поле не изтрива неволно действащ secret"
+   ],
+   "check": "Запази несвързана настройка и провери, че ключът остава валиден.",
+   "evidence": [
+    "AD-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-04"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "ADM-013",
+   "group": "ADM",
+   "title": "Миграции, версии и възстановяване",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Покажи schema/app/data/rule version, backup status и runbooks; опасните действия имат dry run и audit.",
+   "deliverable": "system lifecycle console",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-001",
+    "DAT-008",
+    "OPS-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Migration failed не изглежда completed",
+    "Възстановяването показва точния dataset и последствията"
+   ],
+   "check": "Прекъсната миграция и rollback към предходна активна версия.",
+   "evidence": [
+    "AD-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-06"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "ADM-014",
+   "group": "ADM",
+   "title": "Журнал, сигнали и review SLA",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Обедини търсене на audit events, входящи data issues, назначения и resolution; историята е append-only за операторите.",
+   "deliverable": "audit и issue console",
+   "owner": "Admin frontend + backend инженер",
+   "depends_on": [
+    "ADM-006",
+    "APP-011",
+    "SEC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Сигналът пази оригиналния record/version context",
+    "Затваряне изисква обяснение и видим резултат"
+   ],
+   "check": "Сигналът се решава след междинна нова версия на регистъра.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 23
+  },
+  {
+   "id": "MON-001",
+   "group": "MON",
+   "title": "Единен журнал на промените",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Събития source_added, source_changed, not_seen, reappeared и explicit_note; derivation changes са отделни.",
+   "deliverable": "change event schema",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "DAT-003",
+    "DAT-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Observed time и source effective date са различни",
+    "Липса не е административно заличаване"
+   ],
+   "check": "Поле се променя, запис изчезва и се връща в три пълни снимки.",
+   "evidence": [
+    "IM-10",
+    "WL-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "WL-04",
+    "IM-10"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "MON-002",
+   "group": "MON",
+   "title": "Transactional outbox",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Записвай publish и pending event batch атомарно; dispatcher има retries и semantic idempotency.",
+   "deliverable": "event outbox worker",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-001",
+    "DAT-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма изгубено събитие след успешен publish",
+    "Retry/rollback/republication не изпраща дубликати"
+   ],
+   "check": "Crash след commit преди dispatch, после повторен worker.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "MON-003",
+   "group": "MON",
+   "title": "Екран Промени",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Филтри по период, тип, фирма и поле; before/after с източник и непълни данни; достъпен от детайл.",
+   "deliverable": "change feed UI/API",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-001",
+    "UX-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Текстът описва реалната промяна, не бизнес догадка",
+    "Страницирането пази стабилен scope"
+   ],
+   "check": "Само trader поле се сменя и е видимо в feed.",
+   "evidence": [
+    "LIVE-11"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-11"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "MON-004",
+   "group": "MON",
+   "title": "Запазени търсения",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Съхранявай query AST/schema version, име, owner/organization и visibility; мигрирай стари филтри.",
+   "deliverable": "saved search service/UI",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "API-004",
+    "IAM-006",
+    "BIL-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Споделеното търсене не изтича извън организацията",
+    "Невалиден стар филтър се показва, не се игнорира"
+   ],
+   "check": "Изтрита категория при запазено търсене от предходна версия.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "MON-005",
+   "group": "MON",
+   "title": "Следене на обекти и заявки",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Един Watch модел за регистрация, фирма, съставка и query; настройки за събития, период и канал.",
+   "deliverable": "watch service/UI",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-004",
+    "ENT-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Повторно включване не създава duplicate watch",
+    "Квотата се проверява на сървъра"
+   ],
+   "check": "Следи фирма като manufacturer и trader без два еднакви сигнала.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "MON-006",
+   "group": "MON",
+   "title": "Оценка на watches при нова версия",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Сравнявай old/new match sets; първоначалното записване създава baseline без лавина от historical alerts.",
+   "deliverable": "watch evaluator",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-002",
+    "MON-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нова watch не изпраща 80k стари записи",
+    "Излизане от query и промяна в поле са различими събития"
+   ],
+   "check": "Категорията на запис се променя само поради нов classifier.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "MON-007",
+   "group": "MON",
+   "title": "Digest и доставка",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Timezone-aware frequency, dedup key, retries/backoff, provider status и DLQ; email accepted не значи delivered.",
+   "deliverable": "notification delivery pipeline",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Повторен retry не изпраща duplicate digest",
+    "Недоставеното се вижда и може да се обработи"
+   ],
+   "check": "Provider timeout след приемане и повторно изпълнение.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 23
+  },
+  {
+   "id": "MON-008",
+   "group": "MON",
+   "title": "Един център за известия",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Покажи inbox, read state, следени обекти и настройки; унифицирай Промени и Известия като части на Наблюдение.",
+   "deliverable": "notification center",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-007",
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Едно събитие има една идентичност във feed/digest/inbox",
+    "Unread count съвпада с реалните записи"
+   ],
+   "check": "Маркирай прочетено на едно устройство и отвори на друго.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 24
+  },
+  {
+   "id": "MON-009",
+   "group": "MON",
+   "title": "Отписване и предпочитания",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Отдели service/billing/security от избираеми watch/marketing съобщения; scoped signed unsubscribe и preference audit.",
+   "deliverable": "notification preferences",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-007",
+    "IAM-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Unsubscribe не изисква разкриване на чужд акаунт",
+    "Не се изпраща watch email след отписване"
+   ],
+   "check": "Стар unsubscribe линк и премахнат organization membership.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 24
+  },
+  {
+   "id": "MON-010",
+   "group": "MON",
+   "title": "Поведение при загубен PRO достъп",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Запази watch definitions според retention; паузирай premium изпълнение и ясно покажи paused/over-limit; в R4 провери чрез временни grants, а с реален billing adapter в R5.",
+   "deliverable": "watch entitlement policy",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-005",
+    "BIL-003",
+    "BIL-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Не се изпращат premium данни след отнемане на право",
+    "Upgrade не повтаря всички пропуснати събития без избор"
+   ],
+   "check": "Downgrade по време на подготвен digest.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "MON-011",
+   "group": "MON",
+   "title": "Завършена заявка за интерес",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Ако остава waitlist: един компонент, много feature interests на email, explicit consent, admin lifecycle и correct errors.",
+   "deliverable": "waitlist service/admin UI",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "UX-005",
+    "API-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Втори интерес със същия email се запазва",
+    "DB/мрежов отказ не се описва като невалиден email"
+   ],
+   "check": "Един email заявява две функции и после оттегля едната.",
+   "evidence": [
+    "WL-01",
+    "WL-02",
+    "WL-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "WL-01",
+    "WL-02",
+    "WL-03"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "MON-012",
+   "group": "MON",
+   "title": "Приемане на известията",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Тествай с mail sink, publication retries, DST и tenancy; измери latency и replay behavior.",
+   "deliverable": "notification acceptance report",
+   "owner": "Backend event/notification инженер",
+   "depends_on": [
+    "MON-008",
+    "MON-009",
+    "MON-010"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нула duplicate deliveries в контролирания suite",
+    "Нито едно съобщение не съдържа данни от чужда организация"
+   ],
+   "check": "Два tenant-а със сходни watches и повторен batch.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 25
+  },
+  {
+   "id": "AI-001",
+   "group": "AI",
+   "title": "Контракт за резултата и ограниченията",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Раздели установено от източник, условие, противоречие и недостатъчни данни; не използвай бинарно разрешено от липса на забрана.",
+   "deliverable": "assessment response schema",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "ARC-004",
+    "ING-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всеки фактически извод сочи evidence",
+    "Няма общ verdict само от свободен AI текст"
+   ],
+   "check": "Съставка без официален резултат връща недостатъчни данни.",
+   "evidence": [
+    "AI-01",
+    "LIVE-10"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-10",
+    "AI-01"
+   ],
+   "wave": 18
+  },
+  {
+   "id": "AI-002",
+   "group": "AI",
+   "title": "Структуриран вход",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Събери canonical ingredient, форма, botanical part, dose/base, intended use, юрисдикция и дата; unknown е допустимо.",
+   "deliverable": "ingredient assessment form",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-001",
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Липсващ контекст се показва като ограничение",
+    "Същото име с друга форма е отделна проверка"
+   ],
+   "check": "Ашваганда root powder срещу standardized extract.",
+   "evidence": [
+    "AI-02"
+   ],
+   "status": "planned",
+   "covers": [
+    "AI-02"
+   ],
+   "wave": 19
+  },
+  {
+   "id": "AI-003",
+   "group": "AI",
+   "title": "Официални източници и проверени цитати",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Поддържай source adapters за приложимите официални каталози/списъци и документи; пази URL, версия, дата и точен evidence span.",
+   "deliverable": "source retrieval layer",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Цитатът действително подкрепя конкретния извод",
+    "Вторичен блог не се представя като официален регистър"
+   ],
+   "check": "AI генерира несъществуващ URL; резултатът не се приема.",
+   "evidence": [
+    "AI-01",
+    "LIVE-10"
+   ],
+   "status": "planned",
+   "covers": [
+    "LIVE-10",
+    "AI-01"
+   ],
+   "wave": 19
+  },
+  {
+   "id": "AI-004",
+   "group": "AI",
+   "title": "Контекстно оценяване на evidence",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Прилагай source hierarchy, jurisdiction/use/form matching и противоречия; каталогът не е самостоятелно разрешително.",
+   "deliverable": "evidence evaluator",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-002",
+    "AI-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Несъвместим контекст не дава положителен статус",
+    "Conflicting official evidence води към review/uncertain"
+   ],
+   "check": "Добавка-only use не се разширява към всички храни.",
+   "evidence": [
+    "AI-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "AI-01"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "AI-005",
+   "group": "AI",
+   "title": "Валидиране и безопасен AI слой",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Изисквай JSON schema, citation validation и timeout; външният текст е untrusted input, без tool/control права.",
+   "deliverable": "AI orchestration service",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Malformed/partial output не се кешира като успех",
+    "Prompt injection не сменя policy или разкрива секрети"
+   ],
+   "check": "Източник съдържа инструкция за игнориране на правилата.",
+   "evidence": [
+    "AI-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "AI-04"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "AI-006",
+   "group": "AI",
+   "title": "Кеш по пълен контекст",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Ключът включва ingredient/form/use/jurisdiction/date и source/model/prompt versions; показвай checked_at и evidence date.",
+   "deliverable": "assessment cache",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Стара проверка е означена и може да бъде обновена",
+    "Self-rated model confidence не се представя като измерена точност"
+   ],
+   "check": "Смени само botanical part и провери cache miss.",
+   "evidence": [
+    "AI-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "AI-06"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "AI-007",
+   "group": "AI",
+   "title": "Квоти, бюджет и конкурентни заявки",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Сървърът резервира quota и cost budget; idempotency key и single-flight; shared gate не заобикаля лимитите.",
+   "deliverable": "AI usage control",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-005",
+    "BIL-004",
+    "BIL-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Enter+click не плащат две заявки",
+    "Provider failure освобождава/отчита квотата по ясна политика"
+   ],
+   "check": "Десет едновременни заявки при оставаща една проверка.",
+   "evidence": [
+    "AI-03",
+    "AI-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "AI-03",
+    "AI-05"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "AI-008",
+   "group": "AI",
+   "title": "Постоянна история и управление на чакането",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Съхранявай история според организацията и retention; cancel UI, queue state, retry и именувани cache results.",
+   "deliverable": "assessment history UI/API",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-006",
+    "IAM-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Историята не изчезва неочаквано при reload",
+    "Отменен view не се подменя от закъснял резултат"
+   ],
+   "check": "Навигация към друга съставка докато първата се обработва.",
+   "evidence": [
+    "AI-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "AI-07"
+   ],
+   "wave": 23
+  },
+  {
+   "id": "AI-009",
+   "group": "AI",
+   "title": "Независим benchmark на AI проверките",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Етикетирай ясни, двусмислени и противоречиви случаи; оценявай citation support, context fit и unsupported claims.",
+   "deliverable": "assessment evaluation suite",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-004",
+    "AI-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нула unsupported категорични заключения в critical corpus",
+    "Отчетът показва fail/abstain, не само успешни отговори"
+   ],
+   "check": "Официален документ е стар или не се отнася до използваната форма.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "AI-010",
+   "group": "AI",
+   "title": "Наблюдение и авариен стоп",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Метрики за цена, latency, errors и evidence coverage; circuit breaker и feature switch при provider/source отказ.",
+   "deliverable": "AI operations dashboard",
+   "owner": "AI application / evidence инженер",
+   "depends_on": [
+    "AI-007",
+    "AI-009",
+    "ADM-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Админ може да спре нови заявки без deployment",
+    "Спирането показва полезно състояние, не празен екран"
+   ],
+   "check": "Provider 429/5xx burst и изчерпан дневен бюджет.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 23
+  },
+  {
+   "id": "IAM-001",
+   "group": "IAM",
+   "title": "Вход и жизнен цикъл на акаунта",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Избери поддържана WP identity интеграция; регистрация, verified email, login, logout и recovery без user enumeration.",
+   "deliverable": "identity flow",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "ARC-005",
+    "ARC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Съобщенията не разкриват съществуващ чужд акаунт",
+    "Return URL е ограничен до разрешени адреси"
+   ],
+   "check": "Грешна парола, expired recovery link, network failure.",
+   "evidence": [
+    "AU-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "AU-04"
+   ],
+   "wave": 4
+  },
+  {
+   "id": "IAM-002",
+   "group": "IAM",
+   "title": "Сесии с реален срок и отнемане",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Сървърът проверява expiry/revocation; secure HttpOnly SameSite cookies и rotation при чувствителни промени.",
+   "deliverable": "session policy",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Remember me срокът се прилага server-side",
+    "Logout/revoke спират всички защитени endpoints"
+   ],
+   "check": "Стара cookie след expiry и след password reset.",
+   "evidence": [
+    "AU-02"
+   ],
+   "status": "planned",
+   "covers": [
+    "AU-02"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "IAM-003",
+   "group": "IAM",
+   "title": "Миграция от обща парола",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Отдели временно site gate от identity/PRO; документирай прехода без автоматично превръщане на общата парола в платени права.",
+   "deliverable": "access migration plan",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Shared password не отключва платени API/AI квоти",
+    "GET/POST и fallback route прилагат еднакви правила"
+   ],
+   "check": "Съществуваща gate cookie опитва да изтегли private export.",
+   "evidence": [
+    "AU-01",
+    "AU-03"
+   ],
+   "status": "planned",
+   "covers": [
+    "AU-01",
+    "AU-03"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "IAM-004",
+   "group": "IAM",
+   "title": "Организации и memberships",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "User има много memberships; organization има owner/admin/analyst/viewer; избраната организация е явна.",
+   "deliverable": "organization schema/services",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-001",
+    "ARC-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Registry company не е billing tenant",
+    "Един user може да работи в две независими организации"
+   ],
+   "check": "Смени организацията без смесване на saved queries.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "IAM-005",
+   "group": "IAM",
+   "title": "Ролева матрица и platform capabilities",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Раздели platform admin, data editor/reviewer, support, billing и organization roles; default deny.",
+   "deliverable": "RBAC/permission matrix",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Ролята не е тарифен план",
+    "Data editor няма финансови права по подразбиране"
+   ],
+   "check": "Опитай publish, refund, invite и export с всяка роля.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "IAM-006",
+   "group": "IAM",
+   "title": "Tenant context навсякъде",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Enforce membership на REST, jobs, exports, caches и downloads; не се доверявай на org_id от клиента.",
+   "deliverable": "authorization middleware",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-005",
+    "API-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всяка private операция валидира resource ownership",
+    "Загубен membership спира и чакащи jobs"
+   ],
+   "check": "Промени org_id/export_id към чужда организация.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "IAM-007",
+   "group": "IAM",
+   "title": "Покани и управление на екипа",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Scoped expiring invitation, accept/revoke, seat reservation и owner transfer; защита срещу последен owner.",
+   "deliverable": "team service/UI",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Поканата не дава права в друга организация",
+    "Не може да остане организация без owner"
+   ],
+   "check": "Покана е отнета преди приемане; два паралелни seat accept-а.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "IAM-008",
+   "group": "IAM",
+   "title": "Усилена защита за администратори",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "MFA и step-up за publish/secret change/financial actions според роля; recovery и emergency access са одитирани.",
+   "deliverable": "admin auth policy",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-002",
+    "IAM-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Критично действие без необходимия step-up се отказва",
+    "Recovery не заобикаля audit"
+   ],
+   "check": "Изтекла step-up сесия при опит за масова корекция.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "IAM-009",
+   "group": "IAM",
+   "title": "Заявяване на фирмен профил",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Отдели company claim от paid subscription; доказателства и review дават ограничени права само върху бизнес профила.",
+   "deliverable": "claim workflow",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-006",
+    "ENT-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Плащане не доказва собственост на фирма",
+    "Claim не разрешава редакция на source данните"
+   ],
+   "check": "Двама кандидати заявяват една фирма; спорът остава за review.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 15
+  },
+  {
+   "id": "IAM-010",
+   "group": "IAM",
+   "title": "Отделни бизнес данни на платена фирма",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Описание, контакти и материали са owner-supplied, модерирани и визуално отделени от БАБХ; registry rankings са независими.",
+   "deliverable": "business profile overlay",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Платен клиент не променя регистърни факти или класация",
+    "Премахване на overlay не трие source profile"
+   ],
+   "check": "Редакция на адрес за контакт не изменя source address.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 16
+  },
+  {
+   "id": "IAM-011",
+   "group": "IAM",
+   "title": "Поверителност и потребителски данни",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Inventory на private fields, export/delete request, consent history и retention exceptions за одобрени законови нужди.",
+   "deliverable": "privacy workflows",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-006",
+    "DAT-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Потребителски export не включва чужди team secrets",
+    "Изтриване има проследимо изпълнение и обосновани изключения"
+   ],
+   "check": "Закрит акаунт с активен organization owner role и фактури.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "IAM-012",
+   "group": "IAM",
+   "title": "Настройки на акаунт и организация",
+   "priority": "P1",
+   "milestone": "R4",
+   "summary": "Един център за профил, екип, сигурност, уведомления и billing links; ясно активна организация.",
+   "deliverable": "account settings UI",
+   "owner": "Identity / backend инженер",
+   "depends_on": [
+    "IAM-007",
+    "IAM-010",
+    "IAM-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма дублирани настройки на различни места",
+    "Смяна на организация обновява всички частни секции"
+   ],
+   "check": "Потребител с различни роли и планове в две организации.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 17
+  },
+  {
+   "id": "BIL-001",
+   "group": "BIL",
+   "title": "Продуктова матрица FREE/PRO",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Определи базов достъп, PRO features, квоти, seats, trial/grace и manufacturer/trader use cases; цени и валути се одобряват отделно.",
+   "deliverable": "commercial-policy.json",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "ARC-004",
+    "IAM-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Роля производител/търговец не е равна на платен план",
+    "Неуточнени цени/данъци не са hardcoded"
+   ],
+   "check": "Една организация с двете роли получава един консистентен абонамент.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "BIL-002",
+   "group": "BIL",
+   "title": "Регистър на capabilities",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Стабилни feature keys, types, limits, availability и version; plan mapping е конфигурация.",
+   "deliverable": "feature-catalog.json",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-001",
+    "ARC-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нова PRO функция се добавя без нови scattered is_pro проверки",
+    "Feature flag, role и entitlement са отделни условия"
+   ],
+   "check": "Добави history.compare capability без промяна на всички screens.",
+   "evidence": [
+    "AU-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "AU-01"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "BIL-003",
+   "group": "BIL",
+   "title": "Модел на достъпа по време",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Entitlement има source, org, capability, starts_at, expires_at, state и limits; manual grant е отделен източник.",
+   "deliverable": "entitlement schema и resolver",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-002",
+    "IAM-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Изтекъл grant не остава active по cookie/cache",
+    "При конфликт има документиран precedence"
+   ],
+   "check": "Платен период изтича, но валиден admin grant остава само за една функция.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "BIL-004",
+   "group": "BIL",
+   "title": "Сървърно прилагане на PRO",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Централен policy check за API, export, AI, jobs и downloads; UI получава capabilities за представяне.",
+   "deliverable": "entitlement enforcement",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Скрит бутон не е единствената защита",
+    "Job проверява правата и при изпълнение/доставка"
+   ],
+   "check": "Потребител запазва стар premium URL след downgrade.",
+   "evidence": [
+    "AU-01",
+    "AI-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "AI-05",
+    "AU-01"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "BIL-005",
+   "group": "BIL",
+   "title": "Атомарни квоти и usage ledger",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Резервирай/освобождавай usage по org/capability/period/request_id; обработи concurrency и failed work.",
+   "deliverable": "quota service",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "При една останала квота само една заявка я взема",
+    "Retry не начислява втори usage"
+   ],
+   "check": "20 конкурентни AI/export requests с quota=1.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "BIL-006",
+   "group": "BIL",
+   "title": "Избор и изолиране на платежен доставчик",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Потвърди merchant eligibility, валута, данъчен модел, фактури и reconciliation; adapter за hosted checkout/portal.",
+   "deliverable": "payment provider ADR и sandbox setup",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-001",
+    "ARC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Test/live secrets и object IDs са отделени",
+    "Приложението не приема или пази картови номера"
+   ],
+   "check": "Sandbox token/price не може да се използва в live конфигурация.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "BIL-007",
+   "group": "BIL",
+   "title": "Checkout от сървърна оферта",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Allowlist на plan/price IDs, minor currency units, org ownership, idempotency key и валидирани return URLs.",
+   "deliverable": "checkout service",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-006",
+    "BIL-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Клиентът не може да подмени цена/валута/org",
+    "Success redirect не дава entitlement"
+   ],
+   "check": "Подправен price_id, двоен click и платен redirect без webhook.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "BIL-008",
+   "group": "BIL",
+   "title": "Сигурен webhook inbox",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Провери raw-body signature и среда; durable inbox с unique event ID преди ack; async processor и retry/DLQ.",
+   "deliverable": "webhook ingress и processor",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Дублиран event не се прилага два пъти",
+    "Не се разчита на реда на пристигане или само на timestamp"
+   ],
+   "check": "Разместени subscription/invoice events и две доставки на един event.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "BIL-009",
+   "group": "BIL",
+   "title": "Абонаментен lifecycle",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Моделирай trialing, active, past_due, unpaid, cancelled и incomplete според adapter; refresh canonical provider state при несигурност.",
+   "deliverable": "subscription state machine",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-008",
+    "BIL-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Payment success и subscription entitlement следват одобрена policy",
+    "Старо събитие не възстановява отменен достъп"
+   ],
+   "check": "invoice paid пристига преди subscription created; по-късно стар active event.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "BIL-010",
+   "group": "BIL",
+   "title": "Самообслужване за абонамента",
+   "priority": "P1",
+   "milestone": "R5",
+   "summary": "Hosted portal или ограничен UI за payment method, invoices, cancel/renew; пази org authorization и return state.",
+   "deliverable": "billing portal integration",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-009",
+    "BIL-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Потребител вижда само своя organization customer",
+    "Cancel at period end показва точната крайна дата"
+   ],
+   "check": "Друг org customer ID в portal request е отказан.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "BIL-011",
+   "group": "BIL",
+   "title": "Upgrade, downgrade, grace и изтичане",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Фиксирай proration, quota/seat overage и end-of-period правила; права се обновяват server-side и в caches.",
+   "deliverable": "plan transition policy",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-009",
+    "BIL-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Downgrade не трие веднага частните definitions",
+    "Grace period не е неограничен и не е скрит"
+   ],
+   "check": "Смяна на план със 7 seats към лимит 3 и pending export.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "BIL-012",
+   "group": "BIL",
+   "title": "Refund и dispute policy",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Запиши кога refund/chargeback променя достъп, кой може да действа и как се възстановява; не извеждай автоматично правило от думата refund.",
+   "deliverable": "refund/dispute workflow",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Финансово действие има actor, reason и provider reference",
+    "Частичен refund не отменя произволно абонамента"
+   ],
+   "check": "Partial refund, full refund и успешно оспорен dispute.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "BIL-013",
+   "group": "BIL",
+   "title": "Reconciliation и финансов журнал",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Сверявай provider subscription/payment/invoice с локалните записи и entitlements; immutable amounts/currency/provider refs.",
+   "deliverable": "reconciliation job и ledger",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-008",
+    "BIL-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Пропуснат webhook се открива и поправя контролирано",
+    "Разминаване е видимо за admin"
+   ],
+   "check": "Изключи webhook, плати sandbox invoice и пусни reconciliation.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "BIL-014",
+   "group": "BIL",
+   "title": "Фактуриране и търговски условия",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Събери billing identity, VAT данни ако са приложими и version на приети условия; счетоводител/правен reviewer потвърждава потоците.",
+   "deliverable": "billing compliance checklist и templates",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-006",
+    "BIL-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Цени, данъци, отказ/renewal са ясни преди покупка",
+    "Не се предполага универсална VAT ставка или режим"
+   ],
+   "check": "B2B сценарии по одобрените юрисдикции и invoice correction.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "BIL-015",
+   "group": "BIL",
+   "title": "Екран План и плащания",
+   "priority": "P1",
+   "milestone": "R5",
+   "summary": "Едно място за активен план, използване, лимити, следващо плащане, фактури и действия; contextual upgrade без шум.",
+   "deliverable": "plans/billing UI",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-010",
+    "BIL-011",
+    "BIL-014",
+    "UX-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Текстът съвпада с реалния entitlement/provider state",
+    "Locked функция обяснява стойността и точния нужен план"
+   ],
+   "check": "Past due, trial, cancel scheduled и over-quota на мобилен екран.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "BIL-016",
+   "group": "BIL",
+   "title": "Пълно sandbox приемане на плащанията",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Покрий success, decline, authentication, timeout, duplicate/out-of-order webhooks, renewal, cancellation и recovery.",
+   "deliverable": "billing acceptance evidence",
+   "owner": "Billing / backend инженер",
+   "depends_on": [
+    "BIL-007",
+    "BIL-010",
+    "BIL-011",
+    "BIL-012",
+    "BIL-013",
+    "BIL-014",
+    "BIL-015"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма неоторизирано отключване или двойно начисляване от приложението",
+    "Live launch е отделна одобрена операция след преминал gate"
+   ],
+   "check": "Пълен purchase→renew→past_due→recover→cancel→expire lifecycle.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 13
+  },
+  {
+   "id": "SEC-001",
+   "group": "SEC",
+   "title": "Threat model на реалните потоци",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Опиши upload/parser, external source, admin, private tenant data, AI, exports и payments; подбери приложими ASVS проверки.",
+   "deliverable": "threat-model.md и verification map",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "ARC-003",
+    "ARC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всеки trust boundary има owner и защита",
+    "Рисковете са свързани с конкретни endpoints/jobs"
+   ],
+   "check": "Проследи untrusted XLSX до HTML, CSV, AI и admin review.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 3
+  },
+  {
+   "id": "SEC-002",
+   "group": "SEC",
+   "title": "WordPress permissions и CSRF",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Capabilities на всяка mutation; nonce е CSRF механизъм, не заместител на authentication/authorization; webhook има signature политика.",
+   "deliverable": "permissions audit",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "API-001",
+    "IAM-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Anonymous и low-role callers не могат да стартират import или променят настройки",
+    "Проверени са REST, fallback и admin actions"
+   ],
+   "check": "Direct POST без UI и с nonce от неподходяща роля.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "SEC-003",
+   "group": "SEC",
+   "title": "SQL injection и XSS защита",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Prepared SQL, allowlisted sort/columns, context escaping и sanitization на HTML; source cells се считат untrusted.",
+   "deliverable": "input/output security checks",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "API-006",
+    "APP-004",
+    "ADM-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Злонамерен source text не изпълнява скрипт",
+    "Sort/filter payload не променя SQL структурата"
+   ],
+   "check": "XLSX клетка със script/HTML и SQL payload в search/sort.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "SEC-004",
+   "group": "SEC",
+   "title": "Изолация между организации",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Negative authorization suite за IDs, lists, search, jobs, cached responses, exports и shared links.",
+   "deliverable": "tenant isolation tests",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "IAM-006",
+    "API-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма private data leakage между два tenant-а",
+    "URL token не замества membership без изрична share policy"
+   ],
+   "check": "User A опитва всички resources на B със сменени IDs.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "SEC-005",
+   "group": "SEC",
+   "title": "Управление на секрети",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Environment/secret store, ограничени credentials, rotation и redaction; забрани логване на tokens/full webhook secrets.",
+   "deliverable": "secret handling policy и redaction",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "ARC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Секрети липсват в DOM, CSV, logs и release zip",
+    "Token scope е минимален"
+   ],
+   "check": "Пусни secret scan и провери network/error logs при отказ.",
+   "evidence": [
+    "AD-04",
+    "GH-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-04",
+    "GH-01"
+   ],
+   "wave": 3
+  },
+  {
+   "id": "SEC-006",
+   "group": "SEC",
+   "title": "Outbound и upload защити",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Потвърди SSRF/redirect/DNS controls, MIME/size limits, isolated storage и непублични временни файлове.",
+   "deliverable": "I/O boundary tests",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "SRC-003",
+    "XLS-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Source downloader не достига metadata/private networks",
+    "Качен PHP/polyglot файл не се изпълнява"
+   ],
+   "check": "Redirect към 127.0.0.1 и ZIP с path traversal.",
+   "evidence": [
+    "SY-07"
+   ],
+   "status": "planned",
+   "covers": [
+    "SY-07"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "SEC-007",
+   "group": "SEC",
+   "title": "Надежден одитен журнал",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Append-only за операторите, отделени права/retention, actor/action/resource/before-after hash/reason/correlation ID.",
+   "deliverable": "audit service",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "IAM-005",
+    "DAT-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Привилегирована промяна винаги има audit event",
+    "Секрети и ненужни лични данни не са в before/after"
+   ],
+   "check": "Неуспешен и успешен bulk correction с един correlation ID.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 8
+  },
+  {
+   "id": "SEC-008",
+   "group": "SEC",
+   "title": "Защити на web сесията",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "TLS, secure cookies, подходящи security headers/CSP и clickjacking защита, съобразени с WP и платежния flow.",
+   "deliverable": "web security configuration",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "IAM-002",
+    "SEC-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Защитите не счупват login или checkout redirects",
+    "Cookie е ограничена до необходимия scope"
+   ],
+   "check": "Cross-site request, embedded admin page и expired session.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "SEC-009",
+   "group": "SEC",
+   "title": "Abuse и rate limits",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Ограничи login, recovery, search, uploads и paid endpoints по подходящи идентичности; не само по IP.",
+   "deliverable": "abuse controls",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "API-012",
+    "IAM-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Shared IP не блокира безразборно всички фирмени потребители",
+    "Distributed retry не заобикаля org cost лимита"
+   ],
+   "check": "NAT офис, brute-force test и паралелни authenticated requests.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "SEC-010",
+   "group": "SEC",
+   "title": "Проверка на платените граници",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Провери entitlement bypass, checkout tampering, webhook forgery/replay, quota race и stale caches.",
+   "deliverable": "paid security report",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "BIL-016",
+    "SEC-004",
+    "AI-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма open Sev0/Sev1/Sev2 в платените потоци",
+    "Всеки тест има доказателство, не само tick box"
+   ],
+   "check": "Подправен webhook и стар premium download URL след revoke.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 23
+  },
+  {
+   "id": "SEC-011",
+   "group": "SEC",
+   "title": "Проверка преди production core",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Dependency/secret scan и целеви review на high-risk paths; triage доказани findings, не празно обещание 100% security.",
+   "deliverable": "core security acceptance",
+   "owner": "Security / backend инженер",
+   "depends_on": [
+    "SEC-002",
+    "SEC-003",
+    "SEC-004",
+    "SEC-005",
+    "SEC-006",
+    "SEC-007",
+    "SEC-008",
+    "SEC-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма неизяснен критичен/висок риск или blocker",
+    "Изключенията имат owner, expiry и конкретна компенсация"
+   ],
+   "check": "Независим reviewer възпроизвежда поправките от доказателствата.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 23
+  },
+  {
+   "id": "OPS-001",
+   "group": "OPS",
+   "title": "Възпроизводима development среда",
+   "priority": "P1",
+   "milestone": "R0",
+   "summary": "Фиксирай PHP/WP/DB/runtime версии по потвърдената текуща среда; dependency lockfiles и one-command setup.",
+   "deliverable": "environment scripts и version matrix",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "ARC-001",
+    "ARC-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нов агент стартира същата среда от чист checkout",
+    "Няма секрети или production DB в репото"
+   ],
+   "check": "Clean machine setup и smoke import на fixture.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 3
+  },
+  {
+   "id": "OPS-002",
+   "group": "OPS",
+   "title": "CI с meaningful gates",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Syntax/static analysis, contract, unit/integration suites, migration и artifact checks; отделни бързи/тежки jobs.",
+   "deliverable": "CI pipeline",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "OPS-001",
+    "ARC-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Failing required gate блокира merge",
+    "Тестовете не извършват реални плащания/имейли"
+   ],
+   "check": "Умишлено счупен contract и секрет в fixture блокират build.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 5
+  },
+  {
+   "id": "OPS-003",
+   "group": "OPS",
+   "title": "Мониторинг на услугата",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Trace/correlation IDs, latency, errors, source lag, queue age и resource saturation; alerts с owner/runbook.",
+   "deliverable": "observability config",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "SRC-009",
+    "SRC-012",
+    "API-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Проблем с parser се отличава от network/provider outage",
+    "SLO има измерим прозорец и dashboard"
+   ],
+   "check": "Source stale и worker stopped се откриват без посещение на сайта.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "OPS-004",
+   "group": "OPS",
+   "title": "Безопасни schema миграции",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Expand/contract, checkpoints, lock и post-validation; version се записва след успех; тежката миграция не е на init.",
+   "deliverable": "migration framework",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "DAT-005",
+    "ARC-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Частичен failure може да се продължи или върне",
+    "Старият код не чете несъвместима schema по време на rollout"
+   ],
+   "check": "Fail след втори migration step и повторно изпълнение.",
+   "evidence": [
+    "AD-06"
+   ],
+   "status": "planned",
+   "covers": [
+    "AD-06"
+   ],
+   "wave": 9
+  },
+  {
+   "id": "OPS-005",
+   "group": "OPS",
+   "title": "Миграция на съществуващите данни",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Shadow import и old/new diff за records, companies, metrics и deep links; не запълвай липсващ historical raw с измислен източник.",
+   "deliverable": "migration reconciliation report",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "OPS-004",
+    "DAT-008",
+    "ARC-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всички текущи IDs са mapped или явно unresolved",
+    "Трансформация на inferred факти е отчетена, не скрита"
+   ],
+   "check": "Сравни старите 82k+ регистрации с новия модел по exact key.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 10
+  },
+  {
+   "id": "OPS-006",
+   "group": "OPS",
+   "title": "Backup и проверено restore",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Пази DB, originals, config references и необходимите logs; encrypted backups и restore в изолирана среда.",
+   "deliverable": "backup/restore automation",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "DAT-011",
+    "OPS-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Предложените RPO≤15 min/RTO≤60 min са измерени или преразгледани преди launch",
+    "Restore възстановява данни и file pointers"
+   ],
+   "check": "Симулирай загуба на DB и storage manifest и измери възстановяването.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "OPS-007",
+   "group": "OPS",
+   "title": "Публикуване с rollback",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Версиониран release artifact, staging sign-off, migration dry run, canary/smoke и конкретна rollback процедура.",
+   "deliverable": "deployment runbook",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "OPS-002",
+    "OPS-005",
+    "OPS-006"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Публикуването е отделно одобрено действие",
+    "Rollback не връща финансови или auth събития назад"
+   ],
+   "check": "Провали smoke след release и върни кода/активния dataset по runbook.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 11
+  },
+  {
+   "id": "OPS-008",
+   "group": "OPS",
+   "title": "Ограничен GitHub auth transport",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Добавяй token само за конкретния allowlisted API/release request; redirects не получават чужди credentials.",
+   "deliverable": "updater HTTP adapter",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "SEC-005"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Глобален HTTP hook не добавя token към произволни домейни",
+    "Redirect сменя auth scope безопасно"
+   ],
+   "check": "Паралелна заявка към друг host не съдържа GitHub header.",
+   "evidence": [
+    "GH-01"
+   ],
+   "status": "planned",
+   "covers": [
+    "GH-01"
+   ],
+   "wave": 4
+  },
+  {
+   "id": "OPS-009",
+   "group": "OPS",
+   "title": "Проверка на release пакета",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Избирай точен asset по manifest/plugin ID/version; checksum/signature policy и съдържание преди install.",
+   "deliverable": "package verifier",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "OPS-008",
+    "OPS-002"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Първият ZIP asset не се приема автоматично",
+    "Пакет за друг plugin или версия се отхвърля"
+   ],
+   "check": "Release с docs.zip преди правилния install artifact.",
+   "evidence": [
+    "GH-02"
+   ],
+   "status": "planned",
+   "covers": [
+    "GH-02"
+   ],
+   "wave": 6
+  },
+  {
+   "id": "OPS-010",
+   "group": "OPS",
+   "title": "Жизнен цикъл на updater",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Отдели no update, failed check и incompatible; покажи собствеността/версията на MU компонента и uninstall policy.",
+   "deliverable": "updater status и lifecycle",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "OPS-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "403/timeout не означава най-нова версия",
+    "Изключване на plugin не оставя неясен orphan updater"
+   ],
+   "check": "Грешен token, pre-release и deactivated main plugin.",
+   "evidence": [
+    "GH-03",
+    "GH-04"
+   ],
+   "status": "planned",
+   "covers": [
+    "GH-03",
+    "GH-04"
+   ],
+   "wave": 7
+  },
+  {
+   "id": "OPS-011",
+   "group": "OPS",
+   "title": "Capacity и натоварване",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Определи ресурси, concurrency и максимум на package; измери API, import, export и UI без недоказани speed claims.",
+   "deliverable": "capacity report",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "API-012",
+    "ANA-010",
+    "XLS-009"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Публикувани са hardware, dataset size и test profile",
+    "Queue/backpressure пази четенето при голям import"
+   ],
+   "check": "200k records, най-голям workbook, 50 readers и export едновременно.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 21
+  },
+  {
+   "id": "OPS-012",
+   "group": "OPS",
+   "title": "Runbooks и инциденти",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Процедури за broken source, bad publish, stuck job, key leak, email outage и restore; owners и escalation.",
+   "deliverable": "operations handbook",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "OPS-003",
+    "OPS-006",
+    "OPS-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всеки alert води към изпълнима процедура",
+    "Incident review връща regression task към backlog"
+   ],
+   "check": "Tabletop за грешно публикуван dataset и изтекъл credential.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 22
+  },
+  {
+   "id": "OPS-013",
+   "group": "OPS",
+   "title": "Експлоатация на платената услуга",
+   "priority": "P1",
+   "milestone": "R5",
+   "summary": "Добави payment reconciliation, renewal failure, AI budget и notification lag runbooks; support access е ограничен.",
+   "deliverable": "paid operations handbook",
+   "owner": "Platform / DevOps инженер",
+   "depends_on": [
+    "BIL-013",
+    "MON-012",
+    "AI-010",
+    "OPS-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Платежен проблем се открива независимо от webhook success rate",
+    "Support вижда необходимото без secrets"
+   ],
+   "check": "Provider outage по време на renewal и просрочен digest.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 26
+  },
+  {
+   "id": "QA-001",
+   "group": "QA",
+   "title": "План за fixtures и очаквания",
+   "priority": "P0",
+   "milestone": "R0",
+   "summary": "Опиши реални, synthetic и holdout набори; независим reviewer утвърждава expected results и source provenance.",
+   "deliverable": "fixture-catalog.json и review log",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "ARC-002",
+    "ARC-004"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма expected резултат, генериран само от тествания parser",
+    "Има случаи за всички рискови категории"
+   ],
+   "check": "Ръчно проследи случайна извадка до оригиналните клетки.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 3
+  },
+  {
+   "id": "QA-002",
+   "group": "QA",
+   "title": "Приемане на качеството на данните",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Измери exactness, coverage, abstentions, false merges и reconciliation; отдели source errors от parser errors.",
+   "deliverable": "data acceptance report",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "QA-001",
+    "XLS-012",
+    "NRM-010",
+    "ING-011",
+    "ENT-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "100% raw provenance и row accounting",
+    "Нула silent ID/date/unit errors в critical corpus"
+   ],
+   "check": "Независим holdout включва формати и фирми извън разработващия corpus.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 20
+  },
+  {
+   "id": "QA-003",
+   "group": "QA",
+   "title": "Failure injection на импорта",
+   "priority": "P0",
+   "milestone": "R1",
+   "summary": "Прекъсни download, parse, SQL, validation, publish и worker lease; проверявай active dataset след всяко прекъсване.",
+   "deliverable": "import resilience report",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "SRC-008",
+    "DAT-008",
+    "QA-001"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Активният набор остава цял и консистентен",
+    "Retry е детерминистичен без дублиране"
+   ],
+   "check": "Два workers, SQL отказ и stale worker след lease takeover.",
+   "evidence": [
+    "IM-02",
+    "IM-04",
+    "IM-05"
+   ],
+   "status": "planned",
+   "covers": [
+    "IM-02",
+    "IM-04",
+    "IM-05"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "QA-004",
+   "group": "QA",
+   "title": "E2E на основните сценарии",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Покрий search→filter→detail→company→export→back и history; асертирай IDs, counts, URL и context.",
+   "deliverable": "core E2E suite",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "APP-012",
+    "ANA-009",
+    "MON-003"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Работят empty/error/retry и директни URL",
+    "Не се проверява само наличие на бутон"
+   ],
+   "check": "Търси, отвори детайл, смени фирма, върни се и reload.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 24
+  },
+  {
+   "id": "QA-005",
+   "group": "QA",
+   "title": "Десктоп и мобилно визуално приемане",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Снимки на всички екрани/състояния по viewport matrix; реални iOS Safari и Android Chrome за критичните потоци.",
+   "deliverable": "visual/device acceptance report",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "APP-012",
+    "UX-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма overlap, clip, unreadable controls или page overflow",
+    "Тестовите устройство/browser версии са записани"
+   ],
+   "check": "320px, landscape, виртуална клавиатура, notch и дълги български стойности.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 24
+  },
+  {
+   "id": "QA-006",
+   "group": "QA",
+   "title": "Достъпност с ръчна проверка",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Автоматизиран scan плюс keyboard, screen reader, contrast, zoom/reflow и form errors към WCAG 2.2 AA target.",
+   "deliverable": "a11y report",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "UX-007",
+    "UX-011",
+    "APP-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Критичните сценарии са изпълними без мишка",
+    "Автоматичен pass не замества ръчните проверки"
+   ],
+   "check": "VoiceOver/NVDA сценарий за search, modal, error и export.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 24
+  },
+  {
+   "id": "QA-007",
+   "group": "QA",
+   "title": "Административно приемане",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Оператор изпълнява import preview, quarantine, correction, merge/split, publish и rollback с различни роли.",
+   "deliverable": "admin UAT report",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "ADM-003",
+    "ADM-006",
+    "ADM-007",
+    "ADM-013",
+    "ADM-014"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Всяко действие има правилен audit и permissions",
+    "Операторът разбира защо publish е блокиран"
+   ],
+   "check": "Двама reviewers и конфликтна корекция след нов source import.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 24
+  },
+  {
+   "id": "QA-008",
+   "group": "QA",
+   "title": "Миграция и възстановяване в staging",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Изпълни upgrade от потвърдената текуща версия със sanitized snapshot и отделно restore drill.",
+   "deliverable": "migration/restore evidence",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "OPS-005",
+    "OPS-006",
+    "OPS-007"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма загубени текущи регистрации без изрично обяснение",
+    "Старите deep links са mapping-tested"
+   ],
+   "check": "Legacy #p/#f адреси след миграция и прекъсната migration стъпка.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 12
+  },
+  {
+   "id": "QA-009",
+   "group": "QA",
+   "title": "Приемане на производителността",
+   "priority": "P1",
+   "milestone": "R3",
+   "summary": "Измери договорени API/import/export budgets и web vitals; field p75 и lab simulation се отчитат отделно.",
+   "deliverable": "performance acceptance",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "OPS-011",
+    "APP-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Показани са среда, sample size, p95 и cold/warm условия",
+    "Не се твърди полево качество само от Lighthouse"
+   ],
+   "check": "Слаб мобилен профил и concurrent import/exports на staging.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 24
+  },
+  {
+   "id": "QA-010",
+   "group": "QA",
+   "title": "Gate за production core",
+   "priority": "P0",
+   "milestone": "R3",
+   "summary": "Провери всички invariants, blocker matrix, rollback, operational ownership и evidence; unsigned/unknown не е pass.",
+   "deliverable": "CORE_RELEASE_CHECKLIST.md",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "QA-002",
+    "QA-003",
+    "QA-004",
+    "QA-005",
+    "QA-006",
+    "QA-007",
+    "QA-008",
+    "QA-009",
+    "SEC-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма отворен Sev0/Sev1/Sev2 в core scope",
+    "Неизмерени parser/mobile рискове блокират заявка за готовност"
+   ],
+   "check": "Независим release owner проследява всеки критерий до отчет.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 25
+  },
+  {
+   "id": "QA-011",
+   "group": "QA",
+   "title": "Gate за PRO скелета",
+   "priority": "P0",
+   "milestone": "R4",
+   "summary": "Добави нова тестова capability през catalog; докажи roles, quotas, tenant isolation и degradation без плащане.",
+   "deliverable": "PRO_READY_CHECKLIST.md",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "MON-012",
+    "AI-007",
+    "AI-009",
+    "IAM-012",
+    "BIL-005",
+    "ANA-008"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Нова функция не изисква промяна на всеки endpoint",
+    "Paid-only output е защитен и при директни заявки"
+   ],
+   "check": "FREE→admin grant→expiry с pending watch, export и AI request.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 26
+  },
+  {
+   "id": "QA-012",
+   "group": "QA",
+   "title": "Gate за платено пускане",
+   "priority": "P0",
+   "milestone": "R5",
+   "summary": "Приеми sandbox lifecycle, финални търговски решения, tax/invoice review, support и конкретен live rollout plan.",
+   "deliverable": "PAID_RELEASE_CHECKLIST.md",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "QA-010",
+    "QA-011",
+    "BIL-016",
+    "SEC-010",
+    "OPS-013",
+    "ADM-011",
+    "QA-013"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Няма отворен Sev0/Sev1/Sev2 в платените потоци",
+    "Live credentials/charges/deploy са отделна финална стъпка"
+   ],
+   "check": "Репетиция на launch и rollback без реално таксуване.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 28
+  },
+  {
+   "id": "QA-013",
+   "group": "QA",
+   "title": "Контролирано пилотно приемане",
+   "priority": "P1",
+   "milestone": "R5",
+   "summary": "Представители на производител и търговец изпълняват задачи в staging с реалистични данни и sandbox плащания; измери завършване/грешки и коригирай blockers преди финалния paid gate.",
+   "deliverable": "pilot UAT и signed findings",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "QA-010",
+    "QA-011",
+    "BIL-016",
+    "SEC-010",
+    "OPS-013",
+    "ADM-011"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Основните сценарии се завършват без помощ при предварително описан протокол",
+    "Всеки дефект има severity/owner и повторна проверка"
+   ],
+   "check": "Намери регистрация, проследи фирма, свали отчет и управлявай план без реално таксуване.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 27
+  },
+  {
+   "id": "QA-014",
+   "group": "QA",
+   "title": "Наблюдение след пускане",
+   "priority": "P1",
+   "milestone": "R5",
+   "summary": "Провери SLO, грешки, качество на import и billing reconciliation през първите 7/30 дни; без обещание за бъдеща липса на дефекти.",
+   "deliverable": "post-launch checklist и review dates",
+   "owner": "Независим QA / release owner",
+   "depends_on": [
+    "QA-012"
+   ],
+   "depends_note": "",
+   "acceptance": [
+    "Инцидентите водят до регресии и конкретни действия",
+    "Не се обявява финален operational sign-off без измерени данни"
+   ],
+   "check": "Първи реален нов BABH пакет и първи renewal се проследяват end-to-end.",
+   "evidence": [
+    "DESIGN"
+   ],
+   "status": "planned",
+   "covers": [
+    "DESIGN"
+   ],
+   "wave": 29
+  }
+ ]
+}

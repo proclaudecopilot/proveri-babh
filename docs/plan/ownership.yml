@@ -1,0 +1,65 @@
+# Собственост върху файлове и договори (ARC-008).
+# Правило: промяна във файл/договор с owner, различен от групата на текущата задача, изисква
+# review от owner-а преди merge. „shared“ договори имат ЕДИН owner; паралелна некоординирана
+# промяна на schema/router/REST/events не се допуска.
+#
+# Групите са тези от docs/plan/backlog.json. Пътищата са спрямо корена на хранилището.
+# Текущата структура е плоска (includes/*.php, assets/*); целевата (src/Domain, src/Application, …)
+# се въвежда от ARC-003 и се добавя тук при първата реална миграция на файл.
+
+shared_contracts:
+  - path: includes/schema.php            # DB схема на всички babh6_* таблици
+    owner: DAT
+    reviewers: [ARC, OPS]
+    change_rule: нова колона/индекс само с миграция, failure/rollback история и обновен baseline-manifest
+  - path: includes/rest.php              # REST namespace babh6/v1 и договорите на отговорите
+    owner: API
+    reviewers: [ARC, APP, SEC]
+    change_rule: промяна на поле/enum/статус = версия на договора (ARC-005); фронтенд и бекенд в един PR
+  - path: includes/ai.php                # auth/permission callbacks + AI endpoint
+    owner: IAM                           # permission/token частта
+    co_owner: AI                         # novel-check частта
+    reviewers: [SEC]
+  - path: babh-register-v6.php           # bootstrap, версии, миграционен hook
+    owner: ARC
+    reviewers: [OPS]
+    change_rule: BABH6_VERSION и header Version се сменят заедно; BABH6_RULES_VERSION само при промяна на производни правила
+  - path: .github/workflows/release.yml
+    owner: OPS
+    reviewers: [ARC]
+  - path: docs/plan/backlog.json         # генериран — не се редактира на ръка
+    owner: ARC
+    change_rule: само чрез docs/plan/tools/build_backlog.py; статусите през docs/plan/status.json
+  - path: docs/plan/source/              # оригиналното задание
+    owner: ARC
+    change_rule: нова версия на заданието = нов файл + нов sha256 в backlog.json; старият не се трие
+
+files:
+  includes/etl.php:            {owner: DAT, reviewers: [SRC, QA]}
+  includes/xlsx-reader.php:    {owner: XLS, reviewers: [DAT]}
+  includes/sync.php:           {owner: SRC, reviewers: [SEC, OPS]}
+  includes/detect.php:         {owner: NRM, co_owners: [ING, ENT]}
+  includes/infer.php:          {owner: ENT, reviewers: [NRM]}
+  includes/parties.php:        {owner: ENT, reviewers: [API, ANA]}
+  includes/rank.php:           {owner: ANA, reviewers: [API]}
+  includes/admin.php:          {owner: ADM, reviewers: [SEC]}
+  includes/frontend.php:       {owner: APP}
+  includes/site.php:           {owner: APP, reviewers: [IAM]}
+  includes/pwa.php:            {owner: UX, reviewers: [APP, OPS]}
+  includes/mu/logador-github-updater.php: {owner: OPS, reviewers: [SEC]}
+  assets/babh6.js:             {owner: APP, co_owners: [UX], reviewers: [API]}
+  assets/babh6.css:            {owner: UX, reviewers: [APP]}
+  assets/icons/:               {owner: UX}
+  docs/baseline/:              {owner: ARC, reviewers: [QA]}
+  docs/domain-glossary.md:     {owner: ARC, reviewers: [DAT, API, APP]}
+  docs/plan/:                  {owner: ARC}
+  docs/adr/:                   {owner: ARC}
+  tests/:                      {owner: QA, change_rule: тестът проверява поведение; промяна на очакване изисква причина в PR-а}
+  AGENTS.md:                   {owner: ARC}
+  README.md:                   {owner: ARC, change_rule: changelog по версии остава; новите секции описват поведение, не планове}
+
+# Кой може да дава release sign-off (не изпълнителят на задачата)
+release_sign_off:
+  core_R3: QA        # QA-010
+  pro_R4: QA         # QA-011
+  paid_R5: QA        # QA-012/013, заедно с BIL и SEC

@@ -1,0 +1,28 @@
+{
+  "ARC-001": {
+    "status": "in_progress",
+    "note": "Baseline на кода (commit 4403727, v6.9.0) и проверка на 90+16 констатации са в docs/baseline/. Остава: сверяване на deployed файловете на proveribabh.com с commit-а и конкретната проверка (промяна само в търговеца) върху реални данни — няма достъп до сайта/DB в сесията от 2026-10-17.",
+    "artifacts": [
+      "docs/baseline/baseline-manifest.json",
+      "docs/baseline/findings-verification.md"
+    ]
+  },
+  "ARC-004": {
+    "status": "in_review",
+    "note": "Чернова на речника в docs/domain-glossary.md с текущото място на всеки термин в кода и предложения за текстове в интерфейса. Конкретната проверка (еднакви определения в API/UI/CSV/админ) е таблицата „Терминология“ — нуждае се от независим преглед. Започната като чернова преди зависимостта ARC-003 да е done; приемането ѝ чака ARC-003.",
+    "artifacts": [
+      "docs/domain-glossary.md"
+    ]
+  },
+  "ARC-008": {
+    "status": "in_review",
+    "note": "AGENTS.md, docs/plan/ownership.yml, docs/plan/task-run-template.md, генератор и валидатор на backlog-а (docs/plan/tools/). Симулацията на конфликт на API договор между два потока не е изпълнена — описано е правилото (ownership.yml shared_contracts); остава за reviewer-а. Започната преди ARC-005/ARC-006 да са done (договорите и screen map още липсват) — приемането ѝ чака тях; ownership.yml ще бъде допълнен с целевата структура от ARC-003.",
+    "artifacts": [
+      "AGENTS.md",
+      "docs/plan/ownership.yml",
+      "docs/plan/task-run-template.md",
+      "docs/plan/tools/build_backlog.py",
+      "docs/plan/tools/validate_backlog.py"
+    ]
+  }
+}
