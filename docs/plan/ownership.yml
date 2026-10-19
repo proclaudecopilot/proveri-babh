@@ -60,6 +60,7 @@ files:
   docs/adr/:                   {owner: ARC}
   tests/:                      {owner: QA, change_rule: тестът проверява поведение; промяна на очакване изисква причина в PR-а; xfail се маха само със затворена задача}
   .env.example:                {owner: OPS, reviewers: [SEC], change_rule: никога стойности на секрети}
+  tests/fixtures/source/:      {owner: QA, reviewers: [ARC, XLS], change_rule: очакванията идват от независим reader (make-expected.py), не от тествания parser; оригиналите не се commit-ват}
   docs/environment-contract.md: {owner: OPS, reviewers: [ARC, SEC]}
   docs/screen-map.md:          {owner: ARC, reviewers: [APP, UX]}
   AGENTS.md:                   {owner: ARC}

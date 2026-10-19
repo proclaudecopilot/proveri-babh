@@ -86,7 +86,7 @@
 | AU-04 | Входът и рамката изискват завършване | fixed_claimed | README v6.6.0. | IAM-001 |
 | IM-05 | Старт/спиране не са безопасни при конкуренция | fixed_verified | атомарни lock редове (`includes/etl.php:19-45`), checkpoint след флаг за отказ (`:168-172`), lock в `babh6_run_step` (`:198-206`). | SRC-005, SRC-006, QA-003 |
 | IM-06 | Структурата на XLSX се предполага | mitigated | probe на първите 40 реда (`includes/etl.php:233-243`); колоните остават позиционни A..N без header signature (`includes/etl.php:445-465`, `includes/xlsx-reader.php:96-99`). | DAT-002, XLS-001/002/004/005/008 |
-| IM-07 | Валидация и съхранение на суровите стойности | **confirmed_active** | пропуснатите редове се броят (`includes/etl.php:264-267`), но текстът се реже тихо (`includes/etl.php:481-497`: purpose 2000, composition 5000, storage/deletion 2000, фирми 490, notif_no 95) и суровият ред не се пази; XLSX файловете се трият след импорт (`:419`). | DAT-001, XLS-003/006/007, NRM-001/002 |
+| IM-07 | Валидация и съхранение на суровите стойности | **confirmed_active** | в снимката от 08.09.2026 отрязването засяга 3 реда, но 2 241 реда без префикс П/Т и 1 203 конфликтни дубликата се изпускат (CORPUS-01/02); пропуснатите редове се броят (`includes/etl.php:264-267`), но текстът се реже тихо (`includes/etl.php:481-497`: purpose 2000, composition 5000, storage/deletion 2000, фирми 490, notif_no 95) и суровият ред не се пази; XLSX файловете се трият след импорт (`:419`). | DAT-001, XLS-003/006/007, NRM-001/002 |
 | IM-08 | „Порции“ не покриват най-тежките фази | mitigated | редовете и renorm са на порции (`includes/etl.php:256, 698`); `babh6_merge_norm_aliases` + `babh6_infer_traders` + rebuild на parties са в една заявка във фаза 3 (`includes/etl.php:401, 544-556`). | SRC-007, XLS-009 |
 | IM-09 | „Завършено“ ≠ валидирано | fixed_verified | нула записа = грешка (`includes/etl.php:373-378`); `last_sig/last_hash` само при пълна версия (`includes/sync.php:822-826`). | DAT-005, SRC-008, XLS-010 |
 | IM-10 | Липсва история на стойностите | **confirmed_active** | няма таблица за версии (`includes/schema.php`); README v6.6.0: извън обхвата. | DAT-003, MON-001 |
@@ -119,10 +119,10 @@
 | LIVE-02 | 29 082 некатегоризирани (~35%) | unverified | категоризацията е по ключови думи (`includes/detect.php`, `babh6_categorize`); покритието не е измерено. | ENT-007 |
 | LIVE-03 | 35 липсващи / 3 бележки / 2765 text-match | mitigated | трите оси съществуват в API (`includes/rest.php:80-88`); единна семантика в експорт/анализи не е проверена. | NRM-006 |
 | LIVE-04 | търсене работи (магнезий/ашваганда) | unverified | — | API-002 |
-| LIVE-05 | целият състав „Магнезий-187,5 мг, Витамин B6-1,05 мг, Ашваганда-74,5 мг“ е една съставка | **confirmed_active** | `parseComp` дели само по „;“ (`assets/babh6.js:202`); `UNIT_RE` изисква интервал преди числото (`:199`), а тук разделителят е „-“. | NRM-004, ING-001, ING-002, ING-009, APP-004 |
+| LIVE-05 | целият състав „Магнезий-187,5 мг, Витамин B6-1,05 мг, Ашваганда-74,5 мг“ е една съставка | **confirmed_active** | `parseComp` дели само по „;“ (`assets/babh6.js:202`); `UNIT_RE` изисква интервал преди числото (`:199`). Мащаб в реалните данни: 10 190 състава с няколко количества без „;“ (CORPUS-10, 12 % от приетите). | NRM-004, ING-001, ING-002, ING-009, APP-004 |
 | LIVE-06 | профил Ревита: 1636 „собствено производство“, 715 марки от първа дума, ООД/ЕООД варианти | **confirmed_active** | v6.8.1 правило „без търговец → самият производител“ (`includes/detect.php:181`); марки по първа дума (`includes/infer.php`, README v6.3.1). | ENT-002, ENT-005, ENT-006, APP-007 |
 | LIVE-07 | след търсене от отворен `#p=` старият hash остава; reload отваря стария продукт | **fixed_verified** (v6.9.1, клон на PR #1) | Беше: `runQ`, `applyFilters`, смяна на подредба нулираха `deepReg`, но не махаха hash-а; при reload `parseHash()` отваряше стария запис. Сега `dropProductHash()` (`assets/babh6.js`, викана от runQ/applyFilters/sort/setTab/dwClose). Доказателство: `tests/browser/live07-product-hash.test.js` — 14 отказа на старата версия, 0 на новата, на 1280 и 390 px. Остатък за UX-003: canonical URL за query/tab, Back/Forward, scroll restoration. | UX-003 |
-| LIVE-08 | бъдещи дати на уведомление (17.04.2027) | **confirmed_active** (parser) | `babh6_parse_date_any` приема 1990–2100 без anomaly flag (`includes/detect.php:247-250`); дали стойността е в оригинала — unverified. | NRM-002 |
+| LIVE-08 | бъдещи дати на уведомление (17.04.2027) | **confirmed_active** (в източника) | Снимката от 08.09.2026 съдържа 40 бъдещи дати до 17.04.2027 (`source-corpus-analysis.md`, CORPUS-12); `babh6_parse_date_any` ги приема правилно, но без anomaly flag (`includes/detect.php:247-250`). | NRM-002 |
 | LIVE-09 | класацията прави по-силни изводи от co-occurrence; unknown дати = най-стари | **confirmed_active** | `includes/rank.php:17, 123` (NULL дати като най-стари); текстове „нови клиенти“ (README v6.8.0). | APP-007, ANA-001, ANA-003, ANA-005 |
 | LIVE-10 | AI: ВНИМАНИЕ с вторични източници | mitigated | цитати се извличат (`includes/ai.php:195`), но няма изискване за официален източник. | AI-001, AI-003 |
 | LIVE-11 | Промени/Известия са „В подготовка“ | unverified | waitlist endpoint (`includes/rest.php:23`); няма модел за промени/известия (`includes/schema.php`). | APP-001, MON-003 |
@@ -131,6 +131,10 @@
 | LIVE-14 | facet counts за целия регистър | confirmed_active | виж PR-06. | API-004 |
 | LIVE-15 | два фирмени детайла повтарят KPI | unverified | v6.9.0 панел + пълна страница (README); един модел не е проверен. | APP-006 |
 | LIVE-16 | 34 срещу 35 доставчика | unverified | `partners_total` брои *другите* фирми, „собствена марка“ е отделен ред (README v6.8.2) — вероятна причина, непотвърдена без данни. | ENT-009 |
+
+## Констатации от реалните данни (08.09.2026)
+
+Виж `source-corpus-analysis.md` за CORPUS-01..16 с бройки и примери. Най-важните: 2 241 регистрации без префикс П/Т не влизат в регистъра (CORPUS-01); 1 203 конфликтни дубликата се изпускат без преглед (CORPUS-02); 1 233 дати изчезват заради двуцифрена година/печатни грешки (CORPUS-03); 35 % от записите имат държава вместо производител (CORPUS-07); 31 023 нямат никакъв производител (CORPUS-08).
 
 ## Какво следва от това
 

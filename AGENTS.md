@@ -16,6 +16,7 @@ WordPress плъгин **babh-register-v6** (PHP 7.4+, MySQL през `$wpdb`, v
 | Критерии за пускане | `docs/plan/gates.md` |
 | Констатации (90 исторически + 16 LIVE) → задачи | `docs/plan/evidence.json`; проверка срещу кода: `docs/baseline/findings-verification.md` |
 | Baseline на кода (commit, hash-ове, схема, REST, options) | `docs/baseline/baseline-manifest.json` |
+| Реалните BABH пакети (manifest, анализ, извлеци) | `docs/baseline/source-corpus-manifest.json`, `docs/baseline/source-corpus-analysis.md`, `tests/fixtures/source/` (оригиналите не са в git) |
 | Речник | `docs/domain-glossary.md` |
 | Собственост на файлове/договори | `docs/plan/ownership.yml` |
 | Шаблон за отчет на задача | `docs/plan/task-run-template.md` |

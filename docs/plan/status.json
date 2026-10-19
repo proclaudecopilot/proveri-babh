@@ -26,9 +26,16 @@
     ]
   },
   "ARC-002": {
-    "status": "blocked",
-    "note": "Порталът на БАБХ не е достъпен от средата на сесията (HTTPS CONNECT 403 през прокси, 2026-10-17); реалните XLSX пакети трябва да дойдат от собственика (ръчно сваляне или staging с достъп). Блокира приемането на parser/dataset (QA-002), не останалата R0 работа. Нужни: всички части на поне 3 последователни пълни снимки + стари формати, с дата, размер, SHA-256.",
-    "artifacts": []
+    "status": "in_progress",
+    "note": "Собственикът предостави снимката от 08.09.2026 (2 части, 82 040 уникални регистрации; старите формати 2000–2023 са в част 1). docs/baseline/source-corpus-manifest.json (размер, SHA-256, листове, редове), source-corpus-report-2026-09-08.json и source-corpus-analysis.md (16 нови констатации CORPUS-01..16 от реалните данни). Извлеци в реалния формат + независими очаквания (openpyxl) в tests/fixtures/source/ и тест tests/php/corpus-excerpt.test.php. Остава: още ≥2 последователни снимки, дата/URL на портала за снимката, sanitized DB snapshot.",
+    "artifacts": [
+      "docs/baseline/source-corpus-manifest.json",
+      "docs/baseline/source-corpus-analysis.md",
+      "docs/baseline/source-corpus-report-2026-09-08.json",
+      "tests/php/corpus-analysis.php",
+      "tests/fixtures/source/",
+      "tests/php/corpus-excerpt.test.php"
+    ]
   },
   "ARC-003": {
     "status": "in_review",

@@ -1,0 +1,484 @@
+{
+    "generated_at": "2026-10-19",
+    "files": [
+        {
+            "file": "Registerfoodsupplements1-08.09.26.xlsx",
+            "size": 6958052,
+            "sha256": "5bcc493a0154db2e2454d592066ddba15b15b8a2d18daf54b5d74e5c3273fa86",
+            "sheets": [
+                "xl\/worksheets\/sheet2.xml (39144 B)",
+                "xl\/worksheets\/sheet3.xml (3925 B)",
+                "xl\/worksheets\/sheet1.xml (29337573 B)"
+            ],
+            "sheet_used_by_reader": "xl\/worksheets\/sheet1.xml",
+            "raw": {
+                "dimension": "A1:CU57088",
+                "physical_rows": 57088,
+                "max_col_index_with_value": 13,
+                "rows_with_values_beyond_col_N": 0,
+                "cells_beyond_col_N": 0,
+                "cols_beyond_N": []
+            },
+            "reader": {
+                "count_data_rows": 57088,
+                "rows_returned": 57088,
+                "rows_with_cells_not_returned": 0
+            },
+            "first_rows_raw": [
+                [
+                    "Пореден № за хранителна добавка",
+                    "",
+                    "Уведомление",
+                    "",
+                    "Производител",
+                    "",
+                    "",
+                    "Търговец",
+                    "",
+                    "Наименование на хранителната добавка",
+                    "Предназначение на хранителната добавка",
+                    "Състав на хранителната добавка",
+                    "Пускане на пазара",
+                    ""
+                ],
+                [
+                    "ПХХГГННННН  ТХХГГННННН",
+                    "дата на вписване",
+                    "вх. №",
+                    "дата",
+                    "наименование и адрес на управление",
+                    "адрес на собствено производство",
+                    "адрес на възложено производство",
+                    "наименование и адрес на управление",
+                    "адрес на складиране",
+                    "",
+                    "",
+                    "",
+                    "дд.мм.гггг",
+                    ""
+                ],
+                [
+                    "Т181900001",
+                    "",
+                    "31",
+                    "   29.01.2019 г",
+                    " ",
+                    "",
+                    "\"ВОЛТ РИТЕЙЛ  ООД                       ",
+                    "\"Грийнуей Интернешънъл\"  ЕООД   гр.Русе,",
+                    "гр.Русе, кв.\"Чародейка юг ул.\".Тодор Ико",
+                    "         PERISTAL",
+                    " Спомага за възстановяване на чревната ф",
+                    "",
+                    " 01.02.2019г.",
+                    ""
+                ],
+                [
+                    "Т181900002",
+                    "",
+                    "32",
+                    " 29.01.2019 г",
+                    " ",
+                    " ",
+                    "\"ВОЛТ РИТЕЙЛ  ООД                       ",
+                    "\"Грийнуей Интернешънъл\"  ЕООД   гр.Русе,",
+                    "гр.Русе, кв.\"Чародейка юг ул.\".Тодор Ико",
+                    "         TEROSGEN",
+                    "Подпомага мъжката потентност",
+                    "",
+                    " 01.02.2019г.",
+                    ""
+                ]
+            ],
+            "accounting": {
+                "data_rows": 50036,
+                "skipped_with_number_like_text": 2254,
+                "skipped_breakdown": {
+                    "no_valid_reg": 2241,
+                    "valid_reg_but_empty_name": 12,
+                    "reg_over_20": 1
+                },
+                "skipped_examples": [
+                    "A=„T160700245 № е запазен от реги“ J=„Стевия 30 мл“ E=„“",
+                    "A=„Т221000752“ J=„“ E=„“",
+                    "A=„Т221000868“ J=„“ E=„“",
+                    "A=„23020002“ J=„Мултивитамин с вкус на портока“ E=„\"Еуросток\"ЕООД,“",
+                    "A=„23020003“ J=„Мултивитамин за деца с вкус на“ E=„\"Еуросток\"ЕООД,“",
+                    "A=„23010003“ J=„ЪП МЕН \/ up man\/- желатинови к“ E=„Виталайф\"АД,гр.София“",
+                    "A=„23010004“ J=„ФЛАВИТ - желатинови капсули, 5“ E=„Виталайф\"АД,гр.София“",
+                    "A=„23020009“ J=„Чай от стрък босилек“ E=„\"Аркадия Херба\"ЕООД“",
+                    "A=„23020010“ J=„Чай от стрък бял равнец“ E=„\"Аркадия Херба\"ЕООД“",
+                    "A=„23020011“ J=„Чай от стрък жълт кантарион“ E=„\"Аркадия Херба\"ЕООД“"
+                ],
+                "header_or_empty": 4798,
+                "duplicate_reg_within_file": 1888,
+                "duplicate_identical_src": 712,
+                "duplicate_conflicting_src": 1176,
+                "duplicate_conflicting_examples": [
+                    "Т161000080 (ред 1813): „Б-комплекс+Б12“",
+                    "Т161000082 (ред 1816): „ЮКАстебло 490мг“",
+                    "Т281000001 (ред 6045): „Цитросепт“",
+                    "Т281000002 (ред 6046): „цитросепт - актив“",
+                    "Т281000003 (ред 6047): „цитросепт - джуниор - сироп за деца“"
+                ],
+                "long_reg_over_20": 1,
+                "check": "physical_rows = data_rows + skipped_with_number_like_text + header_or_empty + rows_with_cells_not_returned → OK"
+            },
+            "quality": {
+                "type": {
+                    "П": 3901,
+                    "Т": 46135
+                },
+                "reg_with_suffix": 1801,
+                "ryear_null": 51,
+                "ryear_min": 2000,
+                "ryear_max": 2023,
+                "oblast_unknown": 4,
+                "notif_date_null": 1046,
+                "notif_date_present_but_invalid": 1027,
+                "notif_date_future": 0,
+                "notif_date_future_examples": [],
+                "notif_date_min": "2001-07-09",
+                "notif_date_max": "2025-08-05",
+                "notif_date_before_2000": 0,
+                "entry_date_null": 40342,
+                "launch_date_null": 3154,
+                "producer_empty": 31066,
+                "producer_country": 10433,
+                "producer_country_examples": [
+                    "Израел",
+                    "САЩ",
+                    "Русия",
+                    "Канада",
+                    "Чехия",
+                    "Австрия"
+                ],
+                "producer_from_contract_column": 912,
+                "trader_empty": 4454,
+                "trader_country": 0,
+                "trader_equals_producer_norm": 873,
+                "deletion_note": 3,
+                "truncated": {
+                    "purpose": 0,
+                    "composition": 0,
+                    "storage": 0,
+                    "deletion": 0,
+                    "producer": 0,
+                    "trader": 0,
+                    "notif_no": 0
+                },
+                "truncated_rows": 0,
+                "truncated_examples": [],
+                "composition_empty": 34957,
+                "composition_has_semicolon": 7733,
+                "composition_comma_no_semicolon": 1792,
+                "composition_multi_qty_no_semicolon": 1173,
+                "composition_multi_qty_no_semicolon_examples": [
+                    "Т220800536: Таурин - 344,8 мг., Изофлавони - 77,3 мг., Натриев хиалуронат - 23,5 мг., Фолиева киселина",
+                    "Т221100099: Калций 400 mg, Магнезий 150 mg, Цинк 5 mg, Витамин D3 - 12.5 µg, Мед 500 µg, Манган 0,25 µ",
+                    "Т221101613: Железен цитрат - 5 мг., цинков глюконат - 5 мг., меден цитрат - 1 мг., Натриев молибден - ",
+                    "Т221101614: Калций - 550 мг., Магнезий - 150 мг., Натрий - 375 мг., Калий - 350 мг., Цинк - 5 мг., Мол",
+                    "Т221102428: Цитрати - 202,5 мг., Витамин В6 - 4,93 мг."
+                ],
+                "composition_over_400_no_separator": 63,
+                "name_empty": 0,
+                "flags_rows": 804,
+                "categories": {
+                    "other": 24895,
+                    "vitamins": 7261,
+                    "protein": 5165,
+                    "herbal": 3681,
+                    "minerals": 2396,
+                    "digestion": 1434,
+                    "omega": 1240,
+                    "collagen": 971,
+                    "sleep": 595,
+                    "immune": 535,
+                    "weight": 498,
+                    "men": 497,
+                    "detox": 390,
+                    "beauty": 169,
+                    "children": 125,
+                    "women": 92,
+                    "cardio": 92
+                },
+                "extra": {
+                    "reg_digit_lengths": {
+                        "7": 6,
+                        "8": 1194,
+                        "9": 48263,
+                        "10": 573
+                    },
+                    "notif_date_invalid_examples": [
+                        "Т030700001: „12.06.07г.“",
+                        "Т030700002: „12.06.07г.“",
+                        "Т030700003: „12.06.07г.“",
+                        "Т030700004: „12.06.07г.“",
+                        "Т030700005: „19.06.07г.“",
+                        "Т030700006: „19.06.07г.“",
+                        "Т030700007: „23.07.07г.“",
+                        "Т030700008: „23.07.07г.“"
+                    ],
+                    "producer_empty_breakdown": {
+                        "E_F_G_all_empty": 30948,
+                        "G_or_F_has_text_not_firm": 118,
+                        "G_or_F_text_examples": [
+                            "гр. София ул. \"Коста Лулчев\" 58",
+                            "гр. София ул. \"Коста Лулчев\" 58",
+                            "гр. София ул. \"Коста Лулчев\" 58",
+                            "гр. София ул. \"Коста Лулчев\" 58",
+                            "гр. София ул. \"Коста Лулчев\" 58",
+                            "гр. София ул. \"Коста Лулчев\" 58"
+                        ]
+                    },
+                    "producer_and_trader_both_empty": 121
+                }
+            },
+            "seconds": 12.9
+        },
+        {
+            "file": "Registerfoodsupplements2-08.09.2026.xlsx",
+            "size": 7031933,
+            "sha256": "abfd184915d558771856b0be0adab95f2082f922d3ff6120381d5ccab720f0a1",
+            "sheets": [
+                "xl\/worksheets\/sheet3.xml (628 B)",
+                "xl\/worksheets\/sheet1.xml (1750 B)",
+                "xl\/worksheets\/sheet2.xml (18562191 B)",
+                "xl\/chartsheets\/sheet1.xml (432 B)"
+            ],
+            "sheet_used_by_reader": "xl\/worksheets\/sheet2.xml",
+            "raw": {
+                "dimension": "A1:P33979",
+                "physical_rows": 33979,
+                "max_col_index_with_value": 13,
+                "rows_with_values_beyond_col_N": 0,
+                "cells_beyond_col_N": 0,
+                "cols_beyond_N": []
+            },
+            "reader": {
+                "count_data_rows": 33979,
+                "rows_returned": 33979,
+                "rows_with_cells_not_returned": 0
+            },
+            "first_rows_raw": [
+                [
+                    "0",
+                    "Дата на вписване",
+                    "Уведомление",
+                    "",
+                    "Производител",
+                    "",
+                    "",
+                    "Търговец",
+                    "",
+                    "Наименование на хранителната добавка",
+                    "Предназначение на хранителната добавка",
+                    "Състав на хранителната добавка",
+                    "Пускане на пазара",
+                    ""
+                ],
+                [
+                    "ПХХГГННННН  ТХХГГННННН",
+                    "",
+                    "вх. №",
+                    "дата",
+                    "наименование и адрес на управление",
+                    "адрес на собствено производство",
+                    "адрес на възложено производство",
+                    "наименование и адрес на управление",
+                    "адрес на складиране",
+                    "",
+                    "",
+                    "",
+                    "дд.мм.гггг",
+                    ""
+                ],
+                [
+                    "Т162304627",
+                    "45215",
+                    "19264",
+                    "5,10,2023",
+                    "Натстим ЕООД, гр. София, бул. Черни връх",
+                    "",
+                    "",
+                    "ЕТ Мота 6 Лаборатори Ст. Роганска, гр. П",
+                    "гр. Пловдив, ул. Георги Измирлиев 40",
+                    "Колаген Пептиди + Пробиотик Витамин С   ",
+                    "За по добър сън и подобряване на колаген",
+                    "Рибен колаген 250 мг; Пробиотик (Лактоба",
+                    "45220",
+                    ""
+                ],
+                [
+                    "Т162304628",
+                    "45215",
+                    "19264",
+                    "5,10,2023",
+                    "Натстим ЕООД, гр. София, бул. Черни връх",
+                    "",
+                    "",
+                    "ЕТ Мота 6 Лаборатори Ст. Роганска, гр. П",
+                    "гр. Пловдив, ул. Георги Измирлиев 40",
+                    " Колаген Пептиди + Пробиотик Мелатонин  ",
+                    "За по качествен сън и поддържане доброто",
+                    "Рибен колаген 600 мг; Пробиотик (Лактоба",
+                    "45220",
+                    ""
+                ]
+            ],
+            "accounting": {
+                "data_rows": 33920,
+                "skipped_with_number_like_text": 1,
+                "skipped_breakdown": {
+                    "no_valid_reg": 0,
+                    "valid_reg_but_empty_name": 1,
+                    "reg_over_20": 0
+                },
+                "skipped_examples": [
+                    "A=„Т242611456“ J=„“ E=„THG Nutrition Limite“"
+                ],
+                "header_or_empty": 58,
+                "duplicate_reg_within_file": 28,
+                "duplicate_identical_src": 1,
+                "duplicate_conflicting_src": 27,
+                "duplicate_conflicting_examples": [
+                    "Т222400358 (ред 1794): „Астрагал Екстракт 90 капсули“",
+                    "Т222400506*** (ред 1944): „АктивЛаб Де Лукс Гейнър вкус ванилия 300“",
+                    "Т222401315 (ред 2790): „PRIMA SANITAS Протеин и глутамин плюс ел“",
+                    "Т222401316 (ред 2791): „PRIMA SANITAS Пробиотици с пребиотик, 24“",
+                    "Т222401317 (ред 2792): „PRIMA SANITAS Омега-3 70% EPA и DHA масл“"
+                ],
+                "long_reg_over_20": 0,
+                "check": "physical_rows = data_rows + skipped_with_number_like_text + header_or_empty + rows_with_cells_not_returned → OK"
+            },
+            "quality": {
+                "type": {
+                    "П": 3438,
+                    "Т": 30482
+                },
+                "reg_with_suffix": 4168,
+                "ryear_null": 81,
+                "ryear_min": 2022,
+                "ryear_max": 2026,
+                "oblast_unknown": 0,
+                "notif_date_null": 207,
+                "notif_date_present_but_invalid": 206,
+                "notif_date_future": 40,
+                "notif_date_future_examples": [
+                    "Т2225069041 → 2026-10-30 (клетка: 30.10.2026)",
+                    "Т222607841*** → 2026-12-01 (клетка: 46357)",
+                    "Т222607842*** → 2026-12-01 (клетка: 46357)",
+                    "Т222607843*** → 2026-12-01 (клетка: 46357)",
+                    "П222607844 → 2026-12-01 (клетка: 46357)",
+                    "П222607845 → 2026-12-01 (клетка: 46357)",
+                    "Т222607846 → 2026-12-01 (клетка: 46357)",
+                    "Т242607878 → 2026-12-10 (клетка: 46366)"
+                ],
+                "notif_date_min": "2021-01-11",
+                "notif_date_max": "2027-04-17",
+                "notif_date_before_2000": 0,
+                "entry_date_null": 1146,
+                "launch_date_null": 582,
+                "producer_empty": 117,
+                "producer_country": 19219,
+                "producer_country_examples": [
+                    "Полша",
+                    "Италия",
+                    "Канада",
+                    "Русия",
+                    "Унгария",
+                    "Швеция"
+                ],
+                "producer_from_contract_column": 106,
+                "trader_empty": 3123,
+                "trader_country": 0,
+                "trader_equals_producer_norm": 552,
+                "deletion_note": 0,
+                "truncated": {
+                    "purpose": 0,
+                    "composition": 1,
+                    "storage": 2,
+                    "deletion": 0,
+                    "producer": 0,
+                    "trader": 0,
+                    "notif_no": 0
+                },
+                "truncated_rows": 3,
+                "truncated_examples": [
+                    "Т2225068975 composition 5017 зн.",
+                    "Т222614163 storage 2008 зн.",
+                    "Т222614164 storage 2008 зн."
+                ],
+                "composition_empty": 1,
+                "composition_has_semicolon": 10169,
+                "composition_comma_no_semicolon": 10366,
+                "composition_multi_qty_no_semicolon": 9017,
+                "composition_multi_qty_no_semicolon_examples": [
+                    "Т222304713: Рибено масло 2000 мг, осигурява ЕРА 360 мг, DHA 240 мг",
+                    "Т222304755: Омега 3 общо 3240 мг, от които ЕПА 1650 мг, ДХА 1350 мг, ЕПА + ДХА 3000 мг",
+                    "Т222304778: Транс ресвератрол 50% екстракт от 100 мг ресвератрол корен 50 мг",
+                    "Т242304843: Рибено масло 2300 мг, от които Омега 3 киселини 800 мг, осигурява ЕРА 350 мг, DHA 300 мг, ",
+                    "Т242304845: Рибено масло 2000 мг, от които Омега 3 киселини 700 мг, осигурява ЕРА 360 мг, DHA 240 мг, "
+                ],
+                "composition_over_400_no_separator": 1479,
+                "name_empty": 0,
+                "flags_rows": 1908,
+                "categories": {
+                    "vitamins": 10315,
+                    "protein": 6743,
+                    "other": 5260,
+                    "herbal": 4883,
+                    "minerals": 2819,
+                    "digestion": 1332,
+                    "collagen": 699,
+                    "omega": 663,
+                    "sleep": 381,
+                    "immune": 305,
+                    "weight": 160,
+                    "detox": 136,
+                    "men": 106,
+                    "cardio": 38,
+                    "women": 32,
+                    "beauty": 31,
+                    "children": 17
+                },
+                "extra": {
+                    "reg_digit_lengths": {
+                        "8": 81,
+                        "9": 30850,
+                        "10": 2989
+                    },
+                    "notif_date_invalid_examples": [
+                        "Т222404154: „235.2024“",
+                        "Т222409867: „30.8..2024“",
+                        "Т222409868***: „30.8..2024“",
+                        "Т222409869: „30.8..2024“",
+                        "Т222409870: „30.8..2024“",
+                        "Т222409871: „30.8..2024“",
+                        "Т222409872: „30.8..2024“",
+                        "Т222409873: „30.8..2024“"
+                    ],
+                    "producer_empty_breakdown": {
+                        "E_F_G_all_empty": 75,
+                        "G_or_F_has_text_not_firm": 42,
+                        "G_or_F_text_examples": [
+                            "гр. Саморново, индустриална зона, Ренифарма Оперей",
+                            "гр. Саморново, индустриална зона, Ренифарма Оперей",
+                            "гр. Саморново, индустриална зона, Ренифарма Оперей",
+                            "С.Баня, Община Разлог, Област Благоевград, ул. Нео",
+                            "гр. Пловдив, ул. Брезовско шосе",
+                            "с. Гълъбовци, ул. II № 3"
+                        ]
+                    },
+                    "producer_and_trader_both_empty": 0
+                }
+            },
+            "seconds": 10.2
+        }
+    ],
+    "combined": {
+        "unique_regs": 82040,
+        "regs_seen_more_than_once": 1169,
+        "regs_in_both_files": 0
+    }
+}

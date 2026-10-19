@@ -2,3 +2,5 @@
 build/
 *.zip
 node_modules/
+# оригиналните BABH пакети (суров слой, 14+ MB) — само извлеци влизат в git; виж docs/baseline/source-corpus-manifest.json
+tests/fixtures/source/full/

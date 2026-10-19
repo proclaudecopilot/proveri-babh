@@ -1,0 +1,96 @@
+{
+ "2026-09-08-part1-excerpt.xlsx": {
+  "sha256": "29e83ba4a5da41669ec897b82f12c1b6b5d0a58fee071ed27328e467bcecc627",
+  "physical_rows": 125,
+  "rows_with_prefixed_reg": 123,
+  "distinct_prefixed_reg": 123,
+  "rows_with_unprefixed_numeric_A": 0,
+  "anomalies": {
+   "Т220800536": {
+    "notif_raw": "26.5.2008; 07.07.2026 г. ",
+    "notif_first_iso": "2008-05-26",
+    "name": "ХРОНОЛОНГ - 30 капсули",
+    "composition_len": 152,
+    "storage_len": 45,
+    "launch_raw": "2008-05-21"
+   },
+   "Т221100099": {
+    "notif_raw": "26.1.2011; 10.06.2026",
+    "notif_first_iso": "2011-01-26",
+    "name": "Остеокер - калций, магнезий, цинк и витамин Д - 30 табл.",
+    "composition_len": 117,
+    "storage_len": 41,
+    "launch_raw": "2011-01-25"
+   }
+  },
+  "serial_46357": "2026-12-01",
+  "serial_46366": "2026-12-10"
+ },
+ "2026-09-08-part2-excerpt.xlsx": {
+  "sha256": "0e1986282a8cabdce9c96374daa49bf2cb6a33bb1a97fbbc6a7f9224afbce53d",
+  "physical_rows": 129,
+  "rows_with_prefixed_reg": 127,
+  "distinct_prefixed_reg": 127,
+  "rows_with_unprefixed_numeric_A": 0,
+  "anomalies": {
+   "Т222304713": {
+    "notif_raw": "29,9,2023",
+    "notif_first_iso": "2023-09-29",
+    "name": "Рибено Масло 60 меки капсули",
+    "composition_len": 54,
+    "storage_len": 30,
+    "launch_raw": "2023-10-23"
+   },
+   "Т2225068975": {
+    "notif_raw": "2025-10-29",
+    "notif_first_iso": "2025-10-29",
+    "name": "Organic G2 Vitality Clean – Optimal Level of Bioavailability – (46) Natural Organic Substances – Herbal Mixture 10g – Daily dose, Органик G2 Жизненост и Чистота – Оптимално Ниво на Бионаличност – (46) Натурални Селектирани Съставки – Билкова смес – 10гр. Дневна доза - 30 дози х 10гр. - Хранителна добавка на прах – 300гр.",
+    "composition_len": 5017,
+    "storage_len": 37,
+    "launch_raw": "2025-11-20"
+   },
+   "Т2225069041": {
+    "notif_raw": "30.10.2026",
+    "notif_first_iso": "2026-10-30",
+    "name": "Комплекс Менопауза Рилайф - 30 капсули",
+    "composition_len": 230,
+    "storage_len": 71,
+    "launch_raw": "21.11.2025"
+   },
+   "Т222607841***": {
+    "notif_raw": "2026-12-01",
+    "notif_first_iso": "2026-12-01",
+    "name": "R1 СУРОВАТЪЧЕН ПРОТЕИН - 905 грама /с вкус на лагерен огън/",
+    "composition_len": 24,
+    "storage_len": 46,
+    "launch_raw": "2026-01-19"
+   },
+   "П222607844": {
+    "notif_raw": "2026-12-01",
+    "notif_first_iso": "2026-12-01",
+    "name": "ХАЕЙЪР АНД НАЙЛС х 30 капсули",
+    "composition_len": 226,
+    "storage_len": 71,
+    "launch_raw": "2026-01-19"
+   },
+   "Т242607878": {
+    "notif_raw": "2026-12-10",
+    "notif_first_iso": "2026-12-10",
+    "name": "Osavi Norwegian Cod Liver Oil | Different Flavors Liquid Omega - Норвежко масло от черен дроб на треска | Течна Омега с вкус на Лимон - 250 мл, 50 дози",
+    "composition_len": 218,
+    "storage_len": 25,
+    "launch_raw": "2026-01-20"
+   },
+   "Т222614163": {
+    "notif_raw": "2026-04-09",
+    "notif_first_iso": "2026-04-09",
+    "name": "Нексабиом® ГАСТРО - 30 капсули",
+    "composition_len": 186,
+    "storage_len": 2008,
+    "launch_raw": "2026-05-21"
+   }
+  },
+  "serial_46357": "2026-12-01",
+  "serial_46366": "2026-12-10"
+ }
+}
