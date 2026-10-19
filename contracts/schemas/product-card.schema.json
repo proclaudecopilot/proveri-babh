@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/schemas/product-card.schema.json",
+  "title": "Карта на регистрация (GET /products items[], /party.latest[], /rank/move.products[]) — as-is 1.0",
+  "description": "Кратки ключове от babh6_row_to_card (includes/rest.php:323). Единицата е регистрация (source record), не уникален продукт.",
+  "type": "object",
+  "required": ["reg", "t", "n", "p", "pk", "pn", "tr", "tk", "tn", "to", "nd", "cat", "catl", "fc", "x", "del", "short"],
+  "additionalProperties": true,
+  "properties": {
+    "reg":  {"type": "string", "pattern": "^[ПТ]\\d{7,}.{0,8}$", "description": "Регистрационен номер (стабилен ID на регистрацията)"},
+    "t":    {"type": "string", "enum": ["П", "Т"], "description": "Тип на рег. номер"},
+    "n":    {"type": "string", "description": "Наименование (източник)"},
+    "p":    {"type": "string", "description": "Производител — само частта преди първата запетая (източник, отрязано за картата)"},
+    "pk":   {"type": "string", "enum": ["", "firm", "country"], "description": "Вид на полето „Производител“: празно, фирма или държава (автоматично)"},
+    "pn":   {"type": "string", "description": "Нормализиран ключ на производителя (автоматично)"},
+    "tr":   {"type": "string", "description": "Търговец, както е посочен (първа част)"},
+    "tk":   {"type": "string", "enum": ["", "firm", "country"]},
+    "tn":   {"type": "string", "description": "Нормализиран ключ на посочения търговец"},
+    "to":   {"type": "integer", "enum": [0, 1], "description": "1 = търговецът е приет по правило за самия производител (без посочен търговец) — автоматичен извод, не факт"},
+    "nd":   {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Дата на уведомление; null = няма/невалидна в източника"},
+    "cat":  {"type": "string", "description": "Автоматична категория (код); 'other' = правилата не намират"},
+    "catl": {"type": "string", "description": "Етикет на категорията на български"},
+    "fc":   {"type": "integer", "minimum": 0, "description": "Брой автоматични бележки; 0 без Pro (capability, не факт)"},
+    "x":    {"type": "integer", "enum": [0, 1], "description": "1 = липсва в последния пълен файл (НЕ е заличаване)"},
+    "del":  {"type": "boolean", "description": "true = в източника има бележка за заличаване"},
+    "short": {"type": "integer", "const": 1, "description": "Маркер, че това е карта, не пълен запис"},
+    "en":   {"type": "string", "description": "Само в /rank/move: ключ на насрещната фирма ('' = без насрещна)"}
+  }
+}

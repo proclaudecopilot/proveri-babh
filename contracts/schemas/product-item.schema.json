@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/schemas/product-item.schema.json",
+  "title": "Пълен запис на регистрация (GET /product/{reg}) — as-is 1.0",
+  "description": "От babh6_row_to_item (includes/rest.php). Текстовите полета са отрязани при импорт (IM-07); provenance по поле липсва (DAT-001).",
+  "type": "object",
+  "required": ["reg", "t", "y", "o", "n", "p", "pk", "pn", "tr", "tk", "tn", "ti", "tin", "tinn", "to", "c", "pp", "st", "nn", "nd", "ld", "ed", "cat", "catl", "f", "x", "xd", "del", "dn"],
+  "additionalProperties": true,
+  "properties": {
+    "reg": {"type": "string"},
+    "t":   {"type": "string", "enum": ["П", "Т"]},
+    "y":   {"type": ["integer", "null"], "minimum": 2000, "description": "Година от рег. номера; null при невалидни цифри (не 1968)"},
+    "o":   {"type": "string", "description": "Област от рег. номера ('' = непознат код)"},
+    "n":   {"type": "string"},
+    "p":   {"type": "string", "description": "Производител — пълен текст (до 490 знака, IM-07)"},
+    "pk":  {"type": "string", "enum": ["", "firm", "country"]},
+    "pn":  {"type": "string"},
+    "tr":  {"type": "string", "description": "Търговец, посочен в регистъра (пълен текст)"},
+    "tk":  {"type": "string", "enum": ["", "firm", "country"]},
+    "tn":  {"type": "string"},
+    "ti":  {"type": "integer", "enum": [0, 1], "description": "1 = има търговец, определен по името на продукта (автоматично предположение)"},
+    "tin": {"type": "string", "description": "Име на предположения търговец ('' ако ti=0)"},
+    "tinn": {"type": "string"},
+    "to":  {"type": "integer", "enum": [0, 1]},
+    "c":   {"type": ["string", "null"], "description": "Състав (до 5000 знака)"},
+    "pp":  {"type": ["string", "null"], "description": "Предназначение (до 2000)"},
+    "st":  {"type": ["string", "null"], "description": "Съхранение (до 2000)"},
+    "nn":  {"type": "string", "description": "Номер на уведомление (до 95)"},
+    "nd":  {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "ld":  {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Дата на пускане на пазара"},
+    "ed":  {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Дата на вписване"},
+    "cat": {"type": "string"},
+    "catl": {"type": "string"},
+    "f": {
+      "type": "array", "description": "Автоматични бележки (само с Pro; иначе [])",
+      "items": {"type": "object", "required": ["term", "field", "field_label"], "properties": {
+        "term": {"type": "string"}, "field": {"type": "string", "enum": ["name", "composition", "purpose"]},
+        "field_label": {"type": "string"}, "label": {"type": "string"}, "excerpt": {"type": "string"}}, "additionalProperties": true}
+    },
+    "x":   {"type": "integer", "enum": [0, 1]},
+    "xd":  {"type": "string", "description": "Дата на импорта, в който записът е липсвал ('' ако x=0) — НЕ е дата от източника"},
+    "del": {"type": "boolean"},
+    "dn":  {"type": "string", "description": "Текст на бележката за заличаване от източника"}
+  }
+}

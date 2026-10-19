@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "docs/plan/backlog.schema.json",
+  "title": "Провери БАБХ · backlog на заданието v1.0",
+  "description": "Структурираният списък от 225 задачи, генериран от docs/plan/source/*.html чрез docs/plan/tools/build_backlog.py. Статусите идват от docs/plan/status.json.",
+  "type": "object",
+  "required": ["spec_version", "spec_date", "generated_from", "milestones", "priorities", "statuses", "groups", "tasks"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"type": "string"},
+    "spec_version": {"type": "string", "pattern": "^\\d+\\.\\d+$"},
+    "spec_date": {"type": "string", "format": "date"},
+    "generated_from": {
+      "type": "object", "required": ["file", "sha256"], "additionalProperties": false,
+      "properties": {"file": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+    },
+    "milestones": {"type": "array", "items": {"type": "string", "pattern": "^R[0-5]$"}, "minItems": 6, "maxItems": 6},
+    "priorities": {"type": "array", "items": {"type": "string", "enum": ["P0", "P1"]}},
+    "statuses": {"type": "array", "items": {"type": "string", "enum": ["planned", "in_progress", "blocked", "in_review", "done", "dropped"]}},
+    "groups": {
+      "type": "array", "minItems": 19, "maxItems": 19,
+      "items": {
+        "type": "object", "required": ["id", "title", "owner", "description", "task_count"], "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z]{2,4}$"},
+          "title": {"type": "string", "minLength": 1},
+          "owner": {"type": "string", "minLength": 1},
+          "description": {"type": "string"},
+          "task_count": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "tasks": {
+      "type": "array", "minItems": 225, "maxItems": 225,
+      "items": {
+        "type": "object",
+        "required": ["id", "group", "title", "priority", "milestone", "summary", "deliverable", "owner", "depends_on", "acceptance", "check", "evidence", "status", "covers", "wave"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z]{2,4}-\\d{3}$"},
+          "group": {"type": "string", "pattern": "^[A-Z]{2,4}$"},
+          "title": {"type": "string", "minLength": 1},
+          "priority": {"type": "string", "enum": ["P0", "P1"]},
+          "milestone": {"type": "string", "pattern": "^R[0-5]$"},
+          "summary": {"type": "string", "minLength": 1},
+          "deliverable": {"type": "string", "minLength": 1},
+          "owner": {"type": "string", "minLength": 1},
+          "depends_on": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]{2,4}-\\d{3}$"}, "uniqueItems": true},
+          "depends_note": {"type": "string"},
+          "acceptance": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "check": {"type": "string", "minLength": 1},
+          "evidence": {"type": "array", "items": {"type": "string", "pattern": "^(DESIGN|LIVE-\\d{2}|[A-Z]{2}-\\d{2})$"}},
+          "covers": {"type": "array", "items": {"type": "string"}},
+          "status": {"type": "string", "enum": ["planned", "in_progress", "blocked", "in_review", "done", "dropped"]},
+          "status_note": {"type": "string", "minLength": 1},
+          "artifacts": {"type": "array", "items": {"type": "string"}},
+          "wave": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}

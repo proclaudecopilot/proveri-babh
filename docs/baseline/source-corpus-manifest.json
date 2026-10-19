@@ -1,0 +1,61 @@
+{
+  "task": "ARC-002",
+  "status": "in_progress — 1 от минимум 3 последователни пълни снимки; старите формати (2000–2023) са вътре в част 1",
+  "generated_at": "2026-10-19",
+  "rules": {
+    "originals": "Оригиналните файлове НЕ са в git (14 MB, суров слой). Пазят се от собственика и се проверяват по SHA-256 от този manifest. Локално: tests/fixtures/source/full/<snapshot>/ (игнорирано от git).",
+    "excerpts": "Малки извлеци в реалния формат са в git (tests/fixtures/source/*.xlsx) с независими очаквания (expected.json от openpyxl).",
+    "provenance_note": "Датата на снимката е от името на файла (08.09.2026). Датата „Последна актуализация“ на портала и URL-ите на частите не са записани, защото файловете са качени ръчно; при сваляне от портала (SRC-001/002) manifest-ът носи и тях."
+  },
+  "snapshots": [
+    {
+      "id": "2026-09-08",
+      "effective_date": "2026-09-08",
+      "source": "Регистър на хранителните добавки, БАБХ (bfsa.egov.bg) — ръчно свалени части, качени от собственика в сесията на 2026-10-19",
+      "complete": true,
+      "completeness_evidence": "Две части, номерирани 1 и 2 в имената; част 1 покрива рег. години 2000–2023, част 2 — 2022–2026; няма общи рег. номера между частите (0); общо 82 040 уникални регистрации (README v6.5.1 отчита 82 041 за по-стара снимка).",
+      "files": [
+        {
+          "part": 1,
+          "name": "Registerfoodsupplements1-08.09.26.xlsx",
+          "size": 6958052,
+          "sha256": "5bcc493a0154db2e2454d592066ddba15b15b8a2d18daf54b5d74e5c3273fa86",
+          "sheets": ["Sheet1 (xl/worksheets/sheet1.xml, 29.3 MB, данните)", "Sheet2 (39 KB, A1:N304, същата структура — вероятно работен лист)", "Sheet3 (3.9 KB, A1:M6)"],
+          "dimension": "A1:CU57088",
+          "physical_rows": 57088,
+          "header_rows": 2,
+          "data_rows_accepted_by_parser": 50036,
+          "rows_skipped_with_number_like_text": 2254,
+          "rows_header_or_empty": 4798,
+          "values_beyond_column_N": 0
+        },
+        {
+          "part": 2,
+          "name": "Registerfoodsupplements2-08.09.2026.xlsx",
+          "size": 7031933,
+          "sha256": "abfd184915d558771856b0be0adab95f2082f922d3ff6120381d5ccab720f0a1",
+          "sheets": ["Sheet1 (xl/worksheets/sheet2.xml, 18.6 MB, данните)", "Chart1 (chartsheet)", "Sheet2 (1.7 KB, A5:K7, празни стилизирани клетки)", "Sheet3 (628 B)"],
+          "dimension": "A1:P33979",
+          "physical_rows": 33979,
+          "header_rows": 2,
+          "data_rows_accepted_by_parser": 33920,
+          "rows_skipped_with_number_like_text": 1,
+          "rows_header_or_empty": 58,
+          "values_beyond_column_N": 0
+        }
+      ],
+      "columns_observed": ["A Пореден № (ПХХГГННННН / ТХХГГННННН)", "B дата на вписване", "C Уведомление вх. №", "D Уведомление дата", "E Производител — наименование и адрес", "F адрес на собствено производство", "G адрес на възложено производство", "H Търговец — наименование и адрес", "I адрес на складиране", "J Наименование", "K Предназначение", "L Състав", "M Пускане на пазара (дд.мм.гггг)", "N (празна / бележка за заличаване)"],
+      "analysis": "docs/baseline/source-corpus-report-2026-09-08.json (суров отчет) и docs/baseline/source-corpus-analysis.md (изводи)"
+    }
+  ],
+  "excerpt_fixtures": [
+    {"name": "tests/fixtures/source/2026-09-08-part1-excerpt.xlsx", "sha256": "29e83ba4a5da41669ec897b82f12c1b6b5d0a58fee071ed27328e467bcecc627", "rows": 125, "content": "2 заглавни реда + първите 120 реда с данни + Т220800536, Т221100099, Т221101613 (състав със запетаи и тирета)", "made_with": "openpyxl (tests/fixtures/source/make-expected.py описва метода); датите, стилизирани като дати, са записани като серийни номера"},
+    {"name": "tests/fixtures/source/2026-09-08-part2-excerpt.xlsx", "sha256": "0e1986282a8cabdce9c96374daa49bf2cb6a33bb1a97fbbc6a7f9224afbce53d", "rows": 129, "content": "2 заглавни реда + първите 120 реда с данни + бъдещи дати (Т2225069041, Т222607841***, П222607844, Т242607878), състав над 5000 знака (Т2225068975), съхранение над 2000 знака (Т222614163), състав със запетаи (Т222304713, Т222304755)"}
+  ],
+  "missing_inputs": [
+    {"what": "Поне две още последователни пълни снимки (напр. предходните две публикации на портала)", "blocks": "QA-002 (промени между версии, липса/заличаване, стабилност на ID); SRC-002 (подпис/съдържание)", "does_not_block": "parser/schema работа върху тази снимка"},
+    {"what": "Датата „Последна актуализация“ и URL-ите на частите за тази снимка", "blocks": "пълна provenance на снимката (DAT-001)", "does_not_block": "анализа"},
+    {"what": "Sanitized DB snapshot от production", "blocks": "сверяване на импортираните 82 897 (LIVE-01) с 82 040 уникални от файловете", "does_not_block": "—"}
+  ],
+  "restore_check": "Конкретната проверка на ARC-002 („възстанови една снимка само от manifest и оригиналните байтове“) е изпълнима: имената, размерите и SHA-256 по-горе идентифицират байтовете еднозначно; изпълнена е за извлеците (sha256 в tests/php/corpus-excerpt.test.php), за оригиналите — при следващото им подаване."
+}

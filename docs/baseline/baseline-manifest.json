@@ -1,0 +1,113 @@
+{
+  "task": "ARC-001",
+  "title": "Baseline на текущата версия на кода (хранилище), сравнен с историческия v6.5.0",
+  "generated_at": "2026-10-17",
+  "scope_note": "Baseline-ът е на КОДА в хранилището (branch main, commit по-долу). Работещият сайт proveribabh.com НЕ е свързан с този commit в тази сесия: няма достъп до production/staging, DB или deployed файлове. Докато това не се направи (ARC-001 остава in_progress), статусите на констатациите важат за кода, не за live deploy-а.",
+  "code": {
+    "repository": "proclaudecopilot/proveri-babh",
+    "branch": "main",
+    "commit": "4403727bdf3e7805e9c0b7cd693537a422d715e5",
+    "commit_date": "2026-10-01T15:47:33Z",
+    "commit_subject": "Merge v6.9.0 — кратък страничен профил + пълна страница на фирмата",
+    "plugin_version": "6.9.0",
+    "rules_version": "2026-10-01.1",
+    "updater_version": "1.0.3",
+    "requires_php": "7.4",
+    "historical_audit_version": "6.5.0",
+    "historical_archive_sha256": "a29c23f50017abcc3e8901d01913c2ef16e497ae931bdda41610680c10740b5c",
+    "versions_between_audit_and_baseline": ["6.5.1", "6.6.0", "6.7.0", "6.7.1", "6.7.2", "6.7.3", "6.8.0", "6.8.1", "6.8.2", "6.9.0"],
+    "total_lines_tracked": 8945
+  },
+  "files": {
+    ".github/workflows/release.yml": {"sha256": "59ac5cdf8ed65176be39eed7a83b675454a6a8aac583e4ba2d6485308ed5abd2", "role": "release automation (tag + zip + GitHub Release при push в main)"},
+    "babh-register-v6.php": {"sha256": "b0c75f0da63f228060e135023f2a207ff40364b034ce87bf530020e3b60025e6", "lines": 90, "role": "bootstrap, версии, миграционен hook, копиране на MU updater"},
+    "includes/schema.php": {"sha256": "dd3e003cee3ae6fffa16b87efcb8e55d71b349a79748cb77e91a118e86ec07fe", "lines": 133, "role": "DB схема (dbDelta), FULLTEXT индекс"},
+    "includes/detect.php": {"sha256": "2279168d8f05219b0ec8b889e5f22b0ad236eaa3f7c620bd9b7c8b68eb6a8377", "lines": 391, "role": "parse на рег. №, дати, фирмени ключове, държави, категории, автоматични бележки, ефективен търговец"},
+    "includes/xlsx-reader.php": {"sha256": "e2a2a04a1f4bd5778eeeb5997ea466e89368ad59623d779ffb0ec096d14c532b", "lines": 221, "role": "минимален XLSX reader (ZipArchive + XMLReader), позиционни колони A..N"},
+    "includes/etl.php": {"sha256": "ba2fa3073ec0044f410e97c34559c4e95cd3ac716c2f4120369a302838bef020", "lines": 745, "role": "chunked import, атомарни lock-ове, diff по src_hash, заличаване на липсващи, преизчисляване на фирми, renorm"},
+    "includes/sync.php": {"sha256": "9862b5c3f4253f66820a04fffea3ecc40654243595c5696742baee7932f6e0a1", "lines": 1028, "role": "откриване на линкове на портала на БАБХ, resumable download, WP-Cron график, известия"},
+    "includes/ai.php": {"sha256": "65a8ef56942541de024d06d585d01d127658e65e16f301a0e3c186326839bd0b", "lines": 246, "role": "парола/токен (Pro), permission callbacks, AI проверка на съставка с кеш и лимити"},
+    "includes/rest.php": {"sha256": "41c844b6b35e095c8d5d47b7c6f6d6e2dc6c5d75d9c9faee5fbca0266b848611", "lines": 561, "role": "REST: products, product, stats, export (CSV), waitlist"},
+    "includes/parties.php": {"sha256": "7d6d24376bb670b19dc3600b491cd37b6753f288e50ac30573dc10324d4709dc", "lines": 305, "role": "REST: parties, party (профил на фирма); babh6_pro_ok"},
+    "includes/rank.php": {"sha256": "0a606326d7768ed7d6f18d5dc04d7d25a701d6107ab90f4b84a3444d69672116", "lines": 383, "role": "REST: rank, rank/move (класация и изпреварвания, transient кеш)"},
+    "includes/infer.php": {"sha256": "f9499859aeb938ef224c4da19239def4b3e1c2533b47a3bea334724729dbc665", "lines": 110, "role": "търговец по марката в името на продукта (trader_inf_*)"},
+    "includes/frontend.php": {"sha256": "5bbbb84c2aa5ae7ecbd8aa956b5b49859688e756ea49c8530023a28120fe4c75", "lines": 37, "role": "shortcode [babh_register], enqueue, CFG за JS"},
+    "includes/pwa.php": {"sha256": "b65612eb2a1f53959d133fd38103f587a50995159944ca5eca689780c70be89e", "lines": 156, "role": "manifest + service worker (REST никога не се кешира)"},
+    "includes/site.php": {"sha256": "cebba45edad19d455e8db7f87bf678e3317f5098dadbc9ce2e8ff806beeeab96", "lines": 63, "role": "персонализирана рамка на сайта / nocache"},
+    "includes/admin.php": {"sha256": "b48dd2fd6501298d09bfe2a020bba26411c14afac9788acf3292db72b6e2b1bb", "lines": 360, "role": "админ табло: качване, прогрес, настройки (маскирани секрети), health (кеш 10 мин)"},
+    "includes/mu/logador-github-updater.php": {"sha256": "350013f25354731bd632a301e37db3968dfd46ee0f015e80ef33973d616cd86f", "lines": 189, "role": "MU updater от GitHub Releases (v1.0.3)"},
+    "assets/babh6.js": {"sha256": "c9059964cfa15906c1864e70897f599f0045958a8813f11648ba360534411d1e", "lines": 2450, "role": "целият публичен интерфейс (IIFE, без framework)"},
+    "assets/babh6.css": {"sha256": "494ce8053b9065735cfa09e62b575f9e6d73fbd750bd2df416e9855a99ca5e2d", "lines": 1071, "role": "стилове; breakpoint 900px; prefers-reduced-motion"},
+    "README.md": {"sha256": "32ee04c9e96aa1093d2e126b27eb48a9df682d144b78d906c7aed0f167c86534", "role": "changelog по версии (v6.1 → v6.9.0) — единствената история на промените"},
+    "assets/icons/*": {"role": "PWA икони (5 PNG)"}
+  },
+  "database": {
+    "prefix": "{wp_prefix}babh6_",
+    "tables": {
+      "products": {"primary": "id", "unique": ["reg"], "notable_columns": ["comp_hash", "src_hash", "producer_norm", "trader_norm", "trader_inf_norm", "trader_inf_name", "category", "flags", "flag_count", "first_upload", "last_upload", "deleted_at"], "text_limits_applied_in_etl": {"name": "без лимит (TEXT)", "purpose": 2000, "composition": 5000, "storage": 2000, "deletion": 2000, "producer_name": 490, "trader_name": 490, "notif_no": 95, "reg": "20 (редове с по-дълъг № се пропускат и броят)"}},
+      "parties": {"unique": ["kind", "norm"], "rebuilt": "изцяло при всеки import; строи се в parties_new и се разменя с RENAME TABLE"},
+      "uploads": {"role": "история на импортите (status processing|done|failed|cancelled, броячи, notes)"},
+      "waitlist": {"unique": ["email", "source"]}
+    },
+    "missing_vs_target_model": ["RawRow/RawCell (няма суров слой; XLSX файловете се трият след импорт)", "DatasetVersion (един активен набор, без версии)", "RecordVersion (няма история на стойностите по запис)", "Correction/ReviewDecision", "ChangeEvent/Outbox", "User/Organization/Membership/Entitlement (Pro = обща парола)", "AuditEvent/ImportJob като таблица (job-ът е в wp_options babh6_job)"]
+  },
+  "rest": {
+    "namespace": "babh6/v1",
+    "routes": [
+      {"route": "/products", "method": "GET", "permission": "babh6_rest_permission", "file": "includes/rest.php:10"},
+      {"route": "/product/(?P<reg>[^/]+)", "method": "GET", "permission": "babh6_rest_permission", "file": "includes/rest.php:13"},
+      {"route": "/stats", "method": "GET", "permission": "babh6_rest_permission", "file": "includes/rest.php:16"},
+      {"route": "/export", "method": "GET", "permission": "babh6_rest_permission_pro", "file": "includes/rest.php:20"},
+      {"route": "/waitlist", "method": "POST", "permission": "babh6_rest_permission", "file": "includes/rest.php:23"},
+      {"route": "/parties", "method": "GET", "permission": "babh6_rest_permission_pro", "file": "includes/parties.php:28"},
+      {"route": "/party", "method": "GET", "permission": "babh6_rest_permission_pro", "file": "includes/parties.php:31"},
+      {"route": "/rank", "method": "GET", "permission": "babh6_rest_permission_pro", "file": "includes/rank.php:21"},
+      {"route": "/rank/move", "method": "GET", "permission": "babh6_rest_permission_pro", "file": "includes/rank.php:24"},
+      {"route": "/auth", "method": "POST", "permission": "__return_true", "file": "includes/ai.php:58"},
+      {"route": "/logout", "method": "POST", "permission": "__return_true", "file": "includes/ai.php:61"},
+      {"route": "/novel-check", "method": "POST", "permission": "babh6_rest_permission", "file": "includes/ai.php:64"}
+    ],
+    "cache_headers": "private, no-store, max-age=0 + Vary: Cookie (includes/rest.php:33)",
+    "access_model": "Pro = логнат администратор или подписан cookie-токен от общата парола на сайта с 30-дневно изтичане (includes/ai.php:34-48, 86-94). Няма акаунти, организации, роли или квоти."
+  },
+  "jobs_and_state": {
+    "cron_hooks": ["babh6_sync_check", "babh6_sync_process", "babh6_renorm_step"],
+    "options": ["babh6_job", "babh6_job_cancel", "babh6_lock_<name> (атомарни lock редове)", "babh6_sync_dl", "babh6_sync_state", "babh6_sync_url", "babh6_sync_enabled", "babh6_sync_slots", "babh6_sync_timeout", "babh6_sync_strategy", "babh6_sync_notify", "babh6_renorm", "babh6_rules_version", "babh6_version", "babh6_fulltext", "babh6_password", "babh6_anthropic_key", "babh6_pwa_name", "babh6_front", "babh6_inferred"],
+    "transients": ["babh6_stats", "babh6_health", "babh6_renorm_lock", "babh6_bg_token", "babh6_migrating", "babh6_ai_<method>_<md5>", "rank кеш 12 ч."],
+    "filters": ["babh6_chunk_size", "babh6_max_remove_ratio", "babh6_export_limit", "babh6_sync_max_file_bytes", "babh6_sync_curl_opts", "babh6_sync_http_args", "babh6_sync_page_timeout", "babh6_sync_slice", "babh6_sync_strategies", "babh6_sync_notify_email", "babh6_ai_hour_max", "babh6_ai_day_max", "babh6_ai_global_day_max", "babh6_pwa_enabled", "babh6_pwa_manifest", "babh6_front_enabled"],
+    "actions": ["babh6_import_done", "babh6_import_failed", "babh6_import_cancelled"]
+  },
+  "import_pipeline_as_is": [
+    "sync: fetch на страницата на портала → parse на .xlsx линкове с текст → проверка на номерирани части 1..N → подпис (пътища + „Последна актуализация“) → resumable cURL download на порции (Range) → PK magic check → md5 на съдържанието (SY-01) → job",
+    "etl фаза 1: count на редовете + probe на първите 40 реда за валиден рег. № (кол. A) и наименование (кол. J)",
+    "etl фаза 2: порции по 1500 реда; normalize (позиционни колони A..N); diff по src_hash; UPDATE/INSERT директно в live таблицата products; всяка SQL операция се проверява",
+    "etl фаза 3: ако parsed>100 и липсващите < 50% от активните → deleted_at за липсващите; иначе версията „не е приета за пълна“; rebuild на parties (staging + RENAME); история в uploads; файловете се трият"
+  ],
+  "verification_method": {
+    "performed": ["статичен прочит на кода на commit 4403727", "grep по ключови функции/низове", "сравнение с описанието на поправките в README (v6.6.0–v6.9.0)", "парсване на оригиналното задание"],
+    "not_performed": ["изпълнение в WordPress/MySQL", "браузърни/мобилни тестове", "достъп до production/staging/DB", "сваляне на реалните XLSX пакети от портала", "сравнение на deployed файловете с commit-а"],
+    "tools_available_in_session": {"php": "8.3.6 (cli) — само php -l", "node": "22 — само node --check", "python3": "3.x — генератор/валидатор на backlog"}
+  },
+  "findings_summary": {
+    "source": "docs/baseline/findings-verification.md",
+    "status_definitions": {
+      "fixed_verified": "поправено; потвърдено в кода с файл:ред",
+      "fixed_claimed": "README обявява поправка; не е проверено независимо в тази сесия (нужен runtime/браузър)",
+      "mitigated": "частично адресирано; остатъчният риск остава към посочената задача",
+      "confirmed_active": "дефектът/ограничението съществува в текущия код (файл:ред)",
+      "unverified": "не може да се провери без работеща среда/устройства; нищо не е твърдяно"
+    },
+    "historical_90": {"fixed_verified": 32, "fixed_claimed": 20, "mitigated": 18, "confirmed_active": 12, "unverified": 8},
+    "live_16": {"confirmed_active": 7, "mitigated": 2, "unverified": 7},
+    "p0_historical": {
+      "IM-01": "fixed_verified", "IM-02": "fixed_verified", "IM-03": "mitigated", "IM-04": "confirmed_active", "SY-02": "mitigated"
+    },
+    "first_actions": [
+      "IM-04 (DAT-004/DAT-005): products се пише на място; прекъснат импорт оставя смесен набор. Първата R1 вертикална промяна е staging + атомарно публикуване на products, както вече е направено за parties.",
+      "IM-07 (DAT-001): тихо отрязване на purpose/composition/storage/deletion/producer/trader — суровата стойност не се пази никъде.",
+      "LIVE-07 (UX-003): нова заявка не маха #p= (assets/babh6.js:666, 589 vs 896) → reload отваря стария продукт.",
+      "LIVE-05 (ING-001): parseComp дели само по „;“ (assets/babh6.js:202) → състав със запетаи/тирета е една съставка.",
+      "LIVE-08 (NRM-002): babh6_parse_date_any приема години до 2100 без anomaly flag (includes/detect.php:247-250)."
+    ]
+  }
+}

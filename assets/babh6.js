@@ -376,7 +376,7 @@ function setTab(t) {
   if (dw.length) dwClose(true);
   var same = state.tab === t;
   state.tab = t; state.page = 1; state.openReg = null; state.fpanel = false; state.draft = null;
-  if (t !== 'products') { state.deepReg = null; state.deepErr = ''; }
+  if (t !== 'products') { state.deepReg = null; state.deepErr = ''; dropProductHash(); }
   document.body.classList.remove('b6-noscroll');
   closeSidebar();
   /* страницата на фирма свети в менюто като списъка, от който идва; при напускане линкът #f= се маха */
@@ -587,6 +587,7 @@ function activeCount(f) {
 function applyFilters(rerenderPanel) {
   clearTimers();
   state.page = 1; state.openReg = null; state.deepReg = null;
+  dropProductHash();
   loadProducts(false); renderActive();
   if (rerenderPanel) renderFilterPanel(); else syncFilterPanel();
   var b = $('#b6-fbtn'); if (b) b.innerHTML = I.filter + 'Филтри' + (activeCount(state.f) ? ' · ' + activeCount(state.f) : '');
@@ -663,7 +664,7 @@ function renderProducts(c) {
     '</div>';
 
   var qi = $('#b6-q');
-  var runQ = function (v) { clearTimeout(timers.q); timers.q = null; state.f.q = v; state.page = 1; state.deepReg = null; loadProducts(false); renderActive(); };
+  var runQ = function (v) { clearTimeout(timers.q); timers.q = null; state.f.q = v; state.page = 1; state.deepReg = null; dropProductHash(); loadProducts(false); renderActive(); };
   qi.addEventListener('input', function (e) {
     clearTimeout(timers.q);
     var v = e.target.value;
@@ -897,7 +898,7 @@ function bindDeep(c) {
 }
 function bindSort(c) {
   var s = $('#b6-sort', c);
-  if (s) s.addEventListener('change', function (e) { state.f.sort = e.target.value; state.page = 1; state.deepReg = null; loadProducts(false); });
+  if (s) s.addEventListener('change', function (e) { state.f.sort = e.target.value; state.page = 1; state.deepReg = null; dropProductHash(); loadProducts(false); });
 }
 /* ===== v6.7.1: страничен панел (drawer) за продукт и фирма; на телефон — панел отдолу нагоре =====
    Стек: всеки отворен продукт/фирма е слой; „Назад“ връща предишния, × затваря всички. */
@@ -917,6 +918,7 @@ function dwClose(all) {
     state.party.open = null; state.party.detail = null; ++seq.party;
     if (!state.fpanel) document.body.classList.remove('b6-noscroll');
     markActiveCard(null);
+    dropProductHash();
     var op = dwOpener; dwOpener = null;
     if (op && document.contains(op)) focusEl(op);
     return;
@@ -2364,6 +2366,12 @@ function bindWaitForm(source, isPro) {
 }
 
 /* ===== Споделен линк #p=REG: точен запис през /product/{reg}, включително липсващ в последния файл (PR-10) ===== */
+/* Старият #p= се маха при ново търсене, филтър, подредба, смяна на екран или затваряне на детайла (LIVE-07 / UX-003):
+   иначе презареждане отваря отново стария продукт върху новите резултати. */
+function dropProductHash() {
+  if (location.hash.indexOf('#p=') !== 0 || !history.replaceState) return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+}
 function parseHash() {
   var m = location.hash.match(/#p=([^&]+)/);
   if (!m) return null;
