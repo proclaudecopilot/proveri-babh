@@ -13,6 +13,14 @@ if (!defined('ABSPATH')) exit;
  * Cron hooks:
  *   babh6_sync_check    — планираната проверка (single event, пренасрочва се сама)
  *   babh6_sync_process  — фонова обработка на порции, докато job-ът приключи
+ *
+ * „Проверка за сигурност" (CAPTCHA, от ноември 2026): порталът показва на всяка
+ * нова сесия страница с код от изображение и чак след това регистъра. Плъгинът
+ * НЕ решава проверката сам (тя е срещу автоматични заявки). Разпознава я и казва
+ * ясно какво се случва; администраторът може да я реши в браузъра си и да
+ * запази бисквитките на портала в настройките — тогава заявките тръгват с тях,
+ * както би ги пратил браузърът. Ако и това не мине (сесия, вързана за IP),
+ * остава ръчното качване на файловете.
  */
 
 define('BABH6_SYNC_DEFAULT_URL', 'https://bfsa.egov.bg/wps/portal/bfsa-web/registers/Registyr_na_hranitelnite_dobavki');
@@ -38,6 +46,119 @@ function babh6_sync_state_set($patch) {
     $s = array_merge(babh6_sync_state(), $patch);
     update_option('babh6_sync_state', $s, false);
     return $s;
+}
+
+/* ============ Бисквитки от портала („Проверка за сигурност" / CAPTCHA) ============ */
+
+/**
+ * Бисквитките на bfsa.egov.bg, записани от администратора след ръчно решена
+ * проверка за сигурност ("име=стойност; име2=стойност2"). Константа
+ * BABH6_SYNC_COOKIE в wp-config.php има предимство; филтър babh6_sync_cookie.
+ */
+function babh6_sync_cookie() {
+    $c = defined('BABH6_SYNC_COOKIE') ? (string)BABH6_SYNC_COOKIE : (string)get_option('babh6_sync_cookie', '');
+    $c = babh6_sync_cookie_clean($c);
+    return (string)apply_filters('babh6_sync_cookie', $c);
+}
+
+/** {at, ua, names} за записаните бисквитки или празен масив. */
+function babh6_sync_cookie_meta() {
+    $m = get_option('babh6_sync_cookie_meta');
+    return is_array($m) ? $m : array();
+}
+
+/**
+ * Нормализира поставен текст: приема реда „cookie: a=1; b=2" от DevTools,
+ * „a=1; b=2" или по една бисквитка на ред. Контролни знаци и CR/LF се махат
+ * (стойността отива в HTTP header). Връща "" ако няма нито една валидна двойка.
+ */
+function babh6_sync_cookie_clean($raw) {
+    $raw = preg_replace('/^\s*cookie\s*:\s*/iu', '', trim((string)$raw));
+    $raw = mb_substr($raw, 0, 8192, 'UTF-8');
+    return babh6_sync_cookie_join(babh6_sync_cookie_pairs($raw));
+}
+
+/** "a=1; b=2" или редове "a=1" → ['a' => '1', 'b' => '2'] (празни/невалидни части се пропускат). */
+function babh6_sync_cookie_pairs($str) {
+    $out = array();
+    foreach (preg_split('/[;\r\n]+/', (string)$str) as $part) {
+        $part = trim($part);
+        if ($part === '' || !preg_match('/^([^=\s]+)=(.*)$/s', $part, $m)) continue;
+        $val = preg_replace('/[\x00-\x1F\x7F]+/', '', $m[2]);
+        $out[$m[1]] = trim($val);
+    }
+    return $out;
+}
+
+function babh6_sync_cookie_join($pairs) {
+    $parts = array();
+    foreach ((array)$pairs as $k => $v) $parts[] = $k . '=' . $v;
+    return implode('; ', $parts);
+}
+
+/** Записва (или маха при "") бисквитките + кога/с кой браузър са записани. */
+function babh6_sync_cookie_save($clean, $ua = '') {
+    $clean = babh6_sync_cookie_clean($clean);
+    if ($clean === '') {
+        delete_option('babh6_sync_cookie');
+        delete_option('babh6_sync_cookie_meta');
+        return;
+    }
+    update_option('babh6_sync_cookie', $clean, false);
+    update_option('babh6_sync_cookie_meta', array(
+        'at'    => current_time('mysql'),
+        'ua'    => mb_substr(sanitize_text_field((string)$ua), 0, 300, 'UTF-8'),
+        'names' => array_keys(babh6_sync_cookie_pairs($clean)),
+    ), false);
+}
+
+/**
+ * Както браузърът: Set-Cookie от отговора на портала обновява записаните
+ * бисквитки по име (нова сесия, изтекла → маха се). Само ако има записани.
+ */
+function babh6_sync_cookie_merge($cookies) {
+    if (defined('BABH6_SYNC_COOKIE')) return;
+    $jar = (string)get_option('babh6_sync_cookie', '');
+    if ($jar === '') return;
+    $pairs = babh6_sync_cookie_pairs($jar);
+    $changed = false;
+    foreach ((array)$cookies as $c) {
+        if (!is_object($c) || empty($c->name)) continue;
+        $name = (string)$c->name; $value = isset($c->value) ? (string)$c->value : '';
+        $expired = !empty($c->expires) && (int)$c->expires < time();
+        if ($expired || $value === '' || $value === 'deleted') {
+            if (isset($pairs[$name])) { unset($pairs[$name]); $changed = true; }
+            continue;
+        }
+        if (!isset($pairs[$name]) || $pairs[$name] !== $value) { $pairs[$name] = $value; $changed = true; }
+    }
+    if ($changed) update_option('babh6_sync_cookie', babh6_sync_cookie_join($pairs), false);
+}
+
+/**
+ * Порталът върна ли страницата „Проверка за сигурност" (CAPTCHA) вместо
+ * регистъра / файла? Гледа се само началото на отговора (HTML е малък).
+ */
+function babh6_sync_is_captcha($html) {
+    $h = (string)$html;
+    if ($h === '' || substr($h, 0, 2) === 'PK') return false;
+    $h = html_entity_decode(substr($h, 0, 131072), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (preg_match('/проверка\s+за\s+сигурност|код\s+от\s+изображението|защита\s+на\s+достъпа|чуйте\s+кода|въведете\s+символите\s+от\s+изображението/iu', $h)) return true;
+    if (preg_match('/captcha/i', $h) && preg_match('/<form\b/i', $h)) return true;
+    return false;
+}
+
+/** Текст за грешка при CAPTCHA — различен според това дали има записани бисквитки. */
+function babh6_sync_captcha_message($where) {
+    $meta = babh6_sync_cookie_meta();
+    $tail = ' Плъгинът не решава проверката сам. Свали файловете ръчно от браузъра и ги качи от таблото („Качи файл от регистъра на БАБХ"),' .
+        ' или реши проверката в браузъра си, копирай бисквитките (cookies) за bfsa.egov.bg и ги запази в „Бисквитки от портала" в настройките за обновяване — стъпките са описани в таблото.';
+    if (babh6_sync_cookie() !== '') {
+        $when = !empty($meta['at']) ? date_i18n('d.m.Y H:i', strtotime($meta['at'])) : '—';
+        return $where . ' порталът на БАБХ отново показва „Проверка за сигурност" (CAPTCHA): записаните бисквитки от портала (' . $when . ') вече не важат или порталът ги свързва с друг адрес/браузър.' .
+            ' Реши проверката отново в браузъра и запази новите бисквитки, или свали файловете ръчно и ги качи от таблото.';
+    }
+    return $where . ' порталът на БАБХ показва „Проверка за сигурност" (CAPTCHA) вместо регистъра и не пуска автоматични заявки.' . $tail;
 }
 
 /**
@@ -151,6 +272,9 @@ function babh6_sync_strategies() {
         'http11'  => array('ua' => $chrome, 'http11' => true, 'nogzip' => true, 'close' => true),
         'plain'   => array('ua' => 'Mozilla/5.0', 'http11' => true, 'nogzip' => true, 'close' => true, 'minimal' => true),
     );
+    /* Със записани бисквитки заявката трябва да изглежда като браузъра, в който е решена проверката */
+    $meta = babh6_sync_cookie_meta();
+    if (!empty($meta['ua']) && babh6_sync_cookie() !== '') foreach ($list as $k => $st) $list[$k]['ua'] = $meta['ua'];
     $list = apply_filters('babh6_sync_strategies', $list);
     $pref = (string)get_option('babh6_sync_strategy', '');
     if ($pref !== '' && isset($list[$pref])) $list = array($pref => $list[$pref]) + $list;
@@ -165,6 +289,8 @@ function babh6_sync_http_args($extra = array(), $strategy = array()) {
     }
     if (!empty($strategy['nogzip'])) $headers['Accept-Encoding'] = 'identity';
     if (!empty($strategy['close']))  $headers['Connection'] = 'close';
+    $cookie = babh6_sync_cookie();
+    if ($cookie !== '') $headers['Cookie'] = $cookie;
     $args = array(
         'timeout'     => 60,
         'redirection' => 5,
@@ -410,6 +536,8 @@ function babh6_sync_curl_download($url, $part, $budget, $label, $strategy = arra
     if (!empty($strategy['nogzip'])) $headers[] = 'Accept-Encoding: identity';
     if (!empty($strategy['close']))  $headers[] = 'Connection: close';
     if ($referer) $headers[] = 'Referer: ' . $referer;
+    $cookie = babh6_sync_cookie();
+    if ($cookie !== '') $headers[] = 'Cookie: ' . $cookie;
 
     $t0 = microtime(true); $last_ui = 0; $base_have = $have; $aborted = false;
     $progress = function ($ch, $dltotal, $dlnow) use ($budget, $t0, &$last_ui, $base_have, $label, &$aborted) {
@@ -539,9 +667,15 @@ function babh6_sync_dl_step_locked($dl, $budget) {
     }
 
     /* done → проверка, че е XLSX (zip) а не HTML страница */
-    $fh = @fopen($part, 'rb'); $magic = $fh ? fread($fh, 2) : ''; if ($fh) fclose($fh);
+    $fh = @fopen($part, 'rb'); $head = $fh ? (string)fread($fh, 131072) : ''; if ($fh) fclose($fh);
+    $magic = substr($head, 0, 2);
     if ($r['bytes'] <= 0 || $magic !== 'PK') {
         @unlink($part);
+        if (babh6_sync_is_captcha($head)) {
+            /* Проверката за сигурност не се решава с повторни опити */
+            babh6_sync_dl_cleanup($dl);
+            return babh6_sync_fail($now, babh6_sync_captcha_message(ucfirst($label) . ':'), $dl['context'], 'captcha');
+        }
         $dl['tries'] = (int)$dl['tries'] + 1;
         babh6_sync_log($label . ' опит ' . $dl['tries'] . '/4: отговорът не е .xlsx (' . babh6_sync_fmt_bytes($r['bytes']) . ')');
         if ($dl['tries'] >= 4) { babh6_sync_dl_cleanup($dl); return babh6_sync_fail($now, ucfirst($label) . ': порталът връща нещо, което не е .xlsx (4 опита).', $dl['context']); }
@@ -626,7 +760,7 @@ function babh6_sync_run($force = false, $context = 'cron', $inline = false) {
 
 function babh6_sync_run_locked($force, $context, $now, $inline = false) {
     $url = babh6_sync_url();
-    babh6_sync_state_set(array('last_result' => 'running', 'last_message' => 'Сваляне на страницата на БАБХ (до ' . babh6_sync_timeout() . ' сек)…', 'queued_force' => 0, 'last_log' => array()));
+    babh6_sync_state_set(array('last_result' => 'running', 'last_message' => 'Сваляне на страницата на БАБХ (до ' . babh6_sync_timeout() . ' сек)…', 'queued_force' => 0, 'last_log' => array(), 'last_error_kind' => ''));
     babh6_sync_log('старт (' . $context . ($force ? ', принудително' : '') . ') → ' . $url);
 
     $page = babh6_sync_fetch_page_retry($url);
@@ -634,8 +768,12 @@ function babh6_sync_run_locked($force, $context, $now, $inline = false) {
         return babh6_sync_fail($now, 'Страницата на БАБХ: ' . $page->get_error_message() . ' Всички HTTP стратегии са опитани; подробности в дневника. При изтекло време увеличи „Време за изчакване на портала“.', $context);
     }
     $html  = $page['html'];
+    if (!empty($page['cookies'])) babh6_sync_cookie_merge($page['cookies']);
     $links = babh6_sync_parse_links($html, babh6_sync_base($url), $url);
     if (!$links) {
+        if (babh6_sync_is_captcha($html)) {
+            return babh6_sync_fail($now, babh6_sync_captcha_message('Вместо регистъра'), $context, 'captcha');
+        }
         return babh6_sync_fail($now, ($page['partial'] ? 'Порталът отговори частично (' . $page['note'] . ') и линковете не са в получената част. ' : '') .
             'Не намерих .xlsx линкове на страницата на БАБХ' . ($page['partial'] ? ' — вдигни „Timeout за портала" и опитай пак.' : ' — структурата ѝ може да е променена.'), $context);
     }
@@ -697,11 +835,15 @@ function babh6_sync_base($url) {
     return (isset($p['scheme']) ? $p['scheme'] : 'https') . '://' . $p['host'] . (isset($p['port']) ? ':' . $p['port'] : '');
 }
 
-function babh6_sync_fail($now, $message, $context) {
+/**
+ * @param string $kind '' | 'captcha' — видът грешка; таблото показва помощ според него.
+ */
+function babh6_sync_fail($now, $message, $context, $kind = '') {
     babh6_sync_log('ГРЕШКА: ' . $message);
-    babh6_sync_state_set(array('last_check' => $now, 'last_result' => 'error', 'last_message' => $message));
+    babh6_sync_state_set(array('last_check' => $now, 'last_result' => 'error', 'last_message' => $message, 'last_error_kind' => (string)$kind));
     $st = babh6_sync_state();
     babh6_sync_notify('Грешка при автоматично обновяване от БАБХ', "Проверката (" . $context . ") не успя:\n\n" . $message . "\n\nАдрес: " . babh6_sync_url() .
+        "\n\nТабло (ръчно качване, бисквитки от портала): " . admin_url('admin.php?page=babh6') .
         "\n\nДневник:\n" . implode("\n", isset($st['last_log']) ? (array)$st['last_log'] : array()));
     return array('status' => 'error', 'message' => $message);
 }
@@ -910,6 +1052,23 @@ add_action('admin_post_babh6_sync_settings', function () {
     update_option('babh6_sync_timeout', min(1800, max(30, $to)));
     $url = esc_url_raw(trim((string)wp_unslash($_POST['babh6_sync_url'] ?? '')));
     update_option('babh6_sync_url', $url === BABH6_SYNC_DEFAULT_URL ? '' : $url);
+    /* Бисквитки от портала: „Премахни" ги трие; непразно поле ги замества; празно — не пипа записаните (не се връщат в HTML) */
+    if (!empty($_POST['babh6_sync_cookie_remove'])) {
+        babh6_sync_cookie_save('');
+    } else {
+        $raw = isset($_POST['babh6_sync_cookie']) ? (string)wp_unslash($_POST['babh6_sync_cookie']) : '';
+        if (trim($raw) !== '') {
+            $clean = babh6_sync_cookie_clean($raw);
+            if ($clean === '') {
+                babh6_sync_schedule_next(); /* останалите настройки вече са записани */
+                wp_safe_redirect(add_query_arg('babh6_err', 'cookie', admin_url('admin.php?page=babh6')));
+                exit;
+            }
+            babh6_sync_cookie_save($clean, isset($_SERVER['HTTP_USER_AGENT']) ? (string)wp_unslash($_SERVER['HTTP_USER_AGENT']) : '');
+            /* Нова сесия от браузъра → следващата проверка да не се откаже заради стар подпис на грешка */
+            babh6_sync_state_set(array('last_error_kind' => ''));
+        }
+    }
     babh6_sync_schedule_next();
     wp_safe_redirect(add_query_arg('babh6_saved', 1, admin_url('admin.php?page=babh6')));
     exit;
@@ -961,6 +1120,22 @@ function babh6_sync_admin_section() {
     if (!empty($state['last_log'])) {
         echo '<details style="margin:0 0 12px"><summary style="cursor:pointer;color:#2271b1">Дневник на последната проверка</summary>';
         echo '<pre style="background:#f6f7f7;border:1px solid #dcdcde;border-radius:4px;padding:8px 10px;font-size:11px;white-space:pre-wrap;max-height:260px;overflow:auto;margin:6px 0 0">' . esc_html(implode("\n", (array)$state['last_log'])) . '</pre></details>';
+    }
+
+    if ($res === 'error' && !empty($state['last_error_kind']) && $state['last_error_kind'] === 'captcha') {
+        $cmeta = babh6_sync_cookie_meta();
+        echo '<div style="background:#fcf9e8;border:1px solid #dba617;border-radius:6px;padding:12px 14px;margin:0 0 14px;line-height:1.6">';
+        echo '<p style="margin:0 0 8px"><b>Порталът на БАБХ показва „Проверка за сигурност“ (CAPTCHA) на всяка нова сесия.</b> Проверката е срещу автоматични заявки и плъгинът не я решава сам. Има два изхода:</p>';
+        echo '<p style="margin:0 0 6px"><b>1. Ръчно качване (винаги работи).</b> Отвори <a href="' . esc_url(babh6_sync_url()) . '" target="_blank" rel="noopener">страницата на регистъра</a>, реши проверката, свали всички части (.xlsx) и ги качи от „Качи файл от регистъра на БАБХ“ по-горе.</p>';
+        echo '<p style="margin:0 0 4px"><b>2. Бисквитки от портала (за да продължи автоматичното обновяване).</b> На компютър, в <b>същия браузър</b>, с който си в това табло:</p>';
+        echo '<ol style="margin:0 0 6px 20px">';
+        echo '<li>Отвори страницата на регистъра и реши проверката — трябва да видиш списъка с файловете.</li>';
+        echo '<li>Натисни F12 (DevTools) → раздел <b>Network</b> → презареди страницата → избери първата заявка (<code>Registyr_na_hranitelnite_dobavki</code>) → <b>Request Headers</b> → копирай стойността на реда <code>cookie</code>. (Или Application/Storage → Cookies → bfsa.egov.bg и запиши всяка бисквитка като <code>име=стойност</code>, разделени с <code>;</code>.)</li>';
+        echo '<li>Постави я в „Бисквитки от портала“ в настройките по-долу и запази. После „Провери и обнови сега“.</li>';
+        echo '</ol>';
+        echo '<p style="margin:0;color:#787c82;font-size:12px">Бисквитките важат, докато порталът не изтрие сесията — тогава ще получиш същия имейл и ги подновяваш по същия начин. Ако порталът свързва проверката и с IP адреса, бисквитките от твоя компютър няма да важат за сървъра и остава вариант 1.' .
+            (!empty($cmeta['at']) ? ' Сега има записани бисквитки от ' . esc_html(date_i18n('d.m.Y H:i', strtotime($cmeta['at']))) . ' — порталът не ги приема вече.' : '') . '</p>';
+        echo '</div>';
     }
 
     if (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) {
@@ -1021,6 +1196,23 @@ function babh6_sync_admin_section() {
     echo '<input type="number" name="babh6_sync_timeout" value="' . esc_attr((int)get_option('babh6_sync_timeout', 300)) . '" min="30" max="1800" step="10" style="width:100px">';
     echo '<p style="margin:14px 0 4px"><b>Адрес на регистъра в БАБХ</b></p>';
     echo '<input type="url" name="babh6_sync_url" value="' . esc_attr(babh6_sync_url()) . '" style="width:100%;max-width:460px">';
+    /* Бисквитки от портала (CAPTCHA) — стойността не се връща в HTML, само статус (AD-04) */
+    $cmeta = babh6_sync_cookie_meta();
+    $has_c = babh6_sync_cookie() !== '';
+    echo '<p style="margin:14px 0 4px"><b>Бисквитки от портала</b> — само ако порталът показва „Проверка за сигурност“ (CAPTCHA). Плъгинът не решава проверката сам: реши я в браузъра си и постави тук реда <code>cookie</code> от DevTools → Network (или <code>име=стойност; име2=стойност2</code>). Заявките към портала тръгват с тях и с User-Agent на браузъра ти.</p>';
+    if (defined('BABH6_SYNC_COOKIE')) {
+        echo '<p style="margin:0 0 4px;color:#787c82;font-size:12px">Зададени са от константата <code>BABH6_SYNC_COOKIE</code> в wp-config.php — полето тук не се ползва.</p>';
+    } elseif ($has_c) {
+        $names = !empty($cmeta['names']) ? implode(', ', array_map('strval', (array)$cmeta['names'])) : '';
+        echo '<p style="margin:0 0 4px;font-size:12px"><span style="color:#00a32a">Записани</span>' . (!empty($cmeta['at']) ? ' на ' . esc_html(date_i18n('d.m.Y H:i', strtotime($cmeta['at']))) : '') .
+            ($names ? ' (' . esc_html($names) . ')' : '') . (!empty($cmeta['ua']) ? ' · браузър: <span title="' . esc_attr($cmeta['ua']) . '">' . esc_html(mb_substr($cmeta['ua'], 0, 70, 'UTF-8')) . (mb_strlen($cmeta['ua'], 'UTF-8') > 70 ? '…' : '') . '</span>' : '') .
+            ' · <label><input type="checkbox" name="babh6_sync_cookie_remove" value="1"> премахни</label></p>';
+    } else {
+        echo '<p style="margin:0 0 4px;color:#787c82;font-size:12px">Няма записани бисквитки.</p>';
+    }
+    if (!defined('BABH6_SYNC_COOKIE')) {
+        echo '<textarea name="babh6_sync_cookie" rows="3" style="width:100%;max-width:460px;font-family:monospace;font-size:12px" placeholder="' . esc_attr($has_c ? 'Постави нови бисквитки, за да замениш записаните' : 'JSESSIONID=…; …') . '" autocomplete="off"></textarea>';
+    }
     echo '<p style="margin-top:14px"><label><input type="checkbox" name="babh6_sync_notify" value="1"' . checked((int)get_option('babh6_sync_notify', 1), 1, false) . '> Изпращай имейл до ' . esc_html(get_option('admin_email')) . ' при обновяване или грешка</label></p>';
     echo '<p style="margin-top:14px">';
     submit_button('Запази настройките за обновяване', 'secondary', 'submit', false);
