@@ -125,6 +125,7 @@ function babh6_admin_dashboard() {
             'partial' => 'Качването на поне една част е прекъснато. Нищо не е обработено — избери отново всички части.',
             'type'    => 'Избери Excel файл във формат .xlsx.',
             'etl'     => 'Качването не започна. ' . (isset($_GET['babh6_msg']) ? esc_html(rawurldecode(sanitize_text_field(wp_unslash($_GET['babh6_msg'])))) : 'Не получихме подробности за грешката.'),
+            'cookie'  => 'Бисквитките от портала не са записани: не разпознах нито една двойка <code>име=стойност</code>. Постави реда <code>cookie</code> от DevTools → Network или бисквитките като <code>име=стойност; име2=стойност2</code>. Останалите настройки са записани.',
             'slots'   => 'Графикът не е записан: неразпознат ден или час („' . (isset($_GET['babh6_msg']) ? esc_html(rawurldecode(sanitize_text_field(wp_unslash($_GET['babh6_msg'])))) : '') . '“). Използвай формат като <code>mon 06:00, fri 18:00</code> или <code>пон 06:00, пет 18:00</code>. Останалите настройки също не са променени.',
         );
         $msg = isset($messages[$err]) ? $messages[$err] : 'Качването не започна. Опитай отново.';
